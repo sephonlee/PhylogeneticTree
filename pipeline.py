@@ -1,4 +1,4 @@
-# Editor: Sean Chen, Poshen Lee
+# Editor: Sean Yang, Poshen Lee
 from featureDetection import cornerDetection 
 from featureDetection import lineDetection
 from featureDetection import scaleCornerDetection
