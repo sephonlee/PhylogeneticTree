@@ -186,8 +186,11 @@ class PhyloParser():
     
     ## end static method for matchLines ##
     
+    # not implemented yet
+    def getSpecies(self, image_data, debug = False):
+        return image_data
     
-    def makeTree(self, image_data, debug = True):
+    def makeTree(self, image_data, debug = False):
         
         if debug:
             self.displayTree(root)
