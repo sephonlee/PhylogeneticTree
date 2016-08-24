@@ -41,7 +41,10 @@ if __name__ == '__main__':
 #         image_data = phyloPaser.detectCorners(image_data)
 #         image_data = phyloPaser.refineLinesByCorners(image_data)
         
-        treeString = phyloPaser.matchLines(image_data)
+        image_data = phyloPaser.matchLines(image_data)
+        
+        treeString = phyloPaser.makeTree(image_data)
+        
         print treeString
         
         

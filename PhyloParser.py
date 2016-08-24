@@ -165,13 +165,7 @@ class PhyloParser():
         
         #..... Keep going as this guideline ....
         
-        
-        if debug:
-            self.displayTree(root)
-        
-        treeString = root.toString()
-        
-        return treeString
+        return image_data
     
     @staticmethod
     # your display() method
@@ -192,6 +186,15 @@ class PhyloParser():
     
     ## end static method for matchLines ##
     
+    
+    def makeTree(self, image_data, debug = True):
+        
+        if debug:
+            self.displayTree(root)
+        
+        treeString = root.toString()
+        
+        return treeString
     
 # All data about the image stored in this instance
 # Methods importing, exporting, sorting internal data placed in this instance
