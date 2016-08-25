@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
     image_data = phyloPaser.detectLines(image_data, debug = False)
     
-    
+    #Not implemented 
 #     image_data = phyloPaser.detectCorners(image_data)
 #     image_data = phyloPaser.refineLinesByCorners(image_data)
 
