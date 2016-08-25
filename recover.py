@@ -27,25 +27,27 @@ if __name__ == '__main__':
     folderPath = 'images/'
     fileNameList = getFilesInFolder(folderPath)
     print fileNameList
-    for index in range(5, len(fileNameList)):
+    for index in range(10, len(fileNameList)):
         print index
         filePath = folderPath + fileNameList[index]
 
         if isfile(filePath) :
             image = cv.imread(filePath,0)
             
+        image_data = ImageData(image)
+        image_data.image = phyloPaser.preprocces(image_data.image)
+        image_data.updateImageDimension()
         
-        image = phyloPaser.preprocces(image)
-        image_data = phyloPaser.detectLines(image)
+        image_data = phyloPaser.detectLines(image_data, True)
         
 #         image_data = phyloPaser.detectCorners(image_data)
 #         image_data = phyloPaser.refineLinesByCorners(image_data)
         
         image_data = phyloPaser.matchLines(image_data)
-        
+        treeString = phyloPaser.makeTree(image_data)
         image_data = phyloPaser.getSpecies(image_data)
         
-        treeString = phyloPaser.makeTree(image_data)
+        
         
         print treeString
         
