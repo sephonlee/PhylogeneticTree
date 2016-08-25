@@ -173,10 +173,12 @@ class PhyloParser():
     ## end static method for detectLine ##
     
     # Maybe you have implemented this. If positive, you can put it here
+    # TODO: Sean, put your old code here
     def detectCorners(self, image_data):
         return image_data
     
     # Not implemented yet
+    # TODO
     def refineLinesByCorners(self, image_data):
         return image_data
     
