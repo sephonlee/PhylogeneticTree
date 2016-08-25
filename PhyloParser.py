@@ -68,7 +68,6 @@ class PhyloParser():
     def thinning(image):
         return image
 
-
     @staticmethod
     # this is duplicate with binarize(bolding), keep only one. 
     # i have changed the binarize to call this method
@@ -79,6 +78,10 @@ class PhyloParser():
     def displayImage(image):
         plt.imshow(image, cmap='Greys_r')
         plt.show()
+
+    @staticmethod
+    def purifyBackGround(image, kernel_size):
+        
 
     ## end static method for preprocessing ##
     
