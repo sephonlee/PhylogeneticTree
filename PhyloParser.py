@@ -80,6 +80,7 @@ class PhyloParser():
 
     @staticmethod
     def purifyBackGround(image, kernel_size):
+        return image
         
 
     ## end static method for preprocessing ##
