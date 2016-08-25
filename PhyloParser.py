@@ -1,6 +1,8 @@
 import cv2 as cv
 import numpy as np
-from matplotlib import pyplot as plt
+from Node import *
+from ImageData import *
+
 
 class PhyloParser():
     
@@ -410,38 +412,48 @@ class PhyloParser():
 
     ## end static method for matchLines ##
     
-    # not implemented yet, if you have, put it here
+    # TODO: not implemented yet, if you have, put it here
     def getSpecies(self, image_data, debug = False):
+        image_data.speciesNameReady 
         return image_data
     
     
     def makeTree(self, image_data, debug = False):
         
-        treeString = None
-        
         if image_data.lineDetected and image_data.lineMatched:
         
+            # Create node from matched lines
             image_data = self.createNodes(image_data)
             
-            print image_data.nodeList
+            # Gather trees from nodes
+            image_data = self.createRootList(image_data)
             
-            image_data = self.getRootList(image_data)
+            # Check if it's perfectly recovered
+            image_data = self.checkDone(image_data)
             
-            print image_data.rootList
             
-            isDone = self.checkDone(image_data)
-            if isDone:
-                treeString = self.treeRecover(image_data.rootList[0])
-            else:
+            if not image_data.treeReady:
+                ## Fix false-positive sub-trees and mandatorily connect sub-trees
                 image_data = self.fixTrees(image_data)
-                self.checkDone(image_data)
-                treeString = self.treeRecover(image_data.rootList[0])
+                image_data = self.checkDone(image_data)
+                
+            # fixTrees fixed everything
+            if image_data.treeReady:
+                image_data.defineTreeHead()
+                if debug:
+                    print "TODO: draw something here"
+            
+            # something bad happens
+            else:
+                print "unknown bad happens"
+                image_data.defineTreeHead()## For now, it still defines the tree head. However, we need something else returned to notice it's not perfect
+                if debug:
+                    print "TODO: draw something here"
         
         else:
             print "Error! Please do detectLine and matchLine before this method"
 
-        
-        return treeString
+        return image_data
     
     
     
@@ -482,7 +494,7 @@ class PhyloParser():
 
     @staticmethod
     def treeRecover(rootNode):
-        return rootNode.getChildren()
+        return rootNode.getTreeString()
 
     def fixTrees(self,image_data):
         rootList = image_data.rootList
@@ -569,21 +581,23 @@ class PhyloParser():
         rootNode = rootList[0]
 
         if not rootNode.isComplete:
-            return False
+            isDone =  False
 
         if rootNode.root:
             x1, y1, x2, y2, length = rootNode.root
             for node in rootList:
                 if node != rootNode:
                     if self.isDotWithinLine((x1, y1), node.branch) or self.isLefter(rootNode.branch, node.branch):
-                        return False
+                        isDone = False
         else:
             for node in rootList:
                 if node != rootNode:
                     if self.isLefter(rootNode.branch, node.branch):
-                        return False
+                        isDone = False
 
-        return isDone
+        image_data.treeReady = isDone
+        
+        return image_data
 
 
     @staticmethod
@@ -687,7 +701,7 @@ class PhyloParser():
                     rootNode.breakSpot.append(node)
                 return False
 
-    def getRootList(self, image_data):
+    def createRootList(self, image_data):
         nodeList = image_data.nodeList
         anchorLines = image_data.anchorLines
         seen = []
@@ -874,6 +888,10 @@ class PhyloParser():
 
 
     def createNodes(self,image_data):
+        
+        if not image_data.speciesNameReady:
+            print "Species names not found! Use dummy names."
+
         parent = image_data.parent
         children = image_data.children
         nodeList = []
@@ -973,273 +991,4 @@ class PhyloParser():
             return True
         else:
             return False        
-
-    
-# All data about the image stored in this instance
-# Methods importing, exporting, sorting internal data placed in this instance
-# Methods, processing image, extracting data from image placed in PhyloParser and store the ouput in this instande
-class ImageData():
-    
-    # filled by detectLine
-    image = None
-    image_height = None
-    image_width = None
-    linesList = []
-    horLines = []
-    verLines = []
-    lineDetected = False
-    
-    # filled by matchLine
-    cleanImage = None
-    parent= []
-    children = []
-    anchorLines = []
-    interLines = []
-    jointLines = []
-    isBinary = True
-    lineMatched = False
-
-    # filled by makeTree
-    nodeList = []
-    rootList = []
-    treeReady = False
-
-    
-    def __init__(self, image):
-        self.image = image
-        self.originalImage = image.copy()
-        (self.image_height, self.image_width) = image.shape
-        self.horLines = []
-        self.verLines = []       
-        self.parent= []
-        self.children = []
-        self.anchorLines = []
-        self.interLines = []
-        self.nodeList = []
-        self.rootList = []
-
-        self.isBinary = True
-
-    def __str__(self):
-        return "ImageData (%d,%d)"%(self.image_height, self.image_width)
-        
-        
-    # make a staticmethod sort everything you want depending on the input
-    # ex: original sortLines will likely call as
-    # sort("verlines", ImageData.lineGetKey)
-    # then you need only different keys as methods, you don't need many sort methods.
-    @staticmethod    
-    def sort(self, target, key):
-        try:
-            list = getattr(self, target)
-            try:
-                list = sorted(list, key=key)
-            except:
-                print "Given key is not valid"
-            setattr(self, target, list)
-        except:
-            print "ImageData has no attribute %s"%target
-
-    @staticmethod
-    def sortByLeftTop(item):
-        criteria = pow(item[0],2) + pow(item[1], 2)
-        return criteria, item[2]-item[0]
-    @staticmethod
-    def sortByBtmRight(item):
-        criteria = pow(item[2], 2) + pow(item[3],2)
-        return -criteria, item[3] - item[1]
-    @staticmethod
-    def sortByXEnd(item):
-        return (-item[2])
-    @staticmethod
-    def sortByXEndFromLeft(item):
-        return (item[2])
-    @staticmethod
-    def sortByXHead(item):
-        return (item[0], item[1])
-    @staticmethod
-    def sortByDist(item):
-        return (-item[1])
-    @staticmethod    
-    def sortByY(item):
-        return item[1]
-    @staticmethod
-    def sortByLengthAndDist(item):
-        return (item[0][0][4], item[1])
-    @staticmethod
-    def sortByLength(item):
-        return (-item[4])
-    @staticmethod
-    def sortByNodeNum(item):
-        return -item.numNodes
-   
-    def addHorizontalLine(self, line):
-        self.horLines.append(line)
-        
-    def addVerticleLine(self, line):
-        self.verLines.append(line)  
-    
-    def updateImage(self, image):
-        self.image = image
-        (self.image_height, self.image_width) = self.image.shape
-        
-    def updateImageDimension(self):
-        self.image_height, self.image_width = self.image.shape
-
-    def getLineLists(self):
-        return (self.verLines, self.horLines)
-
-    def getImage(self):
-        return self.image
-
-    @staticmethod 
-    def getColor(count):
-        if count %5 == 0:
-            return (255, 0, 0)
-        elif count % 5 == 1:
-            return (0, 255, 0)
-        elif count % 5 == 2:
-            return (0, 0, 255)
-        elif count % 5 == 3:
-            return (255, 0, 255)
-        else:
-            return (0, 255, 255)
-
-
-    def displayTargetLines(self, target):
-        
-        print "Display %s"%(target)
-        
-        if len(self.image.shape) == 2:
-            whatever = cv.cvtColor(self.image, cv.COLOR_GRAY2RGB)
-
-        list = getattr(self, target)
-        if target == 'parent' or target == 'children':
-            count = 0
-            for ((line, rlines), dist) in list:
-                x1, y1, x2, y2, length = line
-                count +=1
-                color = self.getColor(count)
-                cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
-                if isinstance(rlines[0], tuple) or not rlines[0]:
-                    for subline in rlines:
-                        if subline:
-                            hx1, hy1, hx2, hy2, hlength = subline
-                            cv.rectangle(whatever, (hx1, hy1), (hx2, hy2), color=color, thickness=2)
-                else:
-                    hx1, hy1, hx2, hy2, hlength = rlines
-                    cv.rectangle(whatever, (hx1, hy1), (hx2, hy2), color=color, thickness=2)
-        else:
-            for line in list:
-                x1, y1, x2, y2, length = line
-                cv.rectangle(whatever, (x1, y1), (x2, y2), color=(255, 0, 0), thickness=2)
-        plt.imshow(whatever)
-        plt.show()
-   
-    def displayImage(self):
-        plt.imshow(self.image, cmap='Greys_r')
-        plt.show()
-        
-## Need modified
-class Node():
-    def __init__(self, root = None, branch = None, upperLeave = None, lowerLeave = None):
-        self.root = root
-        self.branch = branch
-        self.upperLeave = upperLeave
-        self.interLeave = []
-        self.lowerLeave = lowerLeave
-        self.to = (None, None)
-        self.otherTo = [] 
-        self.whereFrom = None
-        self.origin = None
-        self.isRoot = False
-        self.isBinary = False
-        self.numNodes = None
-        self.isUpperAnchor = False
-        self.isLowerAnchor = False
-        self.isInterAnchor = []
-        self.isComplete = False
-        self.upperLabel = None
-        self.lowerLabel = None
-        self.interLabel = []
-        self.area = None
-        self.breakSpot = []
-        self.status = 0
-
-    def isAnchor(self, anchorLines):
-        if self.upperLeave in anchorLines:
-            self.isUpperAnchor = True
-            self.getLabel(self.upperLeave)
-        if self.lowerLeave in anchorLines:
-            self.isLowerAnchor = True
-            self.getLabel(self.lowerLeave)
-
-    def getNodeInfo(self):
-        print '------node Information-------'
-        print 'root:', self.root
-        print 'branch: ', self.branch
-        print 'upperLeave: ', self.upperLeave
-        print 'lowerLeave: ', self.lowerLeave
-        if self.to[0]:
-            print 'upperLeave goes to:', self.to[0].branch
-        if self.to[1]:
-            print 'lowerLeave goes to:', self.to[1].branch
-        if self.origin:
-            print 'origin node is:', self.origin.branch
-
-
-    def getLabel(self):
-        pass
-
-    def sortByY(self, item):
-        return item[0][1]
-
-    def getChildren(self):
-
-        if self.to[0]:
-            upperChildren = self.to[0].getChildren()
-        else:
-            if self.upperLabel:
-                upperChildren = self.upperLabel
-            elif self.isUpperAnchor:
-                upperChildren = "%"
-            else:
-                upperChildren = "**"
-        if self.to[1]:
-            lowerChildren = self.to[1].getChildren()
-        else:
-            if self.lowerLabel:
-                lowerChildren = self.lowerLabel
-            elif self.isLowerAnchor:
-                lowerChildren = "%"
-            else:
-                lowerChildren = "**"
-
-        if self.isBinary:
-            return "(%s, %s)" %(upperChildren, lowerChildren)
-        else:
-            result = "(%s," %upperChildren
-
-            # newList = sorted(zip(self.interLeave, self.otherTo, self.interLabel, self.), key = self.sortByY)
-            # tmp1 = []
-            # tmp2 = []
-            # for a,b in newList:
-            #     tmp1.append(a)
-            #     tmp2.append(b)
-            # self.interLeave = tmp1
-            # self.otherTo = tmp2
-            for index, to in enumerate(self.otherTo):
-                if to:
-                    interChildren = to.getChildren()
-                else:
-                    if self.interLabel[index]:
-                        interChildren = self.interLabel
-                    elif self.isInterAnchor[index]:
-                        interChildren = "%"
-                    else:
-                        interChildren = "**"
-                result += interChildren + ','
-
-            return result + '%s)' %lowerChildren
-        
         
