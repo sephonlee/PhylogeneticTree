@@ -5,9 +5,8 @@ from matplotlib import pyplot as plt
 class PhyloParser():
     
     def __init__(self):
-        print "ddd"
-        
-        
+        return 
+    
     def preprocces(self, image, debug = False):
         
         image = self.downSample(image)
@@ -30,10 +29,10 @@ class PhyloParser():
     
     @staticmethod
     def sobelFilter(image, k=5, sigma = 3):
-        image  = self.gaussianBlur(image, (k,k), sigma)
+        image  = PhyloParser.gaussianBlur(image, (k,k), sigma)
         sobelx = cv.Sobel(image, cv.CV_64F, 1, 0, ksize = k)
         sobely = cv.Sobel(image, cv.CV_64F, 0, 1, ksize = k)
-        image = cv.addWeighted(sobelX, 0.5, sobely, 0.5, 0)
+        image = cv.addWeighted(sobelx, 0.5, sobely, 0.5, 0)
         return image
     
     @staticmethod 
@@ -102,9 +101,11 @@ class PhyloParser():
         image_data = self.cutLines(image_data)
         
         if debug:
+            print "detectLines debugging"
             image_data.displayTargetLines('horLines')
             image_data.displayTargetLines('verLines')
         
+        image_data.lineDetected = True # Update image_data status
         return image_data
         
         
@@ -181,16 +182,27 @@ class PhyloParser():
     
     ## end static method for detectCorners ##
     
-    def matchLines(self, image_data, debug = True):
+    def matchLines(self, image_data, debug = False):
         
-        image_data = self.matchParent(image_data)
-        image_data = self.matchChildren(image_data)
-        # image_data = self.removeText(image_data)
-        image_data.displayTargetLines('parent')
-        image_data.displayTargetLines('children')
-        image_data.displayTargetLines('interLines')
-        image_data.displayTargetLines('anchorLines')
-        #..... Keep going as this guideline ....
+        print hasattr(image_data, 'horLines')
+        print len(image_data.horLines)
+        
+        if image_data.lineDetected:
+            image_data = self.matchParent(image_data)
+            image_data = self.matchChildren(image_data)
+            # image_data = self.removeText(image_data)
+            
+            if debug:
+                image_data.displayTargetLines('parent')
+                image_data.displayTargetLines('children')
+                image_data.displayTargetLines('interLines')
+                image_data.displayTargetLines('anchorLines')
+            
+            image_data.lineMatched = True
+            
+        else:
+            print "Error! Please do detectLines before this method"
+        
         
         return image_data
     
@@ -405,21 +417,34 @@ class PhyloParser():
     
     def makeTree(self, image_data, debug = False):
         
-        if debug:
-            self.displayTree(root)
+        treeString = None
         
-        image_data = self.createNodes(image_data)
-        image_data = self.getRootList(image_data)
-        isDone = self.checkDone(image_data)
-        if isDone:
-            treeString = self.treeRecover(image_data.rootList[0])
+        if image_data.lineDetected and image_data.lineMatched:
+        
+            image_data = self.createNodes(image_data)
+            
+            print image_data.nodeList
+            
+            image_data = self.getRootList(image_data)
+            
+            print image_data.rootList
+            
+            isDone = self.checkDone(image_data)
+            if isDone:
+                treeString = self.treeRecover(image_data.rootList[0])
+            else:
+                image_data = self.fixTrees(image_data)
+                self.checkDone(image_data)
+                treeString = self.treeRecover(image_data.rootList[0])
+        
         else:
-            image_data = self.fixTrees(image_data)
-            self.checkDone(image_data)
-            treeString = self.treeRecover(image_data.rootList[0])
+            print "Error! Please do detectLine and matchLine before this method"
 
         
         return treeString
+    
+    
+    
     @staticmethod
     def isDotWithinLine(dot, line):
         margin = 5
@@ -962,6 +987,7 @@ class ImageData():
     linesList = []
     horLines = []
     verLines = []
+    lineDetected = False
     
     # filled by matchLine
     cleanImage = None
@@ -971,10 +997,12 @@ class ImageData():
     interLines = []
     jointLines = []
     isBinary = True
+    lineMatched = False
 
     # filled by makeTree
     nodeList = []
     rootList = []
+    treeReady = False
 
     
     def __init__(self, image):
@@ -992,6 +1020,9 @@ class ImageData():
 
         self.isBinary = True
 
+    def __str__(self):
+        return "ImageData (%d,%d)"%(self.image_height, self.image_width)
+        
         
     # make a staticmethod sort everything you want depending on the input
     # ex: original sortLines will likely call as
@@ -1048,6 +1079,10 @@ class ImageData():
     def addVerticleLine(self, line):
         self.verLines.append(line)  
     
+    def updateImage(self, image):
+        self.image = image
+        (self.image_height, self.image_width) = self.image.shape
+        
     def updateImageDimension(self):
         self.image_height, self.image_width = self.image.shape
 
@@ -1072,6 +1107,9 @@ class ImageData():
 
 
     def displayTargetLines(self, target):
+        
+        print "Display %s"%(target)
+        
         if len(self.image.shape) == 2:
             whatever = cv.cvtColor(self.image, cv.COLOR_GRAY2RGB)
 
