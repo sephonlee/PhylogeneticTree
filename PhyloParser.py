@@ -11,6 +11,8 @@ class PhyloParser():
     
     def preprocces(self, image, debug = False):
         
+        image = self.purifyBackGround(image)
+        
         image = self.downSample(image)
         if debug:
             self.displayImage(image)
@@ -78,16 +80,27 @@ class PhyloParser():
     def displayImage(image):
         plt.imshow(image, cmap='Greys_r')
         plt.show()
-
+  
     @staticmethod
-    def purifyBackGround(image, kernel_size):
-        return image
-        
+    def purifyBackGround(image, threshold = 0.01, kernel_size = (3,3)):
 
+        dim = image.shape
+        mask = np.zeros(dim, dtype=np.uint8)   # 1:keep 0:remove
+        
+        for i in range(0, dim[0] - kernel_size[0] + 1):
+            for j in range(0, dim[1] - kernel_size[1] + 1):
+
+                patch = image[i:i+kernel_size[0], j:j+kernel_size[1]].copy().astype("float")/255      
+                patch_variance =  np.var(patch)
+
+                if patch_variance < threshold:
+                    mask[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
+
+        image[np.where(mask == 255)] = 255
+        return image
     ## end static method for preprocessing ##
     
-    
-    
+
     def detectLines(self, image_data, debug = False):
                
         image = self.negateImage(image_data.image)
