@@ -138,12 +138,12 @@ if __name__ == '__main__':
 #     print "ori"
 #     PhyloParser.displayImage(image_data.originalImage)
 
-#     image_data = phyloPaser.getCorners(image_data, mask = mask, debug = False)    
+    image_data = phyloPaser.getCorners(image_data, mask = mask, debug = True)    
     image_data = phyloPaser.detectLines(image_data, debug = False)
 
-#     image_data = phyloPaser.makeLinesFromCorner(image_data, debug = False)
+    image_data = phyloPaser.makeLinesFromCorner(image_data, debug = True)
     
-#     image_data = phyloPaser.includeLinesFromCorners(image_data)
+    image_data = phyloPaser.includeLinesFromCorners(image_data)
     
     
 #     image_data = phyloPaser.refineLinesByCorners(image_data)
