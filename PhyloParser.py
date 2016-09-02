@@ -2,6 +2,7 @@ import cv2 as cv
 import numpy as np
 from Node import *
 from ImageData import *
+from sets import Set
 
 
 class PhyloParser():
@@ -82,7 +83,12 @@ class PhyloParser():
         plt.show()
   
     @staticmethod
-    def purifyBackGround(image, threshold = 0.01, kernel_size = (3,3)):
+    def purifyBackGroundV2(image, threshold = 0.01, kernel_size = (3,3)):
+        
+        return
+    
+    @staticmethod
+    def purifyBackGround(image, threshold_var = 0.01, threshold_pixel = 5, kernel_size = (3,3)):
 
         dim = image.shape
         mask = np.zeros(dim, dtype=np.uint8)   # 1:keep 0:remove
@@ -92,8 +98,11 @@ class PhyloParser():
 
                 patch = image[i:i+kernel_size[0], j:j+kernel_size[1]].copy().astype("float")/255      
                 patch_variance =  np.var(patch)
-
-                if patch_variance < threshold:
+                patch_sum = np.sum(patch)*255
+                
+                threshold_sum = kernel_size[0] * kernel_size[1] * threshold_pixel
+                
+                if patch_variance < threshold_var and patch_sum > threshold_sum:
                     mask[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
 
         image[np.where(mask == 255)] = 255
@@ -187,13 +196,603 @@ class PhyloParser():
     
     # Maybe you have implemented this. If positive, you can put it here
     # TODO: Sean, put your old code here
-    def detectCorners(self, image_data):
+    @staticmethod
+    def getCorners(image_data, mask = None, debug = False):
+        
+        if debug:
+            print "original image ..."
+            PhyloParser.displayCorners(image_data.image)
+                
+        image = PhyloParser.bilateralFilter(image_data.originalImage)
+        if debug:
+            print "bilarteralizing ..."
+            PhyloParser.displayCorners(image)
+        
+        
+        image = PhyloParser.binarize(image_data.originalImage, thres = 180)
+        if debug:
+            print "binarizing ..."
+            PhyloParser.displayCorners(image)
+
+        # save the preprocessed image
+        image_data.image_preproc_for_corner = image
+        
+        image_data.upCornerList = PhyloParser.detectCorners(image, 1, mask = mask)
+        image_data.downCornerList = PhyloParser.detectCorners(image, -1, mask = mask)
+
+        image_data.jointUpList = PhyloParser.detectCorners(image, 2, mask = mask)
+#         image_data.jointUpList = PhyloParser.refineUpJoint(image_data.jointUpList, 5)
+
+        
+#         image_data.jointDownList = PhyloParser.detectCorners(image, -2, mask = mask)
+        
+        if debug:
+            if mask is not None:
+                print "Result with use of mask"
+            else:
+                print "Result without use of mask"
+                
+            PhyloParser.displayCorners(image, [image_data.upCornerList, image_data.downCornerList, image_data.jointUpList, image_data.jointDownList])
+        
+        image_data.cornerDetected = True
         return image_data
+    
+    @staticmethod
+    # NOT use
+    def refinePoint_(pointList, tolerance = 5):
+        
+        print "refine"
+        print pointList
+        
+        remove_index = []
+        for i in range(0, len(pointList)-1):
+            j = i + 1
+            
+            print "index=",i 
+            while True and j < len(pointList):
+
+                p = pointList[i]
+                next_p = pointList[j]
+                
+                print i, p
+                print j, next_p
+                
+                if abs(p[0] - next_p[0]) <= tolerance and abs(p[1] - next_p[1]) <= tolerance:
+                    if next_p[0] > p[0]:
+                        remove_index.append(i)
+                        print "remove", i   
+                    else:
+                        remove_index.append(j)
+                        print "remove", j
+
+                
+                j += 1
+                if j < len(pointList) and abs(p[1] - pointList[j][1]) > tolerance:
+                    break                
+        
+        remove_index = list(Set(remove_index))
+        remove_index = sorted(remove_index, reverse=True)
+        
+        print "pointList"
+        print "remove_index", remove_index
+        
+        for index in remove_index:
+            del pointList[index]
+            
+        return pointList
+        
+    
+#     @staticmethod
+#     def refineCorners(upCornerList, downCornerList, jointDownList):
+#         removeIndexUp = []
+#         removeIndexDown = []
+#         
+#         for i, p in enumerate(upCornerList):
+#             if (p[0]-1, p[1]) in jointDownList:
+#                 removeIndexUp.append(i)
+#                 
+#         removeIndexUp = sorted(removeIndexUp, reverse=True)
+#         for index in removeIndexUp:
+#             del upCornerList[index]
+#         
+#         for i, p in enumerate(downCornerList):
+#             if (p[0]+1, p[1]) in jointDownList:
+#                 removeIndexDown.append(i)
+#                 
+#         removeIndexDown = sorted(removeIndexDown, reverse=True)
+#         for index in removeIndexDown:
+#             del downCornerList[index]
+#             
+#         return upCornerList, downCornerList
+#     
+#     @staticmethod
+#     def refineJoints(jointDownList, upCornerList, downCornerList):
+#         
+#         removeIndexList = []
+#         for i, p in enumerate(jointDownList):
+#             if (p[0]+1, p[1]) in upCornerList:
+#                 removeIndexList.append(i)
+#                 
+#         for i, p in enumerate(jointDownList):
+#             if (p[0]-1, p[1]) in downCornerList:
+#                 removeIndexList.append(i)
+#                 
+#         removeIndexList = sorted(removeIndexList, reverse=True)
+#         for index in removeIndexList:
+#             del jointDownList[index]
+#             
+#         return jointDownList
+                
+        
+        
+    @staticmethod
+    def detectCorners(image, mode, kernelSize = 3, mask = None):
+        
+
+        line_width = 1##
+        (kernel, norPixelValue, mode) = PhyloParser.createKernel(mode, 3)
+#         print kernel
+        
+        filteredImage = cv.filter2D(image, -1, kernel)
+        
+#         print "filteredImage"
+#         print filteredImage
+#         print "image"
+#         print image
+#         
+        
+        
+        # First threshold to find possible corners from filtering
+        mmin = np.amin(filteredImage)
+        threshold= norPixelValue * pow(line_width,1.5) * 255 - 1 ####
+#         print "threshold: ", threshold
+        upperBound = mmin + threshold
+            
+        if mask is not None and mask.shape == image.shape:
+            indices = np.where((filteredImage < upperBound) & mask == 1)
+        else:
+            indices = np.where(filteredImage < upperBound)
+            
+        cornerList = zip(indices[0], indices[1])
+                
+        new_cornerList = []
+        for corner in cornerList:
+                        
+            if(corner[0]-1 >= 0 and corner[0]+2 <= image.shape[0] and corner[1]-1 >=0 and corner[1]+2 <= image.shape[1]):
+                patch = image[corner[0]-1:corner[0]+2, corner[1]-1:corner[1]+2].copy().astype("float")/255      
+                patch_variance =  np.var(patch)
+            
+#                 print corner
+#                 print "patch"
+#                 print patch
+#                 print filteredImage[corner[0]-1:corner[0]+2, corner[1]-1:corner[1]+2].copy().astype("float")
+                
+                patch_sum = max(np.amax(np.sum(patch, 0)), np.amax(np.sum(patch, 1)))
+#                 print "sum, ", patch_sum
+#                 print max(np.amax(np.sum(patch, 0)), np.amax(np.sum(patch, 1)))
+#                 print "filter value,", filteredImage[corner[0], corner[1]]
+#                 print "var,", patch_variance
+
+                if abs(mode) == 1:
+                    if patch_variance > 0.2 and patch_sum <= 2:
+                        if mode == 1:
+                            new_cornerList.append((corner[0]-1, corner[1]-1)) # shift back in line
+                        else:
+                            new_cornerList.append((corner[0]+1, corner[1]-1)) # shift back in line
+                            
+                if abs(mode) == 2:
+                    if  0.17 < patch_variance < 0.23 and patch_sum <= 2:
+                        if mode == 2:
+                            new_cornerList.append((corner[0], corner[1]+1)) # shift back in line
+                        else:
+                            new_cornerList.append((corner[0], corner[1]-1)) # shift back in line
+                
+#         print "cornerList", len(cornerList)
+#         print "new_cornerList", new_cornerList
+        
+#         print cornerList
+        cornerList = new_cornerList
+#         print cornerList
+        cornerList = sorted(cornerList, key = lambda x: (int(x[1]), x[0]))
+#         cornerList = PhyloParser.removeRepeatCorner(cornerList)
+
+        return cornerList
+        
+    ## NOT USE
+    @staticmethod
+    def removeRepeatCorner(cornerList):
+        i=0
+        margin = 5
+        xList = []
+        yList = []
+        while i<len(cornerList):
+            x, y = cornerList[i]
+            xList.append(x)
+            yList.append(y)
+            j = i
+            while j+1<len(cornerList) and x + margin > cornerList[j+1][0] and x-margin < cornerList[j+1][0]:
+                if y+margin > cornerList[j+1][1] and y-margin < cornerList[j+1][1]:
+                    del cornerList[j+1]
+                else:
+                    j+=1
+            i +=1
+        return cornerList
+    
+    
+    @staticmethod
+    def displayCorners(image, list_pointList = []):
+        
+        displayImage = cv.cvtColor(image,cv.COLOR_GRAY2RGB)
+        if len(list_pointList) > 0:
+
+            rad = 2            
+            colors = [(255, 0 , 0), (0, 255 , 0), (0, 0 , 255), (0, 255 , 255)]
+            for i, pointList in enumerate(list_pointList):
+                for y, x in pointList:
+                    cv.rectangle(displayImage, (x-rad, y - rad), (x + rad, y +rad), color=colors[i], thickness=2)
+
+        plt.imshow(displayImage)
+        plt.show()
+    
+    
+    @staticmethod
+    def createKernel(mode, kernelSize):
+        width = 1##
+        kernel = np.zeros((kernelSize, kernelSize), np.float32)
+        
+        # top left corner
+        if mode==1:
+            for i in range(width):
+                for x in range(kernelSize):
+                    kernel[i][x] = 1
+                    kernel[x][i] = 1
+                    
+        # join up kernel
+        elif mode == 2:
+            for i in range(width):
+                for x in range(kernelSize):
+                    kernel[x][kernelSize-1 - i] = 1
+                    kernel[(kernelSize/2)+i][x] = 1
+                    
+        # join down kernel
+        elif mode == -2:
+            for i in range(width):
+                for x in range(kernelSize):
+                    kernel[x][0] = 1
+                    kernel[(kernelSize/2)+i][x] = 1
+            
+        # bottom left corner
+        elif mode == -1:
+            for i in range(width):
+                for x in range(kernelSize):
+                    kernel[x][i] = 1
+                    kernel[kernelSize-1 - i][x] = 1
+                    
+        summ = np.sum(kernel)
+        kernel = kernel / summ
+        
+        if kernel[0][0] != 0:
+            norPixelValue = kernel[0][0]
+        else:
+            norPixelValue = kernel[kernelSize-1][kernelSize-1]
+
+        kernelPackage = (kernel, norPixelValue, mode)
+
+        return kernelPackage
+    
+    @staticmethod
+    #return a list of dictionary
+    #each element is set of point that stand in the same line
+    #in each element
+    #    key "corners" contains all corners in such line
+    #    key "joints" contains the corner and it's corresponding joints, the first point in the list is the anchor corner
+    def makeLinesFromCorner(image_data, margin = 5, debug = False):
+        
+        image = image_data.image_preproc_for_corner.copy()
+        
+        upCornerList_ver = list(image_data.upCornerList)
+        upCornerList_hor = sorted(list(image_data.upCornerList),  key = lambda x: (int(x[0]), x[1]))
+        upCornerIndex_ver = 0  
+        upCornerIndex_hor = 0  
+#         print "upCornerList", upCornerList_ver
+
+        downCornerList_ver = list(image_data.downCornerList)
+        downCornerList_hor = sorted(list(image_data.downCornerList),  key = lambda x: (int(x[0]), x[1]))
+        downCornerIndex_hor = 0
+#         print "downCornerList", downCornerList_ver
+        
+        jointUpList_ver = list(image_data.jointUpList)
+        jointUpList_hor = sorted(list(image_data.jointUpList),  key = lambda x: (int(x[0]), x[1]))
+#         print "jointUpList", jointUpList_ver
+        
+#         jointDownList = list(image_data.jointDownList)
+#         print "jointDownList", jointDownList
+        
+        pointSet_ver = [] #vertical line between corners
+        upPointSet_hor = [] #horizontal line between top left corners and corresponding joints
+        downPointSet_hor = [] #horizontal line between bottom left corners and corresponding joints
+        
+        while upCornerIndex_ver < len(upCornerList_ver):
+            upCorner = upCornerList_ver[upCornerIndex_ver]
+             
+            # vertical match
+            cornerCandidate, downCornerList_ver = PhyloParser.matchPoints(upCorner, downCornerList_ver, image, 0, margin = margin)
+            jointCandidate, jointUpList_ver = PhyloParser.matchPoints(upCorner, jointUpList_ver, image, 0, margin = margin)
+                 
+            ## find vertical line!
+            if len(cornerCandidate) > 1:
+                data = {}
+                data["corners"] = cornerCandidate
+                 
+#                 if len(jointCandidate) > 1:
+#                     del jointCandidate[0]
+                     
+                data["joints"] = jointCandidate
+                 
+                pointSet_ver.append(data)
+                del upCornerList_ver[upCornerIndex_ver]
+                 
+            ## find on line, go next
+            else:
+                upCornerIndex_ver += 1
+            
+            
+        # match horizontal line on up corner   
+        while upCornerIndex_hor < len(upCornerList_hor):
+            upCorner = upCornerList_hor[upCornerIndex_hor]
+              
+            # horizontal math
+            jointCandidate, jointUpList_hor = PhyloParser.matchPoints(upCorner, jointUpList_hor, image, 1, margin = margin)
+ 
+            ## find horizontal line!
+            if len(jointCandidate) > 1:
+                data = {}
+                data["joints"] = jointCandidate
+                 
+                upPointSet_hor.append(data)
+                del upCornerList_hor[upCornerIndex_hor]
+#                 print "find joint candidate", jointCandidate
+                 
+            ## find no line, go next
+            else:
+                upCornerIndex_hor += 1
+
+        
+        # match horizontal line on down corner
+        # keep using the same jointUpList_hor
+        while downCornerIndex_hor < len(downCornerList_hor):
+            downCorner = downCornerList_hor[downCornerIndex_hor]
+              
+            # horizontal math
+            jointCandidate, jointUpList_hor = PhyloParser.matchPoints(downCorner, jointUpList_hor, image, 1, margin = margin)
+ 
+            ## find horizontal line!
+            if len(jointCandidate) > 1:
+                data = {}
+                data["joints"] = jointCandidate
+                 
+                downPointSet_hor.append(data)
+                del downCornerList_hor[upCornerIndex_hor]
+#                 print "find joint candidate", jointCandidate
+                 
+            ## find no line, go next
+            else:
+                downCornerIndex_hor += 1
+
+        pointSet_ver = PhyloParser.removeDuplicatePoint(pointSet_ver, 0)
+        upPointSet_hor = PhyloParser.removeDuplicatePoint(upPointSet_hor, 0)
+        downPointSet_hor = PhyloParser.removeDuplicatePoint(downPointSet_hor, 0)
+
+        if debug:
+            ver_lines = PhyloParser.pointSetToLine(pointSet_ver, type="corners")
+            hor_lines_up =  PhyloParser.pointSetToLine(upPointSet_hor, type="joints")
+            hor_lines_down =  PhyloParser.pointSetToLine(downPointSet_hor, type="joints")
+            
+            PhyloParser.displayCornersAndLine(image, [upCornerList_hor, jointUpList_hor], [ver_lines, hor_lines_up, hor_lines_down])
+        
+                
+        #         print "remain upCornerList horizontal", upCornerList_hor
+        
+        image_data.pointSet_ver = pointSet_ver
+        image_data.upPointSet_hor = upPointSet_hor
+        image_data.downPointSet_hor = downPointSet_hor
+        
+        image_data.lineDetectedFromCorners = True
+        
+        return image_data
+
+        
+        
+    @staticmethod
+    def removeDuplicatePoint(pointSet, axis, margin = 5):
+        for s in pointSet:
+            if "corners" in s and len(s["corners"]) > 2:
+                s["corners"] = PhyloParser.refinePoint(s["corners"], margin)
+            if "joints" in s and len(s["joints"]) > 2:
+                s["joints"] = PhyloParser.refinePoint(s["joints"], margin)
+                
+        return pointSet
+                
+                
+    @staticmethod
+    # need sorted
+    # deep the very bottom or very right point in the margin
+    def refinePoint(pointList, margin = 5):
+         
+        remove_index = []
+        for i in range(0, len(pointList)-1):
+            j = i + 1
+
+            p = pointList[i]
+            next_p = pointList[j]
+
+            if abs(p[0] - next_p[0]) <= margin and abs(p[1] - next_p[1]) <= margin:
+                remove_index.append(i)
+              
+        remove_index = list(Set(remove_index))
+        remove_index = sorted(remove_index, reverse=True)
+         
+        for index in remove_index:
+            del pointList[index]
+             
+        return pointList
+    
+    @staticmethod
+    # axis = 0 --> vertically match
+    # axis = 1 --> horizontally match 
+    def matchPoints(point, candidatePoints, image, axis, margin = 5):
+        
+        if axis == 0 or axis == 1 :
+            
+            index_for_margin_test = 1 - axis
+            index_for_location_test = axis
+            
+            matchPoints = [point] ### 
+            candidatePointsIndex = 0
+
+            while True and candidatePointsIndex < len(candidatePoints):
+                downCorner = candidatePoints[candidatePointsIndex]
+#                 print "this downCornerIndex: ", candidatePointsIndex, downCorner
+                
+                if  (abs(downCorner[1-axis] - point[1-axis]) <= margin) and  (downCorner[axis] - point[axis] > 0) and PhyloParser.isInLine(point, downCorner, image):
+                    # find match,  stay in the same index due to removal"
+                    matchPoints.append(downCorner)
+                    del candidatePoints[candidatePointsIndex]
+                
+                elif downCorner[1-axis] - point[1-axis] <= margin or downCorner[axis] - point[axis] > 0 or PhyloParser.isInLine(point, downCorner, image):
+                    # not match, but close, keep searching next element
+                    candidatePointsIndex += 1
+                    
+                else: 
+                    # once margin test fail, the later elements will all fail, so stop iterating
+                    break
+            
+            return matchPoints, candidatePoints
+        
+        else:
+            print "axis must ether 1 or 0"
+            return None, candidatePoints
+    
+    @staticmethod
+    # need sorted already
+    def pointSetToLine(pointSetList, type = "corners"):
+        lineList = []
+        for pointSet in pointSetList:
+            
+            points = pointSet[type] # select the type of point set
+            
+            # must have at least two points to form a line
+            if len(points) > 1:
+                y1 = points[0][0]
+                x1 = points[0][1]
+                
+                y2 =  points[-1][0]
+                x2 =  points[-1][1]
+            
+                lineLength = max(abs(x2-x1),abs(y2-y1))
+                lineList.append((x1, y1, x2, y2, lineLength))
+        
+        return lineList
+            
+    @staticmethod
+    def displayCornersAndLine(image, list_pointList = [], list_lines = []):
+        
+        displayImage = cv.cvtColor(image,cv.COLOR_GRAY2RGB)
+        if len(list_pointList) > 0:
+            rad = 2            
+            colors = [(255, 0 , 0), (0, 255 , 0), (0, 0 , 255), (0, 255 , 255)]
+            for i, pointList in enumerate(list_pointList):
+                for y, x in pointList:
+                    cv.rectangle(displayImage, (x-rad, y - rad), (x + rad, y +rad), color=colors[i], thickness=2)
+
+
+        if len(list_lines) > 0:
+            colors = [(255, 150 , 0), (150, 255 , 0), (150, 0 , 255)]
+            for i, lines in enumerate(list_lines):
+                for line in lines:
+                    x1, y1, x2, y2, length = line
+                    cv.rectangle(displayImage, (x1, y1), (x2, y2), color=colors[i], thickness=2)
+            
+        plt.imshow(displayImage)
+        plt.show()
+        
+        
+    @staticmethod
+    # determine if two points are in the same line
+    def isInLine(corner1, corner2, image, threshold = 0.01):
+        
+        y_min = min(corner1[0], corner2[0])
+        y_max = max(corner1[0], corner2[0])      
+        x_min = min(corner1[1], corner2[1])
+        x_max = max(corner1[1], corner2[1])
+        
+        subimage = image[y_min:y_max+1, x_min:x_max+1].copy().astype("float")/255  ## not count the later index
+        variance =  np.var(subimage)
+        
+        return variance < threshold
+        
     
     # Not implemented yet
     # TODO
-    def refineLinesByCorners(self, image_data):
+    @staticmethod
+    def includeLinesFromCorners(image_data):
+        if image_data.lineDetectedFromCorners and image_data.lineDetected:
+            ver_lines = PhyloParser.pointSetToLine(image_data.pointSet_ver, type="corners")
+            hor_lines_up =  PhyloParser.pointSetToLine(image_data.upPointSet_hor, type="joints")
+            hor_lines_down =  PhyloParser.pointSetToLine(image_data.downPointSet_hor, type="joints")
+            
+            image_data.horLines += hor_lines_up
+            image_data.horLines += hor_lines_down
+            image_data.verLines += ver_lines
+        
+        else:
+            print "Found no lines created from corner detection."
+            
         return image_data
+            
+#             print "refineLinesByCorners"
+#             horLines = list(image_data.horLines)
+# #             print horLines
+#             verLines = list(image_data.verLines)
+#             
+#             verLines = sorted(verLines,  key = lambda x: (int(x[0]), x[1]))
+#             print verLines
+#             
+#             zone1 = [verLines[0][1]-3, verLines[0][3]+3, verLines[0][0]-3, verLines[0][2]+3]
+#             print zone1
+#             PhyloParser.displayCorners(image_data.image[zone1[0]:zone1[1], zone1[2]:zone1[3]])
+#             
+#             
+#             upCornerList = list(image_data.upCornerList)
+#             print upCornerList
+#             
+#             print image_data.image[486:491, 28:30]
+# #             print image_data.image[486:620, 25]
+#             
+#             downCornerList = list(image_data.downCornerList)
+#             print downCornerList
+#             jointUpList = list(image_data.jointUpList)
+#             jointDownList = list(image_data.jointDownList)
+#             
+#             
+#             
+#             
+#             print len(horLines)
+#             horLines.pop()
+#             print len(horLines)
+#             print len(image_data.horLines)
+            
+            
+            
+            
+#         elif image_data.cornerDetected:
+#             print "PLease get corner first. (Run getCorners)"
+#         elif image_data.lineDetected:
+#             print "Please get lines first. (Run detectLines) "
+#         else:
+#             print "Please get corners and lines first. (Run getCorners and detectLines) "
+#             
+#         return image_data
     
     ## static method for detectCorners ##
     
