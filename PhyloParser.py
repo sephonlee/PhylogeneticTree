@@ -32,6 +32,7 @@ class PhyloParser():
         
     ## static method for preprocessing ##
     
+
     @staticmethod
     def sobelFilter(image, k=5, sigma = 3):
         image  = PhyloParser.gaussianBlur(image, (k,k), sigma)
@@ -798,7 +799,7 @@ class PhyloParser():
     
     ## end static method for detectCorners ##
     
-    def matchLines(self, image_data, debug = False):
+    def matchLines(self, image_data, debug = True):
         
         print hasattr(image_data, 'horLines')
         print len(image_data.horLines)
@@ -1032,15 +1033,22 @@ class PhyloParser():
         return image_data
     
     
-    def makeTree(self, image_data, debug = False):
+    def makeTree(self, image_data, debug = True):
         
         if image_data.lineDetected and image_data.lineMatched:
         
             # Create node from matched lines
             image_data = self.createNodes(image_data)
-            
+            if debug:
+                for node in image_data.nodeList:
+                    node.getNodeInfo()
+                image_data.displayNodes()
+
+
             # Gather trees from nodes
             image_data = self.createRootList(image_data)
+            if debug:
+                image_data.displayTrees('regular')
             
             # Check if it's perfectly recovered
             image_data = self.checkDone(image_data)
@@ -1056,6 +1064,7 @@ class PhyloParser():
                 image_data.defineTreeHead()
                 if debug:
                     print "TODO: draw something here"
+                    image_data.displayTrees('final')
             
             # something bad happens
             else:
@@ -1293,8 +1302,7 @@ class PhyloParser():
         elif mode[:5] == 'inter':
             isAnchorLine = False
             index = int(mode[5])
-            print index
-            if node.interLeave[index]:
+            if index < len(node.interLeave) and node.interLeave[index]:
                 for line in anchorLines:
                     if self.isSameLine(line, node.interLeave[index]):
                         node.isInterAnchor[index] = True
@@ -1390,6 +1398,7 @@ class PhyloParser():
                     isComplete = False
                     lineList.append(rootNode.branch)
         if not rootNode.isBinary:
+            print rootNode.getNodeInfo()
             for index, to in enumerate(rootNode.otherTo):
                 if to:
                     if rootNode.branch != to.branch:
@@ -1466,6 +1475,7 @@ class PhyloParser():
                     lineList.append(node.lowerLeave)
 
             if not node.isBinary:
+                print rootNode.getNodeInfo()
                 for index, to in enumerate(node.otherTo):
 
                     if to:
@@ -1556,7 +1566,7 @@ class PhyloParser():
                             lowerLeave = line
                         else:
                             interLine.append(line)
-                    a = Node(root, branch, upperLeave, lowerLeave)
+                    a = Node(None, branch, upperLeave, lowerLeave)
                     a.interLeave = interLine
                     numInterLeave = len(hlines) - 2
                     for index in range(numInterLeave):

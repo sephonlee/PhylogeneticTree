@@ -44,6 +44,11 @@ class Node():
             print 'lowerLeave goes to:', self.to[1].branch
         if self.origin:
             print 'origin node is:', self.origin.branch
+        if not self.isBinary:
+            for index, leave in enumerate(self.interLeave):
+                print 'one of the interleavs: ', leave
+                print 'this leave goes to the node: ', self.otherTo[index]
+        print '------------------------------'
 
 
     def getLabel(self):

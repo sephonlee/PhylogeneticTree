@@ -27,10 +27,9 @@ if __name__ == '__main__':
     folderPath = 'images/'
     fileNameList = getFilesInFolder(folderPath)
     print fileNameList
-    for index in range(10, len(fileNameList)):
+    for index in range(18, len(fileNameList)):
         print index
         filePath = folderPath + fileNameList[index]
-
         if isfile(filePath) :
             image = cv.imread(filePath,0)
             
