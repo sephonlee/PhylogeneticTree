@@ -89,7 +89,7 @@ class PhyloParser():
         return
     
     @staticmethod
-    def purifyBackGround(image, threshold_var = 0.01, threshold_pixel = 5, kernel_size = (3,3)):
+    def purifyBackGround(image, threshold_var = 0.01, threshold_pixel = 40, kernel_size = (3,3)):
 
         dim = image.shape
         mask = np.zeros(dim, dtype=np.uint8)   # 1:keep 0:remove
@@ -99,14 +99,27 @@ class PhyloParser():
 
                 patch = image[i:i+kernel_size[0], j:j+kernel_size[1]].copy().astype("float")/255      
                 patch_variance =  np.var(patch)
-                patch_sum = np.sum(patch)*255
+#                 patch_sum = np.sum(patch)*255
+                patch_mean = np.mean(patch)*255
+            
                 
-                threshold_sum = kernel_size[0] * kernel_size[1] * threshold_pixel
+#                 threshold_sum = kernel_size[0] * kernel_size[1] * threshold_pixel
                 
-                if patch_variance < threshold_var and patch_sum > threshold_sum:
+#                 print "%d, %d"%(i, j)
+#                 print patch
+#                 print patch_variance
+#                 print patch_sum
+                
+                if patch_variance < threshold_var and patch_mean > threshold_pixel:
                     mask[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
 
         image[np.where(mask == 255)] = 255
+        
+#         print "mask"
+#         PhyloParser.displayImage(mask)
+#         print "image"
+#         PhyloParser.displayImage(image)
+        
         return image
     ## end static method for preprocessing ##
     
