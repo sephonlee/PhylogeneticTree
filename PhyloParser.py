@@ -12,7 +12,7 @@ class PhyloParser():
     
     def preprocces(self, image, debug = False):
         
-        image = self.purifyBackGround(image)
+        image, var_mask = self.purifyBackGround(image)
         
         image = self.downSample(image)
         if debug:
@@ -120,7 +120,7 @@ class PhyloParser():
 #         print "image"
 #         PhyloParser.displayImage(image)
         
-        return image
+        return image, mask
     ## end static method for preprocessing ##
     
 
