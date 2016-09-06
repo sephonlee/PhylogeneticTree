@@ -35,8 +35,8 @@ class PhyloParser():
             print "Purify color background"
             self.displayImage(image)
  
-         #determine effective area
-        image_data.treeMask, image_data.nonTreeMask, image_data.contours = self.findContours(var_mask)       
+        #determine effective area
+        image_data.treeMask, image_data.nonTreeMask, image_data.contours = self.findContours(image_data.varianceMask)       
 
          
 #         empty non-tree information
