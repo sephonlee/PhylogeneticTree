@@ -68,6 +68,8 @@ class ImageData():
         self.nodeList = []
         self.rootList = []
         self.varianceMask = None
+        self.treeMask = None
+        self.nonTreeMask = None
         self.isBinary = True
 
     def __str__(self):

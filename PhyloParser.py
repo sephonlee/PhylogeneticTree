@@ -10,14 +10,27 @@ class PhyloParser():
     def __init__(self):
         return 
     
-    def preprocces(self, image, debug = False):
+    def preprocces(self, image_data, debug = False):
         
+        image = image_data.image
+        
+        # image = self.downSample(image)
+        # if debug:
+        #     self.displayImage(image)
+
+        self.originalImage = image.copy()
+
         image, var_mask = self.purifyBackGround(image)
-        
-        image = self.downSample(image)
-        if debug:
-            self.displayImage(image)
-            
+
+        image_data.varianceMask = var_mask
+
+        treeMask, nonTreeMask = self.findContours(var_mask)
+        image_data.treeMask = treeMask
+        image_data.nonTreeMask = nonTreeMask
+
+        image = self.removeLabels(image, treeMask)
+        self.displayImage(image)
+
         image = self.bilateralFilter(image)
         
         if debug:
@@ -28,7 +41,9 @@ class PhyloParser():
         if debug:
             self.displayImage(image)
             
-        return image
+        image_data.image = image
+
+        return image_data
         
     ## static method for preprocessing ##
     
@@ -82,6 +97,36 @@ class PhyloParser():
     def displayImage(image):
         plt.imshow(image, cmap='Greys_r')
         plt.show()
+
+    @staticmethod
+    def sortByCntsLength(item):
+        return -len(item)
+
+
+    def findContours(self, image):
+
+
+        image = 255 - image
+
+        height, width = image.shape
+        _, contours, hierarchy= cv.findContours(image.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+
+        contours = sorted(contours, key=self.sortByCntsLength)
+
+        mask = np.zeros((height,width), dtype=np.uint8)
+        cv.drawContours(mask, contours, 0, (255), thickness = -1)
+        nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+
+        for index in range(1, len(contours)):
+            cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
+
+        return mask, nonTreeMask
+
+    @staticmethod
+    def removeLabels(image, mask):
+        image[np.where(mask == 0)] = 255
+        return image
+
   
     @staticmethod
     def purifyBackGroundV2(image, threshold = 0.01, kernel_size = (3,3)):
@@ -147,7 +192,7 @@ class PhyloParser():
         return image_data
         
         
-    ## static method for detectLine ##
+    ## static method for detectLine ##remremoveTextoveText
     @staticmethod
     def negateImage(image, thres = 30):
         image = 255 - image
