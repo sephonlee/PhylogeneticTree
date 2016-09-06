@@ -233,9 +233,9 @@ class ImageData():
                 for line in node.interLeave:
                     x1, y1, x2, y2, length = line
                     cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
-            print node.getNodeInfo()
-            plt.imshow(whatever)
-            plt.show()
+
+        plt.imshow(whatever)
+        plt.show()
 
 
 

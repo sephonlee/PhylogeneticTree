@@ -15,6 +15,7 @@ class PhyloParser():
         image = image_data.image
         
         # image = self.downSample(image)
+
         if debug:
             print "Preprocessing image ..."
             print "Input image:"
@@ -22,6 +23,25 @@ class PhyloParser():
 
         #save original image
         image_data.originalImage = image.copy() 
+
+        # if debug:
+        #     self.displayImage(image)
+
+        self.originalImage = image.copy()
+
+        image, var_mask = self.purifyBackGround(image)
+
+        self.displayImage(image)
+
+        image_data.varianceMask = var_mask
+
+        treeMask, nonTreeMask = self.findContours(var_mask)
+
+        self.displayImage(nonTreeMask)
+
+        image_data.nonTreeMask = nonTreeMask
+
+        image = self.removeLabels(image, treeMask)
 
         #purify background
         image, image_data.varianceMask = self.purifyBackGround(image)
@@ -116,8 +136,11 @@ class PhyloParser():
         image = 255 - image
 
         height, width = image.shape
+        image = cv.copyMakeBorder(image, 1, 1, 1, 1, cv.BORDER_CONSTANT, value = 0)
         _, contours, hierarchy= cv.findContours(image.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
-
+        for cnts in contours:
+            for index, points in enumerate(cnts):
+                cnts[index] = points - 1
         contours = sorted(contours, key=self.sortByCntsLength)
 
         mask = np.zeros((height,width), dtype=np.uint8)
@@ -141,6 +164,7 @@ class PhyloParser():
         return
     
     @staticmethod
+
     def purifyBackGround(image, threshold_var = 0.008, threshold_pixel = 60, kernel_size = (3,3)):
 
         dim = image.shape
@@ -284,8 +308,8 @@ class PhyloParser():
                     if x1+margin<vx1 and vx1<x2-margin and vy1<y1 and y1<vy2:
                         newline1 = [x1, y1, vx1, y2, vx1-x1]
                         newline2 = [vx1, y1, x2, y2, x2-vx1]
-                        newList.append(newline1)
-                        newList.append(newline2)
+                        newList.append(tuple(newline1))
+                        newList.append(tuple(newline2))
                         isnotcut = False
                         break
                 if isnotcut:
@@ -1056,7 +1080,7 @@ class PhyloParser():
     
     ## end static method for detectCorners ##
     
-    def matchLines(self, image_data, debug = True):
+    def matchLines(self, image_data, debug = False):
         
         print hasattr(image_data, 'horLines')
         print len(image_data.horLines)
@@ -1286,7 +1310,22 @@ class PhyloParser():
     
     # TODO: not implemented yet, if you have, put it here
     def getSpecies(self, image_data, debug = False):
-        image_data.speciesNameReady 
+
+        image = image_data.image
+        nonTreeMask = image_data.nonTreeMask
+        treeMask = image_data.treeMask
+        anchorLines = image_data.anchorLines
+        anchorLabelList = {}
+        for line in anchorLines:
+            print line
+            anchorLabelList[line] = None
+            #case1: label is detected in nontreemask and 
+
+        print anchorLabelList
+
+
+
+
         return image_data
     
     
@@ -1294,6 +1333,10 @@ class PhyloParser():
         
         if image_data.lineDetected and image_data.lineMatched:
         
+
+            # Detect Label and Create Label List
+            image_data = self.getSpecies(image_data)
+
             # Create node from matched lines
             image_data = self.createNodes(image_data)
             if debug:
