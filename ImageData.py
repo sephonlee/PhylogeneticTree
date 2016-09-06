@@ -29,6 +29,11 @@ class ImageData():
     cornerDetected = False
     lineDetectedFromCorners = False
     
+    # filled by refineLine
+    horLineGroup = []
+    verLineGroup = []
+    lineRefined = False
+    
     # filled by matchLine
     cleanImage = None
     parent= []

@@ -79,7 +79,8 @@ if __name__ == '__main__':
     
     #hard case
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC535349_1471-2148-4-46-1.jpg"
-    
+#     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2174949_1471-213X-7-118-3.jpg"
+#     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2614493_gb-2008-9-11-r161-3.jpg"
     mask = np.ones((663,600), dtype = np.uint8)
     mask[0:,385:] = 0
     
@@ -138,22 +139,24 @@ if __name__ == '__main__':
 #     print "ori"
 #     PhyloParser.displayImage(image_data.originalImage)
 
-    image_data = phyloPaser.getCorners(image_data, mask = mask, debug = True)    
+    image_data = phyloPaser.getCorners(image_data, debug = False)    
     image_data = phyloPaser.detectLines(image_data, debug = False)
 
-    image_data = phyloPaser.makeLinesFromCorner(image_data, debug = True)
-    
+    image_data = phyloPaser.makeLinesFromCorner(image_data, debug = False)
     image_data = phyloPaser.includeLinesFromCorners(image_data)
     
+    image_data = phyloPaser.refineLines(image_data, debug = True)
+
+#     print phyloPaser.checkLine(image_data.image_preproc_for_corner, [29, 490, 64, 490, 35])
     
-#     image_data = phyloPaser.refineLinesByCorners(image_data)
-#  
-#    
-    print "match line"
-    image_data = phyloPaser.matchLines(image_data, debug = True)
-#      
-#     image_data = phyloPaser.getSpecies(image_data)
-#      
-#      
-    image_data = phyloPaser.makeTree(image_data, debug = True)
-    print "final string: ", image_data.getTreeString()
+
+    
+
+#     print "match line"
+#     image_data = phyloPaser.matchLines(image_data, debug = True)
+# #      
+# #     image_data = phyloPaser.getSpecies(image_data)
+# #      
+# #      
+#     image_data = phyloPaser.makeTree(image_data, debug = True)
+#     print "final string: ", image_data.getTreeString()

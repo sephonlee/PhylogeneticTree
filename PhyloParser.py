@@ -157,7 +157,7 @@ class PhyloParser():
         if mode==0:
             for line in tmp:
                 x1, y1, x2, y2 = list(line[0])
-                lineList = x1, y2, x2, y1, abs(y2-y1)
+                lineList = [x1, y2, x2, y1, abs(y2-y1)]
                 image_data.addVerticleLine(lineList)
         elif mode == 1:
             for line in tmp:
@@ -573,7 +573,7 @@ class PhyloParser():
                 data["joints"] = jointCandidate
                  
                 downPointSet_hor.append(data)
-                del downCornerList_hor[upCornerIndex_hor]
+                del downCornerList_hor[downCornerIndex_hor]
 #                 print "find joint candidate", jointCandidate
                  
             ## find no line, go next
@@ -602,6 +602,164 @@ class PhyloParser():
         
         return image_data
 
+        
+    @staticmethod
+    def getMidPoints(lines):
+        midPoints = []
+        for l in lines:
+            midPoints.append((int((l[0] + l[2])/2), int((l[1] + l[3])/2), l[4], l))
+        return midPoints
+        
+    @staticmethod
+    def checkLine(image, line, var_threshold = 0.01, mean_threshold = 3):
+
+        if line[0] == line[2]:
+            array = image[line[1]:line[3], line[0]:line[0]+1]
+        else:
+            array = image[line[1]:line[1]+1, line[0]:line[2]]
+            
+            
+        variance = np.var(array.astype("float")/255)
+        mean = np.mean(array)
+        
+#         print variance, mean, array.shape
+#         print array
+#         PhyloParser.displayImage(array)
+
+        return variance < var_threshold and mean < mean_threshold
+
+        
+        
+    @staticmethod
+    #axis = 0: vertical lines
+    #axis = 1: horizontal lines
+    
+    def getIndexOfDuplicateLine(image, midPointOfLines, margin = 5):
+        
+
+        print midPointOfLines
+        
+        keep_lines = []
+        group_line_indices = []
+        group_lines = []
+        
+        
+        index_head = 0
+        line1 = midPointOfLines[index_head]
+        max_length = line1[2]
+        keep_index = 0
+        index_head += 1
+        temp_line_indices = [0]
+        
+        while index_head < len(midPointOfLines):
+            
+            line2 = midPointOfLines[index_head]
+            
+            x_in_margin = abs(line1[0] - line2[0]) <= margin
+            y_in_margin = abs(line1[1] - line2[1]) <= margin
+            
+            print "line1", line1
+            print "line2", line2, PhyloParser.checkLine(image, line2[3])
+            
+            if x_in_margin and y_in_margin:
+                print "find a continuous line"
+                #find a continuous line
+                temp_line_indices.append(index_head)            
+                
+                # check if line2 is better to keep as the main line of the set
+                if line2[2] >= max_length and PhyloParser.checkLine(image, line2[3]):
+                    print "put line2 index into keep index"
+                    max_length = line2[2]
+                    keep_index = index_head
+                    
+                # moving forward
+                line1 = line2
+                index_head += 1
+            
+            elif (not x_in_margin and not y_in_margin) or index_head == len(midPointOfLines) - 1:
+                print "break"
+                #save set
+                group_line_indices.append(temp_line_indices)####
+                group_lines.append([midPointOfLines[x] for x in temp_line_indices])
+                keep_lines.append(midPointOfLines[keep_index][3])
+                
+                print "this set:", group_lines[-1]
+                print "keep lines:", len(keep_lines), keep_lines
+                
+                #remove found index from the lines
+                temp_line_indices = sorted(temp_line_indices, reverse=True)
+                for i in temp_line_indices:
+                    del midPointOfLines[i]
+                    
+                print "remain lines:", midPointOfLines
+                #start over
+                index_head = 0 
+                line1 = midPointOfLines[index_head]
+                max_length = line1[2]
+                keep_index = 0
+                index_head += 1
+                temp_line_indices = [0]
+                
+            else:
+                #keep moving foward
+                print "not matched, keep searching next"
+                index_head += 1
+            
+        
+        #pick up last sest
+        if midPointOfLines > 0:
+            group_lines.append(midPointOfLines)
+            keep_lines.append(midPointOfLines[keep_index][3])
+            
+            
+        print "group_lines", len(group_lines), group_lines
+        print "keep lines:", len(keep_lines), keep_lines
+        
+        return keep_lines, group_lines
+        
+    @staticmethod
+    def refineLines(image_data, debug = False):
+        
+        image = image_data.image_preproc_for_corner
+                
+        if debug:
+            PhyloParser.displayLines(image, image_data.horLines)
+        
+        midPointOfHorLines = PhyloParser.getMidPoints(image_data.horLines)
+        midPointOfVerLines = PhyloParser.getMidPoints(image_data.verLines)
+        
+        
+        midPointOfHorLines = sorted(midPointOfHorLines, key = lambda x: (x[0], x[1]))
+        midPointOfVerLines = sorted(midPointOfVerLines, key = lambda x: (x[1], x[0]), reverse=True) #take the very right lines
+        
+
+        image_data.horLines, image_data.horLineGroup = PhyloParser.getIndexOfDuplicateLine(image, midPointOfHorLines)
+        
+                    
+        if debug:
+            PhyloParser.displayLines(image, image_data.horLines)
+            
+        image_data.verLines, image_data.verLineGroup = PhyloParser.getIndexOfDuplicateLine(image, midPointOfVerLines)
+                    
+        if debug:
+            PhyloParser.displayLines(image, image_data.verLines)
+            
+        image_data.lineRefined = True
+        return image_data
+
+
+    @staticmethod
+    #for debug
+    def displayLines(image, lines):
+                
+        if len(image.shape) == 2:
+            whatever = cv.cvtColor(image, cv.COLOR_GRAY2RGB)
+
+        for line in lines:
+            x1, y1, x2, y2, length = line
+            cv.rectangle(whatever, (x1, y1), (x2, y2), color=(255, 0, 0), thickness=2)
+        plt.imshow(whatever)
+        plt.show()
         
         
     @staticmethod
@@ -691,7 +849,7 @@ class PhyloParser():
                 x2 =  points[-1][1]
             
                 lineLength = max(abs(x2-x1),abs(y2-y1))
-                lineList.append((x1, y1, x2, y2, lineLength))
+                lineList.append([x1, y1, x2, y2, lineLength])
         
         return lineList
             
