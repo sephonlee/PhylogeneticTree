@@ -4,30 +4,36 @@ from Node import *
 from ImageData import *
 
 
+
+
+
+
 class PhyloParser():
     
     def __init__(self):
         return 
     
-    def preprocces(self, image, debug = False):
+    def preprocces(self, image_data, debug = False):
+
+        image_data.image, image_data.varianceMask = self.purifyBackGround(image_data)
+
+        image_data = self.findContours(image_data)
         
-        image = self.purifyBackGround(image)
-        
-        image = self.downSample(image)
+        image_data = self.downSample(image_data)
         if debug:
-            self.displayImage(image)
+            self.displayImage(image_data.image)
             
-        image = self.bilateralFilter(image)
-        
-        if debug:
-            self.displayImage(image)
-            
-        image = self.binarize(image, 180, 3)
+        image_data = self.bilateralFilter(image_data)
         
         if debug:
-            self.displayImage(image)
+            self.displayImage(image_data.image)
             
-        return image
+        image_data = self.binarize(image_data, 180, 3)
+        
+        if debug:
+            self.displayImage(image_data.image)
+            
+        return image_data
         
     ## static method for preprocessing ##
     
@@ -81,26 +87,86 @@ class PhyloParser():
     def displayImage(image):
         plt.imshow(image, cmap='Greys_r')
         plt.show()
-  
-    @staticmethod
-    def purifyBackGround(image, threshold = 0.01, kernel_size = (3,3)):
 
+    @staticmethod
+    def sortByCntsLength(item):
+        return -len(item)
+
+
+    def findContours(self, image):
+
+        height, width = image.shape
+        _, contours, hierarchy= cv.findContours(image.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+
+        contours = sorted(contours, key=self.sortByCntsLength)
+
+        mask = np.zeros((height,width), dtype=np.uint8)
+        cv.drawContours(mask, contours, 0, (255), thickness = -1)
+        nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+        for index in range(1, len(contours)):
+            cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
+
+        plt.imshow(mask, cmap='Greys_r')
+        plt.show()
+        plt.imshow(nonTreeMask, cmap='Greys_r')
+        plt.show()
+
+        return mask, nonTreeMask
+
+
+    # def purifyBackGround(image, threshold_var = 0.01, threshold_pixel = 5, kernel_size = (3,3)):
+
+    #     dim = image.shape
+    #     mask = np.zeros(dim, dtype=np.uint8)   # 1:keep 0:remove
+        
+    #     for i in range(0, dim[0] - kernel_size[0] + 1):
+    #         for j in range(0, dim[1] - kernel_size[1] + 1):
+
+    #             patch = image[i:i+kernel_size[0], j:j+kernel_size[1]].copy().astype("float")/255      
+    #             patch_variance =  np.var(patch)
+    #             patch_sum = np.sum(patch)*255
+                
+    #             threshold_sum = kernel_size[0] * kernel_size[1] * threshold_pixel
+                
+    #             if patch_variance < threshold_var and patch_sum > threshold_sum:
+    #                 mask[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
+
+    #     image[np.where(mask == 255)] = 255
+    #     return image, mask
+    def purifyBackGround(self, image_data, threshold = 0.01, kernel_size = (3,3)):
+        image = image_data.image
         dim = image.shape
         mask = np.zeros(dim, dtype=np.uint8)   # 1:keep 0:remove
-        
+        test = np.zeros(dim, dtype=np.uint8)
+        h,w = image.shape
+
         for i in range(0, dim[0] - kernel_size[0] + 1):
             for j in range(0, dim[1] - kernel_size[1] + 1):
 
                 patch = image[i:i+kernel_size[0], j:j+kernel_size[1]].copy().astype("float")/255      
                 patch_variance =  np.var(patch)
+                if j < w and i < h:
+                    if patch_variance < threshold:
+                        test[i][j] = 0
+                    else:
+                        test[i][j] = 255
 
-                if patch_variance < threshold:
+                if patch_variance < threshold:                
                     mask[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
 
+
+        boxList, contours = self.findContours(test)
+        # search(test, contours)
+        # drawContours(boxList, test)
+        kernel = cv.getStructuringElement(cv.MORPH_RECT,(3,3))
+        eroImage = cv.morphologyEx(test,cv.MORPH_OPEN, kernel)
+        plt.imshow(test, cmap = 'Greys_r')
+        plt.show()
+        plt.imshow(eroImage, cmap = 'Greys_r')
+        plt.show()
         image[np.where(mask == 255)] = 255
         return image
     ## end static method for preprocessing ##
-    
 
     def detectLines(self, image_data, debug = False):
                
@@ -161,6 +227,7 @@ class PhyloParser():
                 
         return image_data
     
+
     def cutLines(self, image_data):
 
         newList = []
@@ -175,10 +242,19 @@ class PhyloParser():
                     if x1+margin<vx1 and vx1<x2-margin and vy1<y1 and y1<vy2:
                         newline1 = [x1, y1, vx1, y2, vx1-x1]
                         newline2 = [vx1, y1, x2, y2, x2-vx1]
-                        newList.append(newline1)
-                        newList.append(newline2)
-                        isnotcut = False
-                        break
+                        length1 = vx1 - x1
+                        length2 = x2 - vx1
+                        isTooShort = False
+                        if length1/length < 0.35 or length2/length< 0.35:
+                            isTooShort = True
+
+                        if not isTooShort:
+                            newList.append(newline1)
+                            newList.append(newline2)
+                            isnotcut = False
+                            break
+
+
                 if isnotcut:
                     newList.append(line)
         image_data.horLines = newList
@@ -298,7 +374,7 @@ class PhyloParser():
                 if x1 > hx1 - margin and x1 < hx1 + margin and y2 > hy1 - margin and y2 < hy1 + margin:
                     lowerLeave.append(hline)
                     isLowerLeave = True
-                if x1 -margin < hx1  and x1 + margin > hx1  and y1 -margin < hy1 and y2 + margin > hy1:
+                if x1 -margin < hx1  and x1 + margin > hx1  and y1 + margin < hy1 and y2 - margin > hy1:
                     if not (isUpperLeave or isLowerLeave):
                         interLeave.append(hline)
             if len(upperLeave) > 0 or len(lowerLeave) > 0 or len(interLeave) > 0:
@@ -434,7 +510,7 @@ class PhyloParser():
         return image_data
     
     
-    def makeTree(self, image_data, debug = True):
+    def makeTree(self, image_data, debug = False):
         
         if image_data.lineDetected and image_data.lineMatched:
         
@@ -450,7 +526,7 @@ class PhyloParser():
             image_data = self.createRootList(image_data)
             if debug:
                 image_data.displayTrees('regular')
-            
+            image_data.displayTrees('regular')
             # Check if it's perfectly recovered
             image_data = self.checkDone(image_data)
             
@@ -459,10 +535,14 @@ class PhyloParser():
                 ## Fix false-positive sub-trees and mandatorily connect sub-trees
                 image_data = self.fixTrees(image_data)
                 image_data = self.checkDone(image_data)
+                image_data.displayTrees('regular')
+                image_data.defineTreeHead()
+                print self.treeRecover(image_data.treeHead)
                 
             # fixTrees fixed everything
             if image_data.treeReady:
                 image_data.defineTreeHead()
+                print self.treeRecover(image_data.treeHead)
                 if debug:
                     print "TODO: draw something here"
                     image_data.displayTrees('final')
@@ -532,13 +612,11 @@ class PhyloParser():
             if node in tmpList:
                 if not node.isComplete:
                     for breakNode in node.breakSpot:
-                        print breakNode.branch, breakNode.to[0], breakNode.to[1]
                         isFixed = False
                         isUpper = True
                         if not ((breakNode.to[0] or breakNode.upperLeave) or (breakNode.to[1] or breakNode.lowerLeave)):
                             pass
                         elif (breakNode.to[0] or breakNode.upperLeave) and not (breakNode.to[1] or breakNode.lowerLeave):
-                            print "upper"
                             x1, y1, x2, y2, length = breakNode.branch
                             result = self.getNodeBranchOnTheRight((x2,y2), rootList)
                             if result:  
@@ -548,12 +626,10 @@ class PhyloParser():
                                 result.whereFrom = breakNode
                                 result.origin = node
                                 if result.isComplete:
-                                    print "remove"
                                     if result in tmpList:
                                         tmpList.remove(result)
                                 node.breakSpot.remove(breakNode)
                                 isFixed = True
-                                print result.branch
                             else:
                                 isUpper = False
 
@@ -567,12 +643,10 @@ class PhyloParser():
                                 node.breakSpot.remove(breakNode)
                                 result.origin = node
                                 if result.isComplete:
-                                    print "remove"
                                     if result in tmpList:
                                         tmpList.remove(result)
                                 result.whereFrom = breakNode
                                 isFixed = True
-                                print result.branch
 
 
                         if isUpper:
@@ -584,8 +658,7 @@ class PhyloParser():
                     pass
         rootList = tmpList[:]
         for node in rootList:
-            if node in tmpList:
-                print node.branch, node.breakSpot, node.whereFrom
+            if node in tmpList: 
                 if len(node.breakSpot) == 0 and node.whereFrom != None:
 
                     tmpList.remove(node)
@@ -799,7 +872,7 @@ class PhyloParser():
                     isComplete = False
                     lineList.append(rootNode.branch)
         if not rootNode.isBinary:
-            print rootNode.getNodeInfo()
+            # print rootNode.getNodeInfo()
             for index, to in enumerate(rootNode.otherTo):
                 if to:
                     if rootNode.branch != to.branch:
@@ -876,7 +949,7 @@ class PhyloParser():
                     lineList.append(node.lowerLeave)
 
             if not node.isBinary:
-                print rootNode.getNodeInfo()
+                # print rootNode.getNodeInfo()
                 for index, to in enumerate(node.otherTo):
 
                     if to:
@@ -978,32 +1051,74 @@ class PhyloParser():
                     a.isBinary = False
 
                 nodeList.append(a)
+        
+
         for node in nodeList:
-            if node.root:
-                for subNode in nodeList:
-                    if subNode != node and subNode.branch != node.branch:                   
-                        if subNode.upperLeave:
-                            if self.isSameLine(node.root, subNode.upperLeave):
-                                node.whereFrom = subNode
-                                tmp = list(subNode.to)
-                                tmp[0] = node
-                                subNode.to = tuple(tmp)
-                                break
-                        if subNode.lowerLeave:
-                            if self.isSameLine(node.root, subNode.lowerLeave):
-                                node.whereFrom = subNode
-                                tmp = list(subNode.to)
-                                tmp[1]= node
-                                subNode.to = tuple(tmp)
-                                break
-                        if not subNode.isBinary :
-                            for index, line in enumerate(subNode.interLeave):
-                                if self.isSameLine(node.root, line):
-                                    node.whereFrom = subNode
-                                    subNode.otherTo[index] = node
-                                    break
+            potentialUpper = []
+            potentialLower = []
+            potentialInter = []
+
+            if not node.isBinary:
+                for leave in node.interLeave:
+                    potentialInter.append([])
+
+
+            for subNode in nodeList:
+                if subNode.root:
+                    if node.upperLeave and not node.isUpperAnchor and self.isSameLine(node.upperLeave, subNode.root):
+                        score = self.evaluateNode(subNode)
+                        potentialUpper.append((subNode, score))
+                    elif node.lowerLeave and not node.isLowerAnchor and self.isSameLine(node.lowerLeave, subNode.root):
+                        score = self.evaluateNode(subNode)
+                        potentialLower.append((subNode,score))
+                    if not node.isBinary:
+                        for index, leave in enumerate(node.interLeave):
+                            if not node.isInterAnchor[index] and self.isSameLine(leave, subNode.root):
+                                score = self.evaluateNode(subNode)
+                                potentialInter[index].append((subNode, score))
+            # if node.lowerLeave:
+            #     if node.lowerLeave[0] > 213 and node.lowerLeave[0] < 223 and node.lowerLeave[1] >295 and node.lowerLeave[1] <305:
+            #         print potentialUpper, potentialLower, potentialInter
+
+            if len(potentialUpper) != 0:
+                potentialUpper = sorted(potentialUpper, key = self.sortByScore)
+
+                tmpTo = list(node.to)
+                tmpTo[0] = potentialUpper[0][0]
+                node.to = tuple(tmpTo)
+                print node.to
+            if len(potentialLower) != 0:
+                potentialLower = sorted(potentialLower, key = self.sortByScore)
+
+                tmpTo = list(node.to)
+                tmpTo[1] = potentialLower[0][0]
+                node.to = tuple(tmpTo)
+            if not node.isBinary:
+                for index, leave in enumerate(node.interLeave):
+                    potentialInter[index] = sorted(potentialInter[index], key = self.sortByScore)
+                    if len(potentialInter[index])!=0:
+                        node.otherTo[index] = potentialInter[index][0]
+
         image_data.nodeList = nodeList
         return image_data
+    @staticmethod
+    def sortByScore(item):
+        return -item[1]
+
+
+    @staticmethod
+    def evaluateNode(node):
+        score = 0
+        if node.upperLeave:
+            score+=1
+        if node.lowerLeave:
+            score+=1
+        if node.to[0]:
+            score+=1
+        if node.to[1]:
+            score+=1
+
+        return score
 
     @staticmethod
     def isSameLine(aline, bline, margin = 5):
