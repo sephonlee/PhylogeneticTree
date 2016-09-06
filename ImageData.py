@@ -6,10 +6,17 @@ from matplotlib import pyplot as plt
 
 class ImageData():
     
+    
+    
+    # filled by preprocessing
     originalImage = None
+    image_preproc = None
+    varianceMask = None # from purifyBackground
+    treeMask = None # determine the tree pixels
+    nonTreeMask = None # determine the non-tree pixels
     
     # filled by detectLine
-    image = None
+    image_preproc_for_line_detection = None
     image_height = None
     image_width = None
     linesList = []
@@ -41,7 +48,7 @@ class ImageData():
     anchorLines = []
     interLines = []
     jointLines = []
-    isBinary = True
+    isBinary = True ###
     lineMatched = False
 
     # filled by getSpecies
@@ -67,9 +74,6 @@ class ImageData():
         self.interLines = []
         self.nodeList = []
         self.rootList = []
-        self.varianceMask = None
-        self.treeMask = None
-        self.nonTreeMask = None
         self.isBinary = True
 
     def __str__(self):
@@ -163,7 +167,7 @@ class ImageData():
             whatever = self.image.copy()
             whatever = cv.cvtColor(whatever, cv.COLOR_GRAY2RGB)
         else:
-            whatever = image.copy()
+            whatever = self.image.copy()
         count = 0
         for rootNode in self.rootList:
 
@@ -207,7 +211,7 @@ class ImageData():
             whatever = self.image.copy()
             whatever = cv.cvtColor(whatever, cv.COLOR_GRAY2RGB)
         else:
-            whatever = image.copy()
+            whatever = self.image.copy()
 
         count = 0
         for node in self.nodeList:
