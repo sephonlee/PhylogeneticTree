@@ -29,26 +29,15 @@ class PhyloParser():
 
         self.originalImage = image.copy()
 
-        image, var_mask = self.purifyBackGround(image)
-
-        image_data.varianceMask = var_mask
-
-        treeMask, nonTreeMask, contours = self.findContours(var_mask)
-
-        image_data.nonTreeMask = nonTreeMask
-        image_data.treeMask = treeMask
-        image_data.contours = contours
-
-        image = self.removeLabels(image, treeMask)
-
         #purify background
         image, image_data.varianceMask = self.purifyBackGround(image)
         if debug:
             print "Purify color background"
             self.displayImage(image)
  
-        #determine effective area
-        image_data.treeMask, image_data.nonTreeMask = self.findContours(image_data.varianceMask)
+         #determine effective area
+        image_data.treeMask, image_data.nonTreeMask, image_data.contours = self.findContours(var_mask)       
+
          
 #         empty non-tree information
 #         image = self.removeLabels(image, image_data.treeMask)
