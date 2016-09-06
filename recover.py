@@ -26,15 +26,18 @@ if __name__ == '__main__':
     
     folderPath = 'images/'
     fileNameList = getFilesInFolder(folderPath)
-    print fileNameList
-    for index in range(18, len(fileNameList)):
+    
+    for index, fileName in enumerate(fileNameList):
+        print index, fileName
+
+    for index in range(24, len(fileNameList)):
         print index
         filePath = folderPath + fileNameList[index]
         if isfile(filePath) :
             image = cv.imread(filePath,0)
             
         image_data = ImageData(image)
-        image_data.image = phyloPaser.preprocces(image_data.image)
+        image_data = phyloPaser.preprocces(image_data)
         image_data.updateImageDimension()
         
         image_data = phyloPaser.detectLines(image_data, True)

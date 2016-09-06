@@ -6,6 +6,8 @@ from matplotlib import pyplot as plt
 
 class ImageData():
     
+    originalImage = None
+    
     # filled by detectLine
     image = None
     image_height = None
@@ -16,7 +18,21 @@ class ImageData():
     lineDetected = False
     
     # filled by detectCorner
+    image_preproc_for_corner = None
+    upCornerList = [] # top left corners
+    downCornerList = [] # bottom left corners
+    jointUpList = [] # joint points to parent
+    jointDownList = [] # joint points to children
+    pointSet_ver = [] #vertical line between corners
+    upPointSet_hor = [] #horizontal line between top left corners and corresponding joints
+    downPointSet_hor = [] #horizontal line between bottom left corners and corresponding joints
     cornerDetected = False
+    lineDetectedFromCorners = False
+    
+    # filled by refineLine
+    horLineGroup = []
+    verLineGroup = []
+    lineRefined = False
     
     # filled by matchLine
     cleanImage = None

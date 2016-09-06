@@ -59,31 +59,33 @@ class Node():
 
     
     def getTreeString(self):
-        return self.printTree()
+        return self.printTree(0)[0]
 
-    def printTree(self):
+    def printTree(self, speciesIndex):
 
         if self.to[0]:
-            upperChildren = self.to[0].printTree()
+            upperChildren, speciesIndex = self.to[0].printTree(speciesIndex)
         else:
             if self.upperLabel:
                 upperChildren = self.upperLabel
             elif self.isUpperAnchor:
-                upperChildren = "%"
+                upperChildren = "%s" %str(speciesIndex)
+                speciesIndex+=1
             else:
                 upperChildren = "**"
         if self.to[1]:
-            lowerChildren = self.to[1].printTree()
+            lowerChildren, speciesIndex = self.to[1].printTree(speciesIndex)
         else:
             if self.lowerLabel:
                 lowerChildren = self.lowerLabel
             elif self.isLowerAnchor:
-                lowerChildren = "%"
+                lowerChildren = "%s" %str(speciesIndex)
+                speciesIndex+=1
             else:
                 lowerChildren = "**"
 
         if self.isBinary:
-            return "(%s, %s)" %(upperChildren, lowerChildren)
+            return "(%s, %s)" %(upperChildren, lowerChildren), speciesIndex
         else:
             result = "(%s," %upperChildren
 
@@ -97,15 +99,16 @@ class Node():
             # self.otherTo = tmp2
             for index, to in enumerate(self.otherTo):
                 if to:
-                    interChildren = to.printTree()
+                    interChildren, speciesIndex = to.printTree(speciesIndex)
                 else:
                     if self.interLabel[index]:
                         interChildren = self.interLabel
                     elif self.isInterAnchor[index]:
-                        interChildren = "%"
+                        interChildren = "%s" %str(speciesIndex)
+                        speciesIndex+=1
                     else:
                         interChildren = "**"
                 result += interChildren + ','
 
-            return result + '%s)' %lowerChildren
+            return result + '%s)' %lowerChildren, speciesIndex
         
