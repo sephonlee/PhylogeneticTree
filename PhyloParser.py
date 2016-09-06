@@ -31,15 +31,13 @@ class PhyloParser():
 
         image, var_mask = self.purifyBackGround(image)
 
-        self.displayImage(image)
-
         image_data.varianceMask = var_mask
 
-        treeMask, nonTreeMask = self.findContours(var_mask)
-
-        self.displayImage(nonTreeMask)
+        treeMask, nonTreeMask, contours = self.findContours(var_mask)
 
         image_data.nonTreeMask = nonTreeMask
+        image_data.treeMask = treeMask
+        image_data.contours = contours
 
         image = self.removeLabels(image, treeMask)
 
@@ -150,7 +148,7 @@ class PhyloParser():
         for index in range(1, len(contours)):
             cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
 
-        return mask, nonTreeMask
+        return mask, nonTreeMask, contours
 
     @staticmethod
     def removeLabels(image, mask):
@@ -1315,6 +1313,8 @@ class PhyloParser():
         nonTreeMask = image_data.nonTreeMask
         treeMask = image_data.treeMask
         anchorLines = image_data.anchorLines
+        contours = image_data.contours
+
         anchorLabelList = {}
         for line in anchorLines:
             print line

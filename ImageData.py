@@ -14,6 +14,7 @@ class ImageData():
     varianceMask = None # from purifyBackground
     treeMask = None # determine the tree pixels
     nonTreeMask = None # determine the non-tree pixels
+    contours = None
     
     # filled by detectLine
     image_preproc_for_line_detection = None
