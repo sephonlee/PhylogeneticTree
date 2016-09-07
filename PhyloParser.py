@@ -3,6 +3,8 @@ import numpy as np
 from Node import *
 from ImageData import *
 from sets import Set
+import pytesseract
+import Image
 
 
 class PhyloParser():
@@ -30,9 +32,10 @@ class PhyloParser():
             print "Purify color background"
             PhyloParser.displayImage(image)
  
+
         #determine effective area and save the masks into image_data
         image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.varianceMask)
- 
+
         image = PhyloParser.bilateralFilter(image_data.originalImage)
         if debug:
             print "bilateralFilter image"
@@ -1332,26 +1335,102 @@ class PhyloParser():
 
 
     ## end static method for matchLines ##
-    
+    @staticmethod
+    def sortCntsByX(item):
+        return item[2][2]
+    @staticmethod
+    def getCntsInfo(contours):
+        #return the four tip points of each contour and the index in the contours list
+        contourInfo = []
+        for index, cnts in enumerate(contours):
+            tupleCnts = []
+            top = None
+            btm = None
+            right = None
+            left  = None
+            for point in cnts:
+                x, y = point[0]
+                if not top or y<top:
+                    top = y
+                if not btm or y>btm:
+                    btm = y
+                if not left or x<left:
+                    left = x
+                if not right or x>right:
+                    right = x
+                tupleCnts.append((x,y))
+            contourInfo.append([tupleCnts, index, (top, btm, left, right)])
+        return contourInfo
+
+    @staticmethod
+    def getLabelSpot(potentialCnts):
+        #input: sorted potentialSpots, and return the label location
+        threshold = 50 #threshold for deciding if it's connected
+        textLeft = None
+        textRight = None
+        textTop = None
+        textBtm = None
+        for index, cntsInfo in enumerate(potentialCnts):
+            cnts, _, (top, btm, left, right) = cntsInfo
+            if index==0:
+                textTop = top
+                textBtm = btm
+                textLeft = left
+                textRight = right
+            else:
+                if left - textRight < threshold:
+                    if textTop > top:
+                        textTop = top
+                    if btm > textBtm:
+                        textBtm = btm
+                    if right > textRight:
+                        textRight = right
+        return (textTop, textBtm, textLeft, textRight)
+
+
+
     # TODO: not implemented yet, if you have, put it here
     def getSpecies(self, image_data, debug = False):
 
         image = image_data.image
+        # displayImage = cv.cvtColor(image, cv.COLOR_GRAY2RGB)
+        # displayImage1 = displayImage.copy()
         nonTreeMask = image_data.nonTreeMask
         treeMask = image_data.treeMask
         anchorLines = image_data.anchorLines
         contours = image_data.contours
+        margin = 3 #margin for tesseract
+        contourInfo = self.getCntsInfo(contours)
 
         anchorLabelList = {}
         for line in anchorLines:
-            print line
+            x1, y1, x2, y2, length = line
+            potentialCnts = []
+            if not isinstance(line, tuple):
+                line = tuple(line)
             anchorLabelList[line] = None
-            #case1: label is detected in nontreemask and 
+            for cntsInfo in contourInfo:
+                cnts, index, (top, btm, left, right) = cntsInfo
+                if y2 > top and y2 < btm and x2 < left:
+                    potentialCnts.append(cntsInfo)
 
-        print anchorLabelList
+            potentialCnts = sorted(potentialCnts, key=self.sortCntsByX)
 
+            # for cntsInfo in potentialCnts:
+            #     cv.rectangle(displayImage, (cntsInfo[2][2], cntsInfo[2][0]), (cntsInfo[2][3], cntsInfo[2][1]), color=(255,0,0), thickness=1)
+            # plt.imshow(displayImage)
+            # plt.show() 
+ 
+            labelSpot = self.getLabelSpot(potentialCnts)
+            # cv.rectangle(displayImage1, (labelSpot[2], labelSpot[0]), (labelSpot[3], labelSpot[1]), color=(255,0,0), thickness=1)
+            
+            labelBox = image[labelSpot[0]-margin:labelSpot[1]+margin, labelSpot[2]-margin:labelSpot[3]+margin]
+            cv.imwrite("tmp.tiff", labelBox)
+            label = pytesseract.image_to_string(Image.open('tmp.tiff'))
+            anchorLinelist[line] = label
 
-
+        image_data.species = anchorLineList
+        image_data.speciesNameReady = True 
 
         return image_data
     
@@ -1443,8 +1522,12 @@ class PhyloParser():
             return potentialNodes[0]
 
     @staticmethod
-    def treeRecover(rootNode):
-        return rootNode.getTreeString()
+    def treeRecover(image_data, mode = 'structure'):
+        if mode == 'structure':
+            return image_data.treeHead.getTreeString()
+        elif mode == 'species':
+            return image_data.treeHead.getTreeSpecies(image_data.species)
+
 
     def fixTrees(self,image_data):
         rootList = image_data.rootList

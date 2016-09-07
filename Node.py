@@ -57,7 +57,48 @@ class Node():
     def sortByY(self, item):
         return item[0][1]
 
-    
+    def getTreeSpecies(self):
+        if self.to[0]:
+            upperChildren, speciesIndex = self.to[0].printTree(speciesIndex)
+        else:
+            if self.upperLabel:
+                upperChildren = self.upperLabel
+            elif self.isUpperAnchor:
+                upperChildren = "%s" %str(speciesIndex)
+                speciesIndex+=1
+            else:
+                upperChildren = "**"
+        if self.to[1]:
+            lowerChildren, speciesIndex = self.to[1].printTree(speciesIndex)
+        else:
+            if self.lowerLabel:
+                lowerChildren = self.lowerLabel
+            elif self.isLowerAnchor:
+                lowerChildren = "%s" %str(speciesIndex)
+                speciesIndex+=1
+            else:
+                lowerChildren = "**"
+
+        if self.isBinary:
+            return "(%s, %s)" %(upperChildren, lowerChildren), speciesIndex
+        else:
+            result = "(%s," %upperChildren
+
+            for index, to in enumerate(self.otherTo):
+                if to:
+                    interChildren, speciesIndex = to.printTree(speciesIndex)
+                else:
+                    if self.interLabel[index]:
+                        interChildren = self.interLabel
+                    elif self.isInterAnchor[index]:
+                        interChildren = "%s" %str(speciesIndex)
+                        speciesIndex+=1
+                    else:
+                        interChildren = "**"
+                result += interChildren + ','
+
+            return result + '%s)' %lowerChildren, speciesIndex        
+
     def getTreeString(self):
         return self.printTree(0)[0]
 
@@ -89,14 +130,6 @@ class Node():
         else:
             result = "(%s," %upperChildren
 
-            # newList = sorted(zip(self.interLeave, self.otherTo, self.interLabel, self.), key = self.sortByY)
-            # tmp1 = []
-            # tmp2 = []
-            # for a,b in newList:
-            #     tmp1.append(a)
-            #     tmp2.append(b)
-            # self.interLeave = tmp1
-            # self.otherTo = tmp2
             for index, to in enumerate(self.otherTo):
                 if to:
                     interChildren, speciesIndex = to.printTree(speciesIndex)

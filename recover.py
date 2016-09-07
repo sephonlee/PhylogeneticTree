@@ -30,7 +30,7 @@ if __name__ == '__main__':
     for index, fileName in enumerate(fileNameList):
         print index, fileName
 
-    for index in range(13, len(fileNameList)):
+    for index in range(28, len(fileNameList)):
         print index
         filePath = folderPath + fileNameList[index]
         if isfile(filePath) :

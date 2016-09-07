@@ -54,7 +54,7 @@ class ImageData():
     lineMatched = False
 
     # filled by getSpecies
-    species = []
+    species = {}
     speciesNameReady = False
 
     # filled by makeTree
