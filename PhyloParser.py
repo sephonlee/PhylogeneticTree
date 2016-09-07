@@ -32,7 +32,7 @@ class PhyloParser():
         image_data.originalImage = image.copy() 
 
         #purify background
-        image, image_data.varianceMask = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
+        image, image_data.varianceMask, image_data.textMask, image_data.varMap = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
         if debug:
             print "Display image with removed background"
             PhyloParser.displayImage(image)
@@ -155,10 +155,11 @@ class PhyloParser():
     
     @staticmethod
     # remove color back ground
-    def purifyBackGround(image, threshold_var = 0.008, threshold_pixel = 60, threshold_hist = 10, kernel_size = (3,3), morph_kernel_size = (3,5)):
+    def purifyBackGround(image, threshold_var = 0.008, threshold_var2 = 0.001, threshold_pixel = 60, threshold_hist = 10, kernel_size = (3,3), morph_kernel_size = (3,5)):
 
         dim = image.shape
         mask = np.zeros(dim, dtype=np.uint8)   # 1:keep 0:remove
+        text_mask = np.zeros(dim, dtype=np.uint8)
         var_map = np.zeros(dim, dtype=np.float)  ## for debugging
 #         print image
          
@@ -205,17 +206,24 @@ class PhyloParser():
                 
                 if patch_variance < threshold_var and patch_mean > threshold_pixel:                 
                     mask[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
+                    
+                if patch_variance < threshold_var2:
+                    text_mask[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
 
 
         if hasColorBackGround:
 #             print "remove background"
             image[np.where(mask == 255)] = 255
         
+#         PhyloParser.displayImage(text_mask)
+#         PhyloParser.displayImage(mask)
+        
         # recover defect using morphology
         kernel = cv.getStructuringElement(cv.MORPH_RECT, morph_kernel_size)
         mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
         
         var_map= var_map * 255/(np.max(var_map) - np.min(var_map)) ## for debugging
+
         # var_map = var_map.astype('uint8')
         # varMap = np.zeros(dim, dtype = np.uint8)
         # plt.imshow(var_map, cmap='Greys_r')
@@ -225,7 +233,11 @@ class PhyloParser():
         # plt.imshow(varMap, cmap='Greys_r')
         # plt.show()
 
-        return image, mask
+        
+#         PhyloParser.displayImage(var_map)
+        
+        return image, mask, text_mask, var_map
+
     
     ## end static method for preprocessing ##
     
@@ -388,8 +400,9 @@ class PhyloParser():
 
     ## end static method for detectLine ##
     
-    # corner data will be written in the image_data
+    
     @staticmethod
+    # corner data will be written in the image_data
     def getCorners(image_data, mask = None, debug = False):
         
         if image_data.preprocessed:      
@@ -540,7 +553,6 @@ class PhyloParser():
 #         print image
 #         
         
-        
         # First threshold to find possible corners from filtering
         mmin = np.amin(filteredImage)
         threshold= norPixelValue * pow(line_width,1.5) * 255 - 1 ####
@@ -594,6 +606,8 @@ class PhyloParser():
 
         return cornerList
         
+    ## static method for detectCorners ##
+
     ## NOT USE
     @staticmethod
     def removeRepeatCorner(cornerList):
@@ -675,6 +689,9 @@ class PhyloParser():
         kernelPackage = (kernel, norPixelValue, mode)
 
         return kernelPackage
+    
+    ## end static method for detectCorners ##
+    
     
     @staticmethod
     #return a list of dictionary
@@ -797,7 +814,174 @@ class PhyloParser():
         
         return image_data
 
+    ## static method for makeLinesFromCorner ##
+
+    @staticmethod
+    # axis = 0 --> vertically match
+    # axis = 1 --> horizontally match 
+    def matchPoints(point, candidatePoints, image, axis, margin = 5):
         
+        if axis == 0 or axis == 1 :
+            
+            index_for_margin_test = 1 - axis
+            index_for_location_test = axis
+            
+            matchPoints = [point] ### 
+            candidatePointsIndex = 0
+
+            while True and candidatePointsIndex < len(candidatePoints):
+                downCorner = candidatePoints[candidatePointsIndex]
+#                 print "this downCornerIndex: ", candidatePointsIndex, downCorner
+                
+                if  (abs(downCorner[1-axis] - point[1-axis]) <= margin) and  (downCorner[axis] - point[axis] > 0) and PhyloParser.isInLine(point, downCorner, image):
+                    # find match,  stay in the same index due to removal"
+                    matchPoints.append(downCorner)
+                    del candidatePoints[candidatePointsIndex]
+                
+                elif downCorner[1-axis] - point[1-axis] <= margin or downCorner[axis] - point[axis] > 0 or PhyloParser.isInLine(point, downCorner, image):
+                    # not match, but close, keep searching next element
+                    candidatePointsIndex += 1
+                    
+                else: 
+                    # once margin test fail, the later elements will all fail, so stop iterating
+                    break
+            
+            return matchPoints, candidatePoints
+        
+        else:
+            print "axis must ether 1 or 0"
+            return None, candidatePoints
+
+    @staticmethod
+    # determine if two points are in the same line
+    def isInLine(corner1, corner2, image, threshold = 0.01):
+        
+        y_min = min(corner1[0], corner2[0])
+        y_max = max(corner1[0], corner2[0])      
+        x_min = min(corner1[1], corner2[1])
+        x_max = max(corner1[1], corner2[1])
+        
+        subimage = image[y_min:y_max+1, x_min:x_max+1].copy().astype("float")/255  ## not count the later index
+        variance =  np.var(subimage)
+        
+        return variance < threshold
+    
+    @staticmethod
+    # remove duplicate point in each point set
+    def removeDuplicatePoint(pointSet, axis, margin = 5):
+        for s in pointSet:
+            if "corners" in s and len(s["corners"]) > 2:
+                s["corners"] = PhyloParser.refinePoint(s["corners"], margin)
+            if "joints" in s and len(s["joints"]) > 2:
+                s["joints"] = PhyloParser.refinePoint(s["joints"], margin)
+                
+        return pointSet
+                
+                
+    @staticmethod
+    # need sorted
+    # called by removeDuplicatePoint
+    # select the very bottom or very right point in the margin as the representative point 
+    def refinePoint(pointList, margin = 5):
+         
+        remove_index = []
+        for i in range(0, len(pointList)-1):
+            j = i + 1
+
+            p = pointList[i]
+            next_p = pointList[j]
+
+            if abs(p[0] - next_p[0]) <= margin and abs(p[1] - next_p[1]) <= margin:
+                remove_index.append(i)
+              
+        remove_index = list(Set(remove_index))
+        remove_index = sorted(remove_index, reverse=True)
+         
+        for index in remove_index:
+            del pointList[index]
+             
+        return pointList
+    
+    @staticmethod
+    # need sorted already
+    def pointSetToLine(pointSetList, type = "corners"):
+        lineList = []
+        for pointSet in pointSetList:
+            
+            points = pointSet[type] # select the type of point set
+            
+            # must have at least two points to form a line
+            if len(points) > 1:
+                y1 = points[0][0]
+                x1 = points[0][1]
+                
+                y2 =  points[-1][0]
+                x2 =  points[-1][1]
+            
+                lineLength = max(abs(x2-x1),abs(y2-y1))
+                lineList.append((x1, y1, x2, y2, lineLength))
+        
+        return lineList
+    
+    @staticmethod
+    def displayCornersAndLine(image, list_pointList = [], list_lines = []):
+        
+        displayImage = cv.cvtColor(image,cv.COLOR_GRAY2RGB)
+        if len(list_pointList) > 0:
+            rad = 2            
+            colors = [(255, 0 , 0), (0, 255 , 0), (0, 0 , 255), (0, 255 , 255)]
+            for i, pointList in enumerate(list_pointList):
+                for y, x in pointList:
+                    cv.rectangle(displayImage, (x-rad, y - rad), (x + rad, y +rad), color=colors[i], thickness=2)
+
+
+        if len(list_lines) > 0:
+            colors = [(255, 150 , 0), (150, 255 , 0), (150, 0 , 255)]
+            for i, lines in enumerate(list_lines):
+                for line in lines:
+                    x1, y1, x2, y2, length = line
+                    cv.rectangle(displayImage, (x1, y1), (x2, y2), color=colors[i], thickness=2)
+            
+        plt.imshow(displayImage)
+        plt.show()
+
+    ## end static method for makeLinesFromCorner ##
+    
+
+    @staticmethod
+    # remove duplicate lines
+    # for vertical lines: select the very right line 
+    # for horizontal lines: select the very bottom line
+    def refineLines(image_data, debug = False):
+        
+        image = image_data.image_preproc_for_corner
+                
+        if debug:
+            PhyloParser.displayLines(image, image_data.horLines)
+        
+        midPointOfHorLines = PhyloParser.getMidPoints(image_data.horLines)
+        midPointOfVerLines = PhyloParser.getMidPoints(image_data.verLines)
+        
+        
+        midPointOfHorLines = sorted(midPointOfHorLines, key = lambda x: (x[0], x[1]))
+        midPointOfVerLines = sorted(midPointOfVerLines, key = lambda x: (x[1], x[0]), reverse=True) #take the very right lines
+        
+
+        image_data.horLines, image_data.horLineGroup = PhyloParser.getRepresentativeLines(image, midPointOfHorLines)
+                    
+        if debug:
+            PhyloParser.displayLines(image, image_data.horLines)
+            
+        image_data.verLines, image_data.verLineGroup = PhyloParser.getRepresentativeLines(image, midPointOfVerLines)
+                    
+        if debug:
+            PhyloParser.displayLines(image, image_data.verLines)
+            
+        image_data.lineRefined = True
+        return image_data
+
+    ## static method for refineLines ##
+
     @staticmethod
     def getMidPoints(lines):
         midPoints = []
@@ -805,40 +989,16 @@ class PhyloParser():
             midPoints.append((int((l[0] + l[2])/2), int((l[1] + l[3])/2), l[4], l))
         return midPoints
         
-    @staticmethod
-    def checkLine(image, line, var_threshold = 0.01, mean_threshold = 3):
-
-        if line[0] == line[2]:
-            array = image[line[1]:line[3], line[0]:line[0]+1]
-        else:
-            array = image[line[1]:line[1]+1, line[0]:line[2]]
-            
-            
-        variance = np.var(array.astype("float")/255)
-        mean = np.mean(array)
-        
-#         print variance, mean, array.shape
-#         print array
-#         PhyloParser.displayImage(array)
-
-        return variance < var_threshold and mean < mean_threshold
-
-        
-        
+    
     @staticmethod
     #axis = 0: vertical lines
     #axis = 1: horizontal lines
-    
-    def getIndexOfDuplicateLine(image, midPointOfLines, margin = 5):
-        
-
-        print midPointOfLines
-        
+    def getRepresentativeLines(image, midPointOfLines, margin = 5):
+                
         keep_lines = []
         group_line_indices = []
         group_lines = []
-        
-        
+           
         index_head = 0
         line1 = midPointOfLines[index_head]
         max_length = line1[2]
@@ -911,38 +1071,22 @@ class PhyloParser():
         print "keep lines:", len(keep_lines), keep_lines
         
         return keep_lines, group_lines
-        
+
     @staticmethod
-    def refineLines(image_data, debug = False):
-        
-        image = image_data.image_preproc_for_corner
-                
-        if debug:
-            PhyloParser.displayLines(image, image_data.horLines)
-        
-        midPointOfHorLines = PhyloParser.getMidPoints(image_data.horLines)
-        midPointOfVerLines = PhyloParser.getMidPoints(image_data.verLines)
-        
-        
-        midPointOfHorLines = sorted(midPointOfHorLines, key = lambda x: (x[0], x[1]))
-        midPointOfVerLines = sorted(midPointOfVerLines, key = lambda x: (x[1], x[0]), reverse=True) #take the very right lines
-        
+    # determine if the given line is a truly BLACK line
+    def checkLine(image, line, var_threshold = 0.01, mean_threshold = 3):
 
-        image_data.horLines, image_data.horLineGroup = PhyloParser.getIndexOfDuplicateLine(image, midPointOfHorLines)
-        
-                    
-        if debug:
-            PhyloParser.displayLines(image, image_data.horLines)
+        if line[0] == line[2]:
+            array = image[line[1]:line[3], line[0]:line[0]+1]
+        else:
+            array = image[line[1]:line[1]+1, line[0]:line[2]]
             
-        image_data.verLines, image_data.verLineGroup = PhyloParser.getIndexOfDuplicateLine(image, midPointOfVerLines)
-                    
-        if debug:
-            PhyloParser.displayLines(image, image_data.verLines)
             
-        image_data.lineRefined = True
-        return image_data
+        variance = np.var(array.astype("float")/255)
+        mean = np.mean(array)
 
-
+        return variance < var_threshold and mean < mean_threshold
+    
     @staticmethod
     #for debug
     def displayLines(image, lines):
@@ -955,140 +1099,12 @@ class PhyloParser():
             cv.rectangle(whatever, (x1, y1), (x2, y2), color=(255, 0, 0), thickness=2)
         plt.imshow(whatever)
         plt.show()
-        
-        
-    @staticmethod
-    def removeDuplicatePoint(pointSet, axis, margin = 5):
-        for s in pointSet:
-            if "corners" in s and len(s["corners"]) > 2:
-                s["corners"] = PhyloParser.refinePoint(s["corners"], margin)
-            if "joints" in s and len(s["joints"]) > 2:
-                s["joints"] = PhyloParser.refinePoint(s["joints"], margin)
                 
-        return pointSet
-                
-                
-    @staticmethod
-    # need sorted
-    # deep the very bottom or very right point in the margin
-    def refinePoint(pointList, margin = 5):
-         
-        remove_index = []
-        for i in range(0, len(pointList)-1):
-            j = i + 1
-
-            p = pointList[i]
-            next_p = pointList[j]
-
-            if abs(p[0] - next_p[0]) <= margin and abs(p[1] - next_p[1]) <= margin:
-                remove_index.append(i)
-              
-        remove_index = list(Set(remove_index))
-        remove_index = sorted(remove_index, reverse=True)
-         
-        for index in remove_index:
-            del pointList[index]
-             
-        return pointList
+    ## end static method for refineLines ##
+    
     
     @staticmethod
-    # axis = 0 --> vertically match
-    # axis = 1 --> horizontally match 
-    def matchPoints(point, candidatePoints, image, axis, margin = 5):
-        
-        if axis == 0 or axis == 1 :
-            
-            index_for_margin_test = 1 - axis
-            index_for_location_test = axis
-            
-            matchPoints = [point] ### 
-            candidatePointsIndex = 0
-
-            while True and candidatePointsIndex < len(candidatePoints):
-                downCorner = candidatePoints[candidatePointsIndex]
-#                 print "this downCornerIndex: ", candidatePointsIndex, downCorner
-                
-                if  (abs(downCorner[1-axis] - point[1-axis]) <= margin) and  (downCorner[axis] - point[axis] > 0) and PhyloParser.isInLine(point, downCorner, image):
-                    # find match,  stay in the same index due to removal"
-                    matchPoints.append(downCorner)
-                    del candidatePoints[candidatePointsIndex]
-                
-                elif downCorner[1-axis] - point[1-axis] <= margin or downCorner[axis] - point[axis] > 0 or PhyloParser.isInLine(point, downCorner, image):
-                    # not match, but close, keep searching next element
-                    candidatePointsIndex += 1
-                    
-                else: 
-                    # once margin test fail, the later elements will all fail, so stop iterating
-                    break
-            
-            return matchPoints, candidatePoints
-        
-        else:
-            print "axis must ether 1 or 0"
-            return None, candidatePoints
-    
-    @staticmethod
-    # need sorted already
-    def pointSetToLine(pointSetList, type = "corners"):
-        lineList = []
-        for pointSet in pointSetList:
-            
-            points = pointSet[type] # select the type of point set
-            
-            # must have at least two points to form a line
-            if len(points) > 1:
-                y1 = points[0][0]
-                x1 = points[0][1]
-                
-                y2 =  points[-1][0]
-                x2 =  points[-1][1]
-            
-                lineLength = max(abs(x2-x1),abs(y2-y1))
-                lineList.append((x1, y1, x2, y2, lineLength))
-        
-        return lineList
-            
-    @staticmethod
-    def displayCornersAndLine(image, list_pointList = [], list_lines = []):
-        
-        displayImage = cv.cvtColor(image,cv.COLOR_GRAY2RGB)
-        if len(list_pointList) > 0:
-            rad = 2            
-            colors = [(255, 0 , 0), (0, 255 , 0), (0, 0 , 255), (0, 255 , 255)]
-            for i, pointList in enumerate(list_pointList):
-                for y, x in pointList:
-                    cv.rectangle(displayImage, (x-rad, y - rad), (x + rad, y +rad), color=colors[i], thickness=2)
-
-
-        if len(list_lines) > 0:
-            colors = [(255, 150 , 0), (150, 255 , 0), (150, 0 , 255)]
-            for i, lines in enumerate(list_lines):
-                for line in lines:
-                    x1, y1, x2, y2, length = line
-                    cv.rectangle(displayImage, (x1, y1), (x2, y2), color=colors[i], thickness=2)
-            
-        plt.imshow(displayImage)
-        plt.show()
-        
-        
-    @staticmethod
-    # determine if two points are in the same line
-    def isInLine(corner1, corner2, image, threshold = 0.01):
-        
-        y_min = min(corner1[0], corner2[0])
-        y_max = max(corner1[0], corner2[0])      
-        x_min = min(corner1[1], corner2[1])
-        x_max = max(corner1[1], corner2[1])
-        
-        subimage = image[y_min:y_max+1, x_min:x_max+1].copy().astype("float")/255  ## not count the later index
-        variance =  np.var(subimage)
-        
-        return variance < threshold
-        
-    
-    # Not implemented yet
-    # TODO
-    @staticmethod
+    # merge the lines created from corners with lines created from line detection
     def includeLinesFromCorners(image_data):
         if image_data.lineDetectedFromCorners and image_data.lineDetected:
             ver_lines = PhyloParser.pointSetToLine(image_data.pointSet_ver, type="corners")
@@ -1103,54 +1119,13 @@ class PhyloParser():
             print "Found no lines created from corner detection."
             
         return image_data
-            
-#             print "refineLinesByCorners"
-#             horLines = list(image_data.horLines)
-# #             print horLines
-#             verLines = list(image_data.verLines)
-#             
-#             verLines = sorted(verLines,  key = lambda x: (int(x[0]), x[1]))
-#             print verLines
-#             
-#             zone1 = [verLines[0][1]-3, verLines[0][3]+3, verLines[0][0]-3, verLines[0][2]+3]
-#             print zone1
-#             PhyloParser.displayCorners(image_data.image[zone1[0]:zone1[1], zone1[2]:zone1[3]])
-#             
-#             
-#             upCornerList = list(image_data.upCornerList)
-#             print upCornerList
-#             
-#             print image_data.image[486:491, 28:30]
-# #             print image_data.image[486:620, 25]
-#             
-#             downCornerList = list(image_data.downCornerList)
-#             print downCornerList
-#             jointUpList = list(image_data.jointUpList)
-#             jointDownList = list(image_data.jointDownList)
-#             
-#             
-#             
-#             
-#             print len(horLines)
-#             horLines.pop()
-#             print len(horLines)
-#             print len(image_data.horLines)
-            
-            
-            
-            
-#         elif image_data.cornerDetected:
-#             print "PLease get corner first. (Run getCorners)"
-#         elif image_data.lineDetected:
-#             print "Please get lines first. (Run detectLines) "
-#         else:
-#             print "Please get corners and lines first. (Run getCorners and detectLines) "
-#             
-#         return image_data
     
-    ## static method for detectCorners ##
+    ## static method for includeLinesFromCorners ##
     
-    ## end static method for detectCorners ##
+    ## end static method for includeLinesFromCorners ##
+    
+    
+    
     
     def matchLines(self, image_data, debug = False):
         
@@ -1175,6 +1150,7 @@ class PhyloParser():
         
         
         return image_data
+
     
     @staticmethod
     # your display() method
