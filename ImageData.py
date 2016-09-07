@@ -11,7 +11,9 @@ class ImageData():
     # filled by preprocessing
     originalImage = None
     image_preproc = None
-    varianceMask = None # from purifyBackground
+    varianceMask = None # from purifyBackground, for tree mask
+    textMask = None # from purifyBackground, for supporting non-tree mask
+    varMap = None # from purifyBackground
     treeMask = None # determine the tree pixels
     nonTreeMask = None # determine the non-tree pixels
     contours = None #contours of the tree image. Index = 0 is the tree, others are labels or noise
