@@ -23,6 +23,7 @@ class Node():
         self.area = None
         self.breakSpot = []
         self.status = 0
+        self.score = None # update by method evaluateNode
 
     def isAnchor(self, anchorLines):
         if self.upperLeave in anchorLines:
@@ -36,8 +37,8 @@ class Node():
         print '------node Information-------'
         print 'root:', self.root
         print 'branch: ', self.branch
-        print 'upperLeave: ', self.upperLeave
-        print 'lowerLeave: ', self.lowerLeave
+        print 'upperLeave: ', self.upperLeave, 'isAnchor? ', self.isUpperAnchor
+        print 'lowerLeave: ', self.lowerLeave, 'isAnchor? ', self.isLowerAnchor
         if self.to[0]:
             print 'upperLeave goes to:', self.to[0].branch
         if self.to[1]:
@@ -46,7 +47,7 @@ class Node():
             print 'origin node is:', self.origin.branch
         if not self.isBinary:
             for index, leave in enumerate(self.interLeave):
-                print 'one of the interleavs: ', leave
+                print 'one of the interleavs: ', leave, 'isAnchor? ', self.isInterAnchor[index]
                 print 'this leave goes to the node: ', self.otherTo[index]
         print '------------------------------'
 
