@@ -4,7 +4,9 @@ from Node import *
 from ImageData import *
 from sets import Set
 import pytesseract
-import Image
+# import Image
+from PIL import Image
+
 
 
 class PhyloParser():
@@ -27,16 +29,21 @@ class PhyloParser():
         image_data.originalImage = image.copy() 
 
         #purify background
-        image, image_data.varianceMask = PhyloParser.purifyBackGround(image)
+        image, image_data.varianceMask = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
         if debug:
-            print "Purify color background"
+            print "Display image with removed background"
             PhyloParser.displayImage(image)
- 
+            print "Display variance mask"
+            PhyloParser.displayImage(image_data.varianceMask)
 
         #determine effective area and save the masks into image_data
         image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.varianceMask)
+        
+        if debug:
+            print "display tree mask"
+            PhyloParser.displayImage(image_data.treeMask)
 
-        image = PhyloParser.bilateralFilter(image_data.originalImage)
+        image = PhyloParser.bilateralFilter(image)
         if debug:
             print "bilateralFilter image"
             PhyloParser.displayImage(image)
@@ -131,30 +138,49 @@ class PhyloParser():
         image[np.where(mask == 0)] = 255
         return image
 
+
+    def erosion(self):
+        # size = 3
+        # radius = size/2
+        kernel = self.erosionKernel()
+        image = self.image
+        image = cv.erode(image, kernel, anchor = (1,1), iterations=1)
+        image = cv.dilate(image, kernel, anchor = (1,1), iterations=1)
+
+        plt.imshow(image, cmap='Greys_r')
+        plt.show()
     
     @staticmethod
     # remove color back ground
-    def purifyBackGround(image, threshold_var = 0.008, threshold_pixel = 60, kernel_size = (3,3)):
+    def purifyBackGround(image, threshold_var = 0.008, threshold_pixel = 60, threshold_hist = 10, kernel_size = (3,3), morph_kernel_size = (3,5)):
 
         dim = image.shape
         mask = np.zeros(dim, dtype=np.uint8)   # 1:keep 0:remove
-        
+        var_map = np.zeros(dim, dtype=np.float)  ## for debugging
 #         print image
-#         
-#         hist, bins = np.histogram(image.ravel(),256,[0,256])
-# #         print hist, bins
-#         
-#         
+         
+        hist, bins = np.histogram(image.ravel(),256,[0,256])
+#         print hist
+#         print hist[-5:]
+#         print sum(hist[-10:])
+#         print sum(hist[-threshold_hist:]) / float(dim[0]*dim[1])
+#         print (255-4*threshold_hist)/float(255)
+#         print hist, bins
+         
+         
 #         sort_order = hist.argsort()
 #         sorted_hist = hist[sort_order[::-1]]
 #         sorted_bins = bins[sort_order[::-1]]
-#         
+         
 #         print sorted_hist
 #         print sorted_bins
-#         
+         
 #         plt.hist(image.ravel(),256,[0,256]) 
 #         plt.show()
 
+        hasColorBackGround = False;
+        if sum(hist[-threshold_hist:]) / float(dim[0]*dim[1]) <= (255-4*threshold_hist)/float(255):
+            hasColorBackGround = True;
         
         for i in range(0, dim[0] - kernel_size[0] + 1):
             for j in range(0, dim[1] - kernel_size[1] + 1):
@@ -163,24 +189,30 @@ class PhyloParser():
                 patch_variance =  np.var(patch)
 #                 patch_sum = np.sum(patch)*255
                 patch_mean = np.mean(patch)*255
+                
+                var_map[i, j] = patch_variance ## for debugging
             
                 
-#                 threshold_sum = kernel_size[0] * kernel_size[1] * threshold_pixel
-                
 #                 print "%d, %d"%(i, j)
-#                 print patch
+#                 print image[i:i+kernel_size[0], j:j+kernel_size[1]]
 #                 print "variacne:", patch_variance
 #                 print "mean:", patch_mean
+#                 print "make white?", patch_variance < threshold_var and patch_mean > threshold_pixel
+#                 PhyloParser.displayImage(image[i:i+kernel_size[0], j:j+kernel_size[1]])
                 
-                if patch_variance < threshold_var and patch_mean > threshold_pixel:
+                if patch_variance < threshold_var and patch_mean > threshold_pixel:                 
                     mask[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
 
-        image[np.where(mask == 255)] = 255
+
+        if hasColorBackGround:
+#             print "remove background"
+            image[np.where(mask == 255)] = 255
         
-#         print "mask"
-#         PhyloParser.displayImage(mask)
-#         print "image"
-#         PhyloParser.displayImage(image)
+        # recover defect using morphology
+        kernel = cv.getStructuringElement(cv.MORPH_RECT, morph_kernel_size)
+        mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
+        
+        var_map= var_map * 255/(np.max(var_map) - np.min(var_map)) ## for debugging
         
         return image, mask
     
