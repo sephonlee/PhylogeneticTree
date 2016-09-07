@@ -266,10 +266,21 @@ class PhyloParser():
         mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
         
         var_map= var_map * 255/(np.max(var_map) - np.min(var_map)) ## for debugging
+
+        # var_map = var_map.astype('uint8')
+        # varMap = np.zeros(dim, dtype = np.uint8)
+        # plt.imshow(var_map, cmap='Greys_r')
+        # plt.show()
+        # _, contours, hierarchy= cv.findContours(var_map, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+        # cv.drawContours(varMap, contours, -1, (255), thickness = -1)
+        # plt.imshow(varMap, cmap='Greys_r')
+        # plt.show()
+
         
 #         PhyloParser.displayImage(var_map)
         
         return image, mask, text_mask, var_map
+
     
     ## end static method for preprocessing ##
     
@@ -297,8 +308,7 @@ class PhyloParser():
         if image_data.treeMask is not None:
             print "Found available tree mask! Applied the tree mask"
             image = PhyloParser.removeLabels(image, image_data.treeMask)
-               
-               
+
         image = PhyloParser.negateImage(image)
         
         # find vertical lines
@@ -375,15 +385,16 @@ class PhyloParser():
                     if x1+margin < vx1 and vx1 < x2-margin and vy1 < y1 and y1 < vy2:
                         newline1 = [x1, y1, vx1, y2, vx1-x1]
                         newline2 = [vx1, y1, x2, y2, x2-vx1]
-                        newList.append(tuple(newline1))
-                        newList.append(tuple(newline2))
-                        isnotcut = False
-                        break
+                        if (vx1-x1+0.0) / length > 0.3 and (vx1 - x1+0.0)/length < 0.7:
+                            newList.append(tuple(newline1))
+                            newList.append(tuple(newline2))
+                            isnotcut = False
+                            break
                 if isnotcut:
                     newList.append(line)
                     
         return newList
-    
+
     ## end static method for detectLine ##
     
     
@@ -1212,7 +1223,7 @@ class PhyloParser():
                 if x1 > hx1 - margin and x1 < hx1 + margin and y2 > hy1 - margin and y2 < hy1 + margin:
                     lowerLeave.append(hline)
                     isLowerLeave = True
-                if x1 -margin < hx1  and x1 + margin > hx1  and y1 -margin < hy1 and y2 + margin > hy1:
+                if x1 -margin < hx1  and x1 + margin > hx1  and y1 + margin < hy1 and y2 - margin > hy1:
                     if not (isUpperLeave or isLowerLeave):
                         interLeave.append(hline)
             if len(upperLeave) > 0 or len(lowerLeave) > 0 or len(interLeave) > 0:
@@ -1488,8 +1499,11 @@ class PhyloParser():
             else:
                 print "unknown bad happens"
                 image_data.defineTreeHead()## For now, it still defines the tree head. However, we need something else returned to notice it's not perfect
+                print self.treeRecover(image_data)
+                image_data.treeHead.getNodeInfo()
                 if debug:
                     print "TODO: draw something here"
+                    image_data.displayTrees('final')
         
         else:
             print "Error! Please do detectLine and matchLine before this method"
@@ -1549,17 +1563,18 @@ class PhyloParser():
         verLines = image_data.verLines
         breakNodeList = []
         tmpList = rootList[:]
+
         for node in rootList:
             if node in tmpList:
                 if not node.isComplete:
-                    for breakNode in node.breakSpot:
-                        print breakNode.branch, breakNode.to[0], breakNode.to[1]
+                    for breakNode in node.breakSpot[:]:
+
                         isFixed = False
                         isUpper = True
                         if not ((breakNode.to[0] or breakNode.upperLeave) or (breakNode.to[1] or breakNode.lowerLeave)):
                             pass
                         elif (breakNode.to[0] or breakNode.upperLeave) and not (breakNode.to[1] or breakNode.lowerLeave):
-                            print "upper"
+                            print "lower"
                             x1, y1, x2, y2, length = breakNode.branch
                             result = self.getNodeBranchOnTheRight((x2,y2), rootList)
                             if result:  
@@ -1571,10 +1586,10 @@ class PhyloParser():
                                 if result.isComplete:
                                     print "remove"
                                     if result in tmpList:
-                                        tmpList.remove(result)
+                                        tmpList.remove(result)                                
                                 node.breakSpot.remove(breakNode)
+                                result.whereFrom = breakNode
                                 isFixed = True
-                                print result.branch
                             else:
                                 isUpper = False
 
@@ -1593,9 +1608,6 @@ class PhyloParser():
                                         tmpList.remove(result)
                                 result.whereFrom = breakNode
                                 isFixed = True
-                                print result.branch
-
-
                         if isUpper:
                             breakSpot = 'upper'
                         else:
@@ -1606,7 +1618,6 @@ class PhyloParser():
         rootList = tmpList[:]
         for node in rootList:
             if node in tmpList:
-                print node.branch, node.breakSpot, node.whereFrom
                 if len(node.breakSpot) == 0 and node.whereFrom != None:
 
                     tmpList.remove(node)
@@ -1671,17 +1682,12 @@ class PhyloParser():
         anchorLines = image_data.anchorLines
         parent = image_data.parent
         if mode == 'upper':
-            isAnchorLine = False
             if node.upperLeave:
-                for line in anchorLines:
-                    if self.isSameLine(line, node.upperLeave):
-                        node.isUpperAnchor = True
-                        isAnchorLine = True
-                        return True
-                if not isAnchorLine:
+                if node.isUpperAnchor:
+                    return True
+                else:
                     for package in parent:
                         lines, dist = package
-
                         if self.isSameLine(lines[0], node.upperLeave):
                             newNode = Node(node.upperLeave, lines[1])
                             nodeTo = list(node.to)
@@ -1690,6 +1696,7 @@ class PhyloParser():
 
                     return False
             else:
+
                 if node.isRoot:
                     node.breakSpot.append(node)
                 else:
@@ -1698,14 +1705,10 @@ class PhyloParser():
                 return False
 
         elif mode == 'lower':
-            isAnchorLine = False
             if node.lowerLeave:
-                for line in anchorLines:
-                    if self.isSameLine(line, node.lowerLeave):
-                        node.isLowerAnchor = True
-                        isAnchorLine = True
-                        return True
-                if not isAnchorLine:
+                if node.isLowerAnchor:
+                    return True
+                else:
                     for package in parent:
                         lines, dist = package
                         if self.isSameLine(lines[0], node.lowerLeave):
@@ -1722,15 +1725,12 @@ class PhyloParser():
                     rootNode.breakSpot.append(node)
                 return False
         elif mode[:5] == 'inter':
-            isAnchorLine = False
+
             index = int(mode[5])
             if index < len(node.interLeave) and node.interLeave[index]:
-                for line in anchorLines:
-                    if self.isSameLine(line, node.interLeave[index]):
-                        node.isInterAnchor[index] = True
-                        isAnchorLine = True
-                        return True
-                if not isAnchorLine:
+                if node.isInterAnchor[index]:
+                    return True
+                else:
                     for package in parent:
                         lines, dist = package
                         if self.isSameLine(lines[0], node.interLeave[index]):
@@ -1772,6 +1772,7 @@ class PhyloParser():
                             rootList.append(subnode)
                 if foundRoot:
                     (seen, loop) = self.groupNodes(rootNode, seen, image_data)
+        rootList = sorted(rootList, key = lambda x: -x.area)
 
         image_data.rootList = rootList
         return image_data
@@ -1820,7 +1821,6 @@ class PhyloParser():
                     isComplete = False
                     lineList.append(rootNode.branch)
         if not rootNode.isBinary:
-            print rootNode.getNodeInfo()
             for index, to in enumerate(rootNode.otherTo):
                 if to:
                     if rootNode.branch != to.branch:
@@ -1897,7 +1897,6 @@ class PhyloParser():
                     lineList.append(node.lowerLeave)
 
             if not node.isBinary:
-                print rootNode.getNodeInfo()
                 for index, to in enumerate(node.otherTo):
 
                     if to:
@@ -1940,18 +1939,31 @@ class PhyloParser():
 
         parent = image_data.parent
         children = image_data.children
+        anchorLines = image_data.anchorLines
         nodeList = []
         for item in children:
             lines, dist = item
             (branch, hlines) = lines
             match = False
+            isAnchor = []
+            hlines = list(hlines)
+            for index, line in enumerate(hlines):
+                isAnchor.append(False)
+                if line:
+                    for anchorLine in anchorLines:
+                        if self.isSameLine(line, anchorLine):
+                            hlines[index] = anchorLine
+                            isAnchor[index] = True
+            hlines = tuple(hlines)
             for pitem in parent:
                 ((root, pbranch), pdist) = pitem
                 if self.isSameLine(branch, pbranch):
                     match = True
                     if len(hlines) <= 2:
                         upperLeave, lowerLeave = hlines
-                        a = Node(root, branch, upperLeave, lowerLeave)                  
+                        a = Node(root, branch, upperLeave, lowerLeave) 
+                        a.isUpperAnchor = isAnchor[0]
+                        a.isLowerAnchor = isAnchor[1]           
                     else:
                         hlines = list(hlines)
                         interLine = []
@@ -1964,12 +1976,13 @@ class PhyloParser():
                             else:
                                 interLine.append(line)
                         a = Node(root,branch,upperLeave,lowerLeave)
-
+                        a.isUpperAnchor = isAnchor[0]
+                        a.isLowerAnchor = isAnchor[1]
                         a.interLeave = interLine
                         numInterLeave = len(hlines) - 2
                         for index in range(numInterLeave):
                             a.otherTo.append(None)
-                            a.isInterAnchor.append(False)
+                            a.isInterAnchor.append(isAnchor[index+2])
                             a.interLabel.append(None)
                         a.isBinary = False
                     nodeList.append(a)
@@ -1978,6 +1991,8 @@ class PhyloParser():
                 if len(hlines) <=2:
                     upperLeave, lowerLeave = hlines
                     a = Node(None, branch ,upperLeave, lowerLeave)
+                    a.isUpperAnchor = isAnchor[0]
+                    a.isLowerAnchor = isAnchor[1]
                 else:
                     hlines = list(hlines)
                     for index, line in enumerate(hlines):
@@ -1989,42 +2004,122 @@ class PhyloParser():
                         else:
                             interLine.append(line)
                     a = Node(None, branch, upperLeave, lowerLeave)
+                    a.isUpperAnchor = isAnchor[0]
+                    a.isLowerAnchor = isAnchor[1]
                     a.interLeave = interLine
                     numInterLeave = len(hlines) - 2
                     for index in range(numInterLeave):
                         a.interLabel.append(None)
                         a.otherTo.append(None)
+                        a.isInterAnchor.append(isAnchor[index+2])
                         a.isInterAnchor.append(False)
 
                     a.isBinary = False
 
                 nodeList.append(a)
+        nodeList = sorted(nodeList, key = lambda x: -x.branch[0])
         for node in nodeList:
-            if node.root:
+            potentialUpperLeaves = []
+            potentialLowerLeaves = []
+            potentialInterLeaves = []
+            if not node.isBinary:
+                for line in node.interLeave:
+                    potentialInterLeaves.append([])
+            if not (node.isUpperAnchor and node.isLowerAnchor and node.isBinary):
                 for subNode in nodeList:
-                    if subNode != node and subNode.branch != node.branch:                   
-                        if subNode.upperLeave:
-                            if self.isSameLine(node.root, subNode.upperLeave):
-                                node.whereFrom = subNode
-                                tmp = list(subNode.to)
-                                tmp[0] = node
-                                subNode.to = tuple(tmp)
-                                break
-                        if subNode.lowerLeave:
-                            if self.isSameLine(node.root, subNode.lowerLeave):
-                                node.whereFrom = subNode
-                                tmp = list(subNode.to)
-                                tmp[1]= node
-                                subNode.to = tuple(tmp)
-                                break
-                        if not subNode.isBinary :
-                            for index, line in enumerate(subNode.interLeave):
-                                if self.isSameLine(node.root, line):
-                                    node.whereFrom = subNode
-                                    subNode.otherTo[index] = node
-                                    break
+                    if subNode!=node and subNode.branch != node.branch and subNode.root:
+                        if node.upperLeave and not node.isUpperAnchor:
+                            if self.isSameLine(subNode.root, node.upperLeave):
+                                score = self.evaluateNode(subNode)
+                                potentialUpperLeaves.append((subNode, score))
+                        if node.lowerLeave and not node.isLowerAnchor:
+                            if self.isSameLine(subNode.root, node.lowerLeave):
+                                score = self.evaluateNode(subNode)
+                                potentialLowerLeaves.append((subNode, score))
+                        if not node.isBinary:
+                            for index, interLine in enumerate(node.interLeave):
+                                if self.isSameLine(interLine, subNode.root):
+                                    score = self.evaluateNode(subNode)
+                                    potentialInterLeaves[index].append((subNode, score))
+            print "before", potentialUpperLeaves
+            potentialUpperLeaves = sorted(potentialUpperLeaves, key = lambda x: -x[1])
+            potentialLowerLeaves = sorted(potentialLowerLeaves, key = lambda x: -x[1])
+            print "after", potentialUpperLeaves
+            
+            tmpTo = list(node.to)
+            if len(potentialUpperLeaves) != 0:
+                tmpTo[0] = potentialUpperLeaves[0][0]
+                potentialUpperLeaves[0][0].whereFrom = node
+            if len(potentialLowerLeaves) !=0:
+                tmpTo[1] = potentialLowerLeaves[0][0]
+                potentialLowerLeaves[0][0].whereFrom = node
+            node.to = tuple(tmpTo)
+            print node.to
+            if len(potentialInterLeaves)!=0:               
+                for index, interLeave in enumerate(potentialInterLeaves):
+                    if len(interLeave)!=0:
+                        tmpList = sorted(interLeave, key = lambda x: -x[1])
+                        
+                        node.otherTo[index] = tmpList[0][0]
+                        tmpList[0][0].whereFrom = node
+        # for node in nodeList:
+        #     if node.root:
+        #         for subNode in nodeList:
+        #             if subNode != node and subNode.branch != node.branch:                   
+        #                 if subNode.upperLeave:
+        #                     if self.isSameLine(node.root, subNode.upperLeave):
+        #                         node.whereFrom = subNode
+        #                         tmp = list(subNode.to)
+        #                         tmp[0] = node
+        #                         subNode.to = tuple(tmp)
+        #                         break
+        #                 if subNode.lowerLeave:
+        #                     if self.isSameLine(node.root, subNode.lowerLeave):
+        #                         node.whereFrom = subNode
+        #                         tmp = list(subNode.to)
+        #                         tmp[1]= node
+        #                         subNode.to = tuple(tmp)
+        #                         break
+        #                 if not subNode.isBinary :
+        #                     for index, line in enumerate(subNode.interLeave):
+        #                         if self.isSameLine(node.root, line):
+        #                             node.whereFrom = subNode
+        #                             subNode.otherTo[index] = node
+        #                             break
         image_data.nodeList = nodeList
         return image_data
+    @staticmethod
+    def evaluateNode(node):
+        score = 0
+        if node.upperLeave:
+            score +=1
+            if node.to[0]:
+                score +=1
+                if node.to[0].score:
+                    score += node.to[0].score
+            elif node.isUpperAnchor:
+                score +=1
+        if node.lowerLeave:
+            score +=1
+            if node.to[1]:
+                if node.to[1].score:
+                    score+= node.to[1].score
+            elif node.isLowerAnchor:
+                score +=1
+        if not node.isBinary:
+            for index, line in enumerate(node.interLeave):
+                if line:
+                    score+=1
+                    if node.otherTo[index]:
+                        score+=1
+                        if node.otherTo[index].score:
+                            score+=node.otherTo[index].score
+                    elif node.isInterAnchor[index]:
+                        score +=1
+        node.score = score
+        return score
+
+
 
     @staticmethod
     def isSameLine(aline, bline, margin = 5):

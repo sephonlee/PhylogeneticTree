@@ -211,6 +211,7 @@ class ImageData():
         for node in self.nodeList:
             count +=1
             color = self.getColor(count)
+
             if node.root:
                 x1, y1, x2, y2, length = node.root
                 cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
@@ -228,8 +229,8 @@ class ImageData():
                     x1, y1, x2, y2, length = line
                     cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
 
-        plt.imshow(whatever)
-        plt.show()
+            plt.imshow(whatever)
+            plt.show()
 
 
 
