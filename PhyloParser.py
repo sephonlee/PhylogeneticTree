@@ -40,11 +40,22 @@ class PhyloParser():
             PhyloParser.displayImage(image_data.varianceMask)
 
         #determine effective area and save the masks into image_data
+        varianceMask = np.ones((200,200), dtype = np.uint8)*255
+        varianceMask[20:180,10:40] = 0
+        varianceMask[50:70,20:30] = 255
+        varianceMask[55:60,22:24] = 0
+        
+        varianceMask[20:180,70:120] = 0
+        
+        PhyloParser.displayImage(varianceMask)
+        
         image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.varianceMask)
         
         if debug:
             print "display tree mask"
             PhyloParser.displayImage(image_data.treeMask)
+            print "display non-tree mask"
+            PhyloParser.displayImage(image_data.nonTreeMask)
 
         image = PhyloParser.bilateralFilter(image)
         if debug:
@@ -121,18 +132,50 @@ class PhyloParser():
         height, width = image.shape
         image = cv.copyMakeBorder(image, 1, 1, 1, 1, cv.BORDER_CONSTANT, value = 0)
         _, contours, hierarchy= cv.findContours(image.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+        
+        lenghtList = []
         for cnts in contours:
+            lenghtList.append(len(cnts))
             for index, points in enumerate(cnts):
-                cnts[index] = points - 1
+                cnts[index] = points - 1 #shift back (because of padding)
+           
+
+        
+        hierarchy = hierarchy[0].tolist()
+        temp =  zip(contours, hierarchy)
+        temp = sorted(temp, key = lambda x: -len(x[0]))
+        
+        contours = [x for x, y in temp]
+        hierarchy = [y for x, y in temp]
                 
-        contours = sorted(contours, key = lambda x: -len(x))
+#         contours = sorted(contours, key = lambda x: -len(x))
+        
+#         for i in range(0,5):
+#             print "length,", len(contours[i])
         
         mask = np.zeros((height,width), dtype=np.uint8)
         cv.drawContours(mask, contours, 0, (255), thickness = -1)
+        
+        PhyloParser.displayImage(mask)
+        
         nonTreeMask = np.zeros((height, width), dtype = np.uint8)
 
+        print contours[0][0:10]
+        print contours[0].shape
+#         for point in contours[0]:
+#             print point[0]
+#             print point[0,0]
+            
+        print [contours[0]]
+
         for index in range(1, len(contours)):
-            cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
+#             print contours
+#             nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+            # draw only contour in level 0
+            if hierarchy[index][3] == -1:
+                cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
+#             print hierarchy[index][3] == -1
+#             PhyloParser.displayImage(nonTreeMask)
 
         return mask, nonTreeMask, contours
 
@@ -296,27 +339,6 @@ class PhyloParser():
     # the image is in the image data
     # fill up the list in image_data
     # return the image_data
-    def getLines_(image, image_data, mode, minLength = 10):
-        
-        tmp = cv.HoughLinesP(image, rho = 9, theta = np.pi, threshold = 10, minLineLength =minLength, maxLineGap = 0)
-        
-        if mode == 0:
-            for line in tmp:
-                x1, y1, x2, y2 = list(line[0])
-                lineList = (x1, y2, x2, y1, abs(y2-y1))
-                image_data.addVerticleLine(lineList)
-        elif mode == 1:
-            for line in tmp:
-                x1, y1, x2, y2 = line[0]
-                y1 = -y1 + image_data.image_width
-                y2 = -y2 + image_data.image_width
-                lineList = (y1, x2, y2, x1, abs(y2-y1))
-                image_data.addHorizontalLine(lineList)
-                
-                
-        return image_data
-    
-    @staticmethod
     def getLines(image, mode, minLength = 10):
         
         tmp = cv.HoughLinesP(image, rho = 9, theta = np.pi, threshold = 10, minLineLength = minLength, maxLineGap = 0)
@@ -362,30 +384,6 @@ class PhyloParser():
                     
         return newList
     
-    def cutLines_(self, image_data, length_threshold = 20):
-
-        newList = []
-        margin = 5
-        for line in image_data.horLines:
-            if line[4] < length_threshold:
-                newList.append(line)
-            else:
-                x1, y1, x2, y2, length = line
-                isnotcut = True
-                for vx1, vy1, vx2, vy2, vlength in image_data.verLines:
-                    if x1+margin < vx1 and vx1 < x2-margin and vy1 < y1 and y1 < vy2:
-                        newline1 = [x1, y1, vx1, y2, vx1-x1]
-                        newline2 = [vx1, y1, x2, y2, x2-vx1]
-                        newList.append(tuple(newline1))
-                        newList.append(tuple(newline2))
-                        isnotcut = False
-                        break
-                if isnotcut:
-                    newList.append(line)
-                    
-        image_data.horLines = newList
-        return image_data
-
     ## end static method for detectLine ##
     
     
