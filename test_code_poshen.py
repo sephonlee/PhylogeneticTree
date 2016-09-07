@@ -13,10 +13,11 @@ import operator
 import random
 from os import listdir
 from os.path import isfile, join
-from featureDetection import  *
 
 
 from PhyloParser import *
+
+
 
 def getFilesInFolder(folderPath):
     fileNameList = [f for f in listdir(folderPath) if isfile(join(folderPath, f))]
@@ -56,8 +57,8 @@ if __name__ == '__main__':
     
     phyloPaser = PhyloParser()
     
-#     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC1474148_ijbsv02p0133g05.jpg'
-#     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2324105_1471-2148-8-100-1.jpg'
+    filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC1474148_ijbsv02p0133g05.jpg'
+    filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2324105_1471-2148-8-100-1.jpg'
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2323573_pone.0002033.g002.jpg'
 
 
@@ -81,6 +82,7 @@ if __name__ == '__main__':
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC535349_1471-2148-4-46-1.jpg"
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2174949_1471-213X-7-118-3.jpg"
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2614493_gb-2008-9-11-r161-3.jpg"
+#     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_6477.jpg"
 #     mask = np.ones((663,600), dtype = np.uint8)
 #     mask[0:,385:] = 0
     
@@ -122,24 +124,24 @@ if __name__ == '__main__':
 #     image, mask = PhyloParser.purifyBackGround(image, kernel_size=(3, 3))
 #     print time.time() - startTime
     
-
+#     image = image[260:285, 275:290]
     image_data = ImageData(image)
 
     image_data = phyloPaser.preprocces(image_data, debug = False)
         
     image_data = phyloPaser.getCorners(image_data, debug = False)   
-    image_data = phyloPaser.detectLines(image_data, debug = True)
+    image_data = phyloPaser.detectLines(image_data, debug = False)
     
-    image_data = phyloPaser.makeLinesFromCorner(image_data, debug = True)
+    image_data = phyloPaser.makeLinesFromCorner(image_data, debug = False)
     image_data = phyloPaser.includeLinesFromCorners(image_data)
-    
-    image_data = phyloPaser.refineLines(image_data, debug = True)
+
+#     image_data = phyloPaser.refineLines(image_data, debug = True)
 
 
-#     print "match line"
-#     image_data = phyloPaser.matchLines(image_data, debug = True)
+    image_data = phyloPaser.matchLines(image_data, debug = True)
+
 # #      
-# #     image_data = phyloPaser.getSpecies(image_data)
+    image_data = phyloPaser.getSpecies(image_data)
 # #      
 # #      
 #     image_data = phyloPaser.makeTree(image_data, debug = True)

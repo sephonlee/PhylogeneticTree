@@ -4,8 +4,11 @@ from Node import *
 from ImageData import *
 from sets import Set
 import pytesseract
-# import Image
-from PIL import Image
+
+try:
+    import Image
+except:
+    from PIL import Image
 
 
 
