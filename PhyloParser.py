@@ -10,59 +10,41 @@ class PhyloParser():
     def __init__(self):
         return 
     
-    def preprocces(self, image_data, debug = False):
+    
+    @staticmethod
+    def preprocces(image_data, debug = False):
         
         image = image_data.image
-        
-        # image = self.downSample(image)
 
         if debug:
             print "Preprocessing image ..."
             print "Input image:"
-            self.displayImage(image)
+            PhyloParser.displayImage(image)
 
         #save original image
         image_data.originalImage = image.copy() 
 
-        # if debug:
-        #     self.displayImage(image)
-
-        self.originalImage = image.copy()
-
         #purify background
-        image, image_data.varianceMask = self.purifyBackGround(image)
+        image, image_data.varianceMask = PhyloParser.purifyBackGround(image)
         if debug:
             print "Purify color background"
-            self.displayImage(image)
+            PhyloParser.displayImage(image)
  
-        #determine effective area
-        image_data.treeMask, image_data.nonTreeMask, image_data.contours = self.findContours(image_data.varianceMask)       
-
-         
-#         empty non-tree information
-#         image = self.removeLabels(image, image_data.treeMask)
-         
-#         if debug:
-#             print "Text label Removed"
-#             self.displayImage(image)
+        #determine effective area and save the masks into image_data
+        image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.varianceMask)
  
-        image = self.bilateralFilter(image_data.originalImage)
+        image = PhyloParser.bilateralFilter(image_data.originalImage)
         if debug:
             print "bilateralFilter image"
-            self.displayImage(image)
-            
-#         image = self.binarize(image, thres = 180, mode = 3)
-#         if debug:
-#             print "binerized image"
-#             self.displayImage(image)
-            
+            PhyloParser.displayImage(image)
+                        
         image_data.image_preproc = image
+        image_data.preprocessed = True
 
         return image_data
         
     ## static method for preprocessing ##
     
-
     @staticmethod
     def sobelFilter(image, k=5, sigma = 3):
         image  = PhyloParser.gaussianBlur(image, (k,k), sigma)
@@ -117,8 +99,9 @@ class PhyloParser():
     def sortByCntsLength(item):
         return -len(item)
 
-
-    def findContours(self, image):
+    @staticmethod
+    # return a mask of the tree, a mask of text and contours
+    def findContours(image):
 
         image = 255 - image
 
@@ -128,8 +111,9 @@ class PhyloParser():
         for cnts in contours:
             for index, points in enumerate(cnts):
                 cnts[index] = points - 1
-        contours = sorted(contours, key=self.sortByCntsLength)
-
+                
+        contours = sorted(contours, key = lambda x: -len(x))
+        
         mask = np.zeros((height,width), dtype=np.uint8)
         cv.drawContours(mask, contours, 0, (255), thickness = -1)
         nonTreeMask = np.zeros((height, width), dtype = np.uint8)
@@ -144,14 +128,9 @@ class PhyloParser():
         image[np.where(mask == 0)] = 255
         return image
 
-  
-    @staticmethod
-    def purifyBackGroundV2(image, threshold = 0.01, kernel_size = (3,3)):
-        
-        return
     
     @staticmethod
-
+    # remove color back ground
     def purifyBackGround(image, threshold_var = 0.008, threshold_pixel = 60, kernel_size = (3,3)):
 
         dim = image.shape
@@ -201,19 +180,25 @@ class PhyloParser():
 #         PhyloParser.displayImage(image)
         
         return image, mask
+    
     ## end static method for preprocessing ##
     
 
-    def detectLines(self, image_data, debug = False):
+    @staticmethod
+    def detectLines(image_data, debug = False):
         
-        # use preprocessed image       
-        image = image_data.image_preproc
+        # use preprocessed image
+        if image_data.preprocessed:      
+            image = image_data.image_preproc
+        else:
+            image = image_data.originalImage
         
         # sub-preprocessing 
-        image = self.binarize(image, thres = 180, mode = 3)
+        image = PhyloParser.binarize(image, thres = 180, mode = 3)
         if debug:
+            print "detecting lines ..."
             print "binerized image"
-            self.displayImage(image)
+            PhyloParser.displayImage(image)
         
         # save the preprocessed image into image_data
         image_data.image_preproc_for_line_detection = image
@@ -224,18 +209,21 @@ class PhyloParser():
             image = PhyloParser.removeLabels(image, image_data.treeMask)
                
                
-        image = self.negateImage(image)
+        image = PhyloParser.negateImage(image)
         
+        # find vertical lines
         mode = 0
-        image_data = self.getLines(image, image_data, mode, minLength = 12)  
-        
-        image = self.rotateImage(image)
-        
-        mode = 1
-        image_data = self.getLines(image, image_data, mode, minLength = 7)
+        image_data.verLines = PhyloParser.getLines(image, mode, minLength = 12)
 
-        image_data = self.cutLines(image_data)
-        
+        # find horizontal lines
+        image = PhyloParser.rotateImage(image)
+        mode = 1
+        image_data.horLines = PhyloParser.getLines(image, mode, minLength = 7)
+
+        # split horizontal lines that cut by vertical lines
+        # to solve the problem of Poseidon trigeminal stick
+        image_data.horLines = PhyloParser.cutLines(image_data.horLines, image_data.verLines)
+
         if debug:
             print "detectLines debugging"
             image_data.displayTargetLines('horLines')
@@ -261,11 +249,11 @@ class PhyloParser():
     # the image is in the image data
     # fill up the list in image_data
     # return the image_data
-    def getLines(image, image_data, mode, minLength = 10):
+    def getLines_(image, image_data, mode, minLength = 10):
         
         tmp = cv.HoughLinesP(image, rho = 9, theta = np.pi, threshold = 10, minLineLength =minLength, maxLineGap = 0)
         
-        if mode==0:
+        if mode == 0:
             for line in tmp:
                 x1, y1, x2, y2 = list(line[0])
                 lineList = (x1, y2, x2, y1, abs(y2-y1))
@@ -281,18 +269,41 @@ class PhyloParser():
                 
         return image_data
     
-    def cutLines(self, image_data):
+    @staticmethod
+    def getLines(image, mode, minLength = 10):
+        
+        tmp = cv.HoughLinesP(image, rho = 9, theta = np.pi, threshold = 10, minLineLength = minLength, maxLineGap = 0)
+        image_height, image_width =  image.shape
+
+        lineList = []
+        if mode == 0:
+            for line in tmp:
+                x1, y1, x2, y2 = list(line[0])
+                lineInfo = (x1, y2, x2, y1, abs(y2-y1))
+                lineList.append(lineInfo)
+        elif mode == 1:
+            for line in tmp:
+                x1, y1, x2, y2 = line[0]
+                y1 = -y1 + image_height 
+                y2 = -y2 + image_height
+                lineInfo = (y1, x2, y2, x1, abs(y2-y1))
+                lineList.append(lineInfo)
+                
+        return lineList
+    
+    @staticmethod
+    def cutLines(horLines, verLines, length_threshold = 20):
 
         newList = []
         margin = 5
-        for line in image_data.horLines:
-            if line[4] <20:
+        for line in horLines:
+            if line[4] < length_threshold:
                 newList.append(line)
             else:
                 x1, y1, x2, y2, length = line
                 isnotcut = True
-                for vx1, vy1, vx2, vy2, vlength in image_data.verLines:
-                    if x1+margin<vx1 and vx1<x2-margin and vy1<y1 and y1<vy2:
+                for vx1, vy1, vx2, vy2, vlength in verLines:
+                    if x1+margin < vx1 and vx1 < x2-margin and vy1 < y1 and y1 < vy2:
                         newline1 = [x1, y1, vx1, y2, vx1-x1]
                         newline2 = [vx1, y1, x2, y2, x2-vx1]
                         newList.append(tuple(newline1))
@@ -301,6 +312,30 @@ class PhyloParser():
                         break
                 if isnotcut:
                     newList.append(line)
+                    
+        return newList
+    
+    def cutLines_(self, image_data, length_threshold = 20):
+
+        newList = []
+        margin = 5
+        for line in image_data.horLines:
+            if line[4] < length_threshold:
+                newList.append(line)
+            else:
+                x1, y1, x2, y2, length = line
+                isnotcut = True
+                for vx1, vy1, vx2, vy2, vlength in image_data.verLines:
+                    if x1+margin < vx1 and vx1 < x2-margin and vy1 < y1 and y1 < vy2:
+                        newline1 = [x1, y1, vx1, y2, vx1-x1]
+                        newline2 = [vx1, y1, x2, y2, x2-vx1]
+                        newList.append(tuple(newline1))
+                        newList.append(tuple(newline2))
+                        isnotcut = False
+                        break
+                if isnotcut:
+                    newList.append(line)
+                    
         image_data.horLines = newList
         return image_data
 
@@ -310,7 +345,10 @@ class PhyloParser():
     @staticmethod
     def getCorners(image_data, mask = None, debug = False):
         
-        image = image_data.image_preproc
+        if image_data.preprocessed:      
+            image = image_data.image_preproc
+        else:
+            image = image_data.originalImage
         
         if debug:
             print "Getting corners..."
@@ -326,24 +364,27 @@ class PhyloParser():
         # save the preprocessed image into image_data
         image_data.image_preproc_for_corner = image
         
-#         mask = image_data.treeMask
-#         image = PhyloParser.removeLabels(image, image_data.treeMask)
-        
-#         print mask[200:220, 100:120]
-        
-        image_data.upCornerList = PhyloParser.detectCorners(image, 1, mask = mask)
-        image_data.downCornerList = PhyloParser.detectCorners(image, -1, mask = mask)
-        image_data.jointUpList = PhyloParser.detectCorners(image, 2, mask = mask)
+        if mask is not None:
+            image = PhyloParser.removeLabels(image, mask)
+            if debug:
+                print "use given mask"
+            
+        elif image_data.treeMask is not None:
+            image = PhyloParser.removeLabels(image, image_data.treeMask)
+            if debug:
+                print "use mask generated from preprocessing"
+        else:
+            if debug:
+                print "no mask"
+                
+        image_data.upCornerList = PhyloParser.detectCorners(image, 1)
+        image_data.downCornerList = PhyloParser.detectCorners(image, -1)
+        image_data.jointUpList = PhyloParser.detectCorners(image, 2)
         
 #         image_data.jointDownList = PhyloParser.detectCorners(image, -2, mask = mask)
         
-        if debug:
-            if mask is not None:
-                print "Result with use of mask"
-            else:
-                print "Result without use of mask"
-                
-            PhyloParser.displayCorners(image, [image_data.upCornerList, image_data.downCornerList, image_data.jointUpList, image_data.jointDownList])
+        if debug:                
+            PhyloParser.displayCorners(image_data.image_preproc, [image_data.upCornerList, image_data.downCornerList, image_data.jointUpList, image_data.jointDownList])
         
         image_data.cornerDetected = True
         return image_data
@@ -437,7 +478,7 @@ class PhyloParser():
         
         
     @staticmethod
-    def detectCorners(image, mode, kernelSize = 3, mask = None):
+    def detectCorners(image, mode, kernelSize = 3):
         
 
         line_width = 1##
@@ -458,11 +499,8 @@ class PhyloParser():
         threshold= norPixelValue * pow(line_width,1.5) * 255 - 1 ####
 #         print "threshold: ", threshold
         upperBound = mmin + threshold
-            
-        if mask is not None and mask.shape == image.shape:
-            indices = np.where((filteredImage < upperBound) & mask == 1)
-        else:
-            indices = np.where(filteredImage < upperBound)
+                
+        indices = np.where(filteredImage < upperBound)
             
         cornerList = zip(indices[0], indices[1])
                 

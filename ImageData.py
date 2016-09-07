@@ -15,6 +15,7 @@ class ImageData():
     treeMask = None # determine the tree pixels
     nonTreeMask = None # determine the non-tree pixels
     contours = None #contours of the tree image. Index = 0 is the tree, others are labels or noise
+    preprocessed = False
     
     # filled by detectLine
     image_preproc_for_line_detection = None
@@ -129,16 +130,6 @@ class ImageData():
     @staticmethod
     def sortByNodeNum(item):
         return -item.numNodes
-   
-    def addHorizontalLine(self, line):
-        self.horLines.append(line)
-        
-    def addVerticleLine(self, line):
-        self.verLines.append(line)  
-    
-    def updateImage(self, image):
-        self.image = image
-        (self.image_height, self.image_width) = self.image.shape
         
     def updateImageDimension(self):
         self.image_height, self.image_width = self.image.shape

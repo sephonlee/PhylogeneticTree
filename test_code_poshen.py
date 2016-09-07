@@ -63,7 +63,7 @@ if __name__ == '__main__':
 
 
     # bg example
-#     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2287175_1471-2148-8-57-2.jpg'
+    filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2287175_1471-2148-8-57-2.jpg'
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_336.jpg'
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_337.jpg'
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2397417_1471-2164-9-215-5.jpg'
@@ -81,8 +81,11 @@ if __name__ == '__main__':
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC535349_1471-2148-4-46-1.jpg"
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2174949_1471-213X-7-118-3.jpg"
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2614493_gb-2008-9-11-r161-3.jpg"
-    mask = np.ones((663,600), dtype = np.uint8)
-    mask[0:,385:] = 0
+#     mask = np.ones((663,600), dtype = np.uint8)
+#     mask[0:,385:] = 0
+    
+    
+#     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/14087683_10153822638021658_1412380893_o.jpg"
     
     print filename
     image = cv.imread(filename, 0)
@@ -109,48 +112,29 @@ if __name__ == '__main__':
 #     image = image[15:70, 320:350]
     
 #     image = image[10:50,  330:340]
+
+#     image = image[350:375 , 90:115]
+    print "original image"
     PhyloParser.displayImage(image)
-    
-    
-#     PhyloParser.displayImage(image[280:300, 240:250])
-#     print image[280:300, 240:250]
+
     
 #     startTime = time.time()
-#     image = PhyloParser.purifyBackGround(image, kernel_size=(3, 3))
+#     image, mask = PhyloParser.purifyBackGround(image, kernel_size=(3, 3))
 #     print time.time() - startTime
     
-#     PhyloParser.displayImage(image)
 
-
-#     thickness1 = getThickness(verLines, 'ver')
-#     thickness2 = getThickness(horLines, 'hor')    
-#     thickness = int(round((thickness1+thickness2)/2))
-            
-    print "ori"
-#     PhyloParser.displayImage(image)
-#     image = image[50:125, 230:280]
     image_data = ImageData(image)
 
-#     image_data.updateImage(phyloPaser.preprocces(image_data.image))
+    image_data = phyloPaser.preprocces(image_data, debug = False)
+        
+    image_data = phyloPaser.getCorners(image_data, debug = False)   
+    image_data = phyloPaser.detectLines(image_data, debug = True)
     
-#     print "pre"
-#     image_data.displayImage()
-    
-#     print "ori"
-#     PhyloParser.displayImage(image_data.originalImage)
-
-    image_data = phyloPaser.getCorners(image_data, debug = False)    
-    image_data = phyloPaser.detectLines(image_data, debug = False)
-
-    image_data = phyloPaser.makeLinesFromCorner(image_data, debug = False)
+    image_data = phyloPaser.makeLinesFromCorner(image_data, debug = True)
     image_data = phyloPaser.includeLinesFromCorners(image_data)
     
     image_data = phyloPaser.refineLines(image_data, debug = True)
 
-#     print phyloPaser.checkLine(image_data.image_preproc_for_corner, [29, 490, 64, 490, 35])
-    
-
-    
 
 #     print "match line"
 #     image_data = phyloPaser.matchLines(image_data, debug = True)
