@@ -54,6 +54,12 @@ if __name__ == '__main__':
 #     
 #     print time.time()-startTime
     
+
+    
+    
+    group = [[75, 89, 207, 496], [98, 110, 180, 496], [115, 128, 180, 433]]
+    new_group = PhyloParser.stitchBoxes(group)
+    print "new_group", new_group
     
     phyloPaser = PhyloParser()
     
@@ -64,8 +70,8 @@ if __name__ == '__main__':
 
 
     # bg example
-    filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2287175_1471-2148-8-57-2.jpg'
-#     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_336.jpg'
+#     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2287175_1471-2148-8-57-2.jpg'
+    filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_336.jpg'
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_337.jpg'
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2397417_1471-2164-9-215-5.jpg'
     
@@ -73,7 +79,7 @@ if __name__ == '__main__':
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2467406_1471-2148-8-193-4.jpg'
     
     # wide line example
-    filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC184354_1471-2148-3-16-2.jpg"
+#     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC184354_1471-2148-3-16-2.jpg"
     
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC184354_1471-2148-3-16-7.jpg"
     
@@ -120,6 +126,18 @@ if __name__ == '__main__':
     PhyloParser.displayImage(image)
 
     
+#     varianceMask = np.ones((200,200), dtype = np.uint8)*255
+#     varianceMask[20:180,10:40] = 0
+#     varianceMask[50:70,20:30] = 255
+#     varianceMask[55:60,22:24] = 0
+#      
+#     varianceMask[20:180,70:120] = 0
+# #         
+#     PhyloParser.displayImage(varianceMask)
+#     
+#     PhyloParser.findContours(varianceMask)
+    
+    
 #     startTime = time.time()
 #     image, mask = PhyloParser.purifyBackGround(image, kernel_size=(3, 3))
 #     print time.time() - startTime
@@ -138,10 +156,10 @@ if __name__ == '__main__':
 #     image_data = phyloPaser.refineLines(image_data, debug = True)
 
 
-    image_data = phyloPaser.matchLines(image_data, debug = True)
+    image_data = phyloPaser.matchLines(image_data, debug = False)
 
 # #      
-    image_data = phyloPaser.getSpecies(image_data)
+    image_data = phyloPaser.getSpecies_(image_data)
 # #      
 # #      
 #     image_data = phyloPaser.makeTree(image_data, debug = True)
