@@ -1386,11 +1386,11 @@ class PhyloParser():
         contourBoxes = sorted(contourBoxes, key = lambda x: (x[0], x[2])) #top, left
         anchorLines = sorted(anchorLines, key = lambda x: (x[3], x[2])) #top, right        
         
-        ## DEBUG
-#         img = varianceMask.copy()
-#         for b in contourBoxes:
-#             cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
-#             PhyloParser.displayLines(img, anchorLines)
+        # DEBUG
+        img = varianceMask.copy()
+        for b in contourBoxes:
+            cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+        PhyloParser.displayLines(img, anchorLines)
         
         
         contour_group = [] # a list of groups of contour boxes 
@@ -1549,12 +1549,21 @@ class PhyloParser():
         index = 0
         while index < len(boxGroup) and boxGroup[index][1][1] - boxGroup[index][1][0] < text_height_threshold:
             index += 1
-            
+        
+        # all boxes can't pass threshold
+        if index == len(boxGroup):
+            top = min(boxGroup[0][1][0], boxGroup[-1][1][0])
+            bot = max(boxGroup[0][1][1], boxGroup[-1][1][1])
+            left = min(boxGroup[0][1][2], boxGroup[-1][1][2])
+            right = max(boxGroup[0][1][3], boxGroup[-1][1][3])
+            return [[top, bot, left, right]]
+        
         print "start from index ", index
         if len(boxGroup) > 1:
             sub_group = [boxGroup[index][1]]
             print sub_group
             for i in range(index+1, len(boxGroup)):
+
                 box = boxGroup[i][1]
                 print "i=,", i, box
                 print "sub_group=", sub_group
@@ -1576,7 +1585,7 @@ class PhyloParser():
                     bot = max(sub_group[index][1], box[1])
                     left = min(sub_group[index][2], box[2])
                     right = max(sub_group[index][3], box[3])
-                    print (top, bot, left, right)
+                    print [top, bot, left, right]
                     sub_group[index] = [top, bot, left, right]
                 # belong to no sub_group
                 # add a new sub_group
@@ -1650,6 +1659,7 @@ class PhyloParser():
             # next box is a qualified
             else:
                 # update current box bot
+                print sub_group
                 boundary = (sub_group[current_index][1] + sub_group[next_index][0])/2
                 sub_group[current_index][1] = boundary
                 # update next box top
@@ -1759,7 +1769,7 @@ class PhyloParser():
         max_location = np.max(np.max(contour, axis=1), axis = 0)
         min_location = np.min(np.min(contour, axis=1), axis = 0)
         
-        box = (min_location[1], max_location[1], min_location[0], max_location[0])
+        box = [min_location[1], max_location[1], min_location[0], max_location[0]]
         return box
     
     @staticmethod
