@@ -196,6 +196,7 @@ class ImageData():
                         cv.rectangle(whatever , (x1, y1), (x2, y2), color=color, thickness=2)
             if target == 'final':
                 break
+
             count +=1
         plt.imshow(whatever)
         plt.show()
@@ -218,6 +219,7 @@ class ImageData():
             if node.branch:
                 x1, y1, x2, y2, length = node.branch
                 cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+
             if node.upperLeave:
                 x1, y1, x2, y2, length = node.upperLeave
                 cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
@@ -229,8 +231,8 @@ class ImageData():
                     x1, y1, x2, y2, length = line
                     cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
 
-            plt.imshow(whatever)
-            plt.show()
+        plt.imshow(whatever)
+        plt.show()
 
 
 

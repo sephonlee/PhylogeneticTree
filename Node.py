@@ -23,7 +23,10 @@ class Node():
         self.area = None
         self.breakSpot = []
         self.status = 0
+        self.isConnected = False
         self.score = None # update by method evaluateNode
+        self.nodesNetwork = [] #update by method createNodes
+
 
     def isAnchor(self, anchorLines):
         if self.upperLeave in anchorLines:
@@ -49,6 +52,12 @@ class Node():
             for index, leave in enumerate(self.interLeave):
                 print 'one of the interleavs: ', leave, 'isAnchor? ', self.isInterAnchor[index]
                 print 'this leave goes to the node: ', self.otherTo[index]
+                if leave[0] == 75 and leave[1] == 354:
+                    self.otherTo[index].getNodeInfo()
+        if self.whereFrom:
+            print 'Connected from the node (branch): ', self.whereFrom.branch
+        print 'node score: ', self.score
+        print 'node isComplete? ', self.isComplete
         print '------------------------------'
 
 

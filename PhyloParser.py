@@ -5,6 +5,8 @@ from ImageData import *
 from sets import Set
 import pytesseract
 import time
+import math
+
 
 try:
     import Image
@@ -1347,7 +1349,7 @@ class PhyloParser():
     # 1F2T: cut, recontour
     # 1F2F: drop 
     @staticmethod
-    def getSpecies_(image_data, debug = True):
+    def getSpecies_(image_data, debug = False):
         image = image_data.image
         nonTreeMask = image_data.nonTreeMask
         treeMask = image_data.treeMask
@@ -1799,21 +1801,21 @@ class PhyloParser():
 
     # End static methos for getSpecies
     
-    def makeTree(self, image_data, debug = True):
+    def makeTree(self, image_data, debug = False):
         
         if image_data.lineDetected and image_data.lineMatched:
         
 
             # Detect Label and Create Label List
-            image_data = self.getSpecies(image_data)
+            # image_data = self.getSpecies(image_data)
 
             # Create node from matched lines
             image_data = self.createNodes(image_data)
             if debug:
-                for node in image_data.nodeList:
-                    node.getNodeInfo()
+                # for node in image_data.nodeList:
+                #     node.getNodeInfo()
                 image_data.displayNodes()
-
+            pass
 
             # Gather trees from nodes
             image_data = self.createRootList(image_data)
@@ -2020,6 +2022,7 @@ class PhyloParser():
         return area
 
     def checkError(self, node, mode , image_data):
+     
         anchorLines = image_data.anchorLines
         parent = image_data.parent
         if mode == 'upper':
@@ -2086,6 +2089,7 @@ class PhyloParser():
                     rootNode.breakSpot.append(node)
                 return False
 
+
     def createRootList(self, image_data):
         nodeList = image_data.nodeList
         anchorLines = image_data.anchorLines
@@ -2098,7 +2102,6 @@ class PhyloParser():
                 stack.append(node)
                 foundRoot = False
                 while stack:
-
                     subnode = stack.pop()
                     if subnode in seen:
                         break               
@@ -2118,7 +2121,32 @@ class PhyloParser():
         image_data.rootList = rootList
         return image_data
 
+    @staticmethod    
+    def drawNode(whatever, node):
+        color = (255, 0, 0)
+        if node.root:
+            x1, y1, x2, y2, length = node.root
+            cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+        if node.branch:
+            x1, y1, x2, y2, length = node.branch
+            cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+
+        if node.upperLeave:
+            x1, y1, x2, y2, length = node.upperLeave
+            cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+        if node.lowerLeave:
+            x1, y1, x2, y2, length = node.lowerLeave
+            cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+        if not node.isBinary:
+            for line in node.interLeave:
+                x1, y1, x2, y2, length = line
+                cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+        return whatever
+
+
     def groupNodes(self, rootNode, seen, image_data):
+        whatever = image_data.image.copy()
+        whatever = cv.cvtColor(whatever, cv.COLOR_GRAY2RGB)
         anchorLines = image_data.anchorLines
         stack = []
         visit = []
@@ -2127,6 +2155,12 @@ class PhyloParser():
         lineList.append(rootNode.branch)
         rootNode.origin = rootNode
         isComplete = True
+
+        # rootNode.getNodeInfo()
+        # self.drawNode(whatever, rootNode)
+        # plt.imshow(whatever)
+        # plt.show()
+
         if rootNode.to[0]:
             if rootNode.branch != rootNode.to[0].branch:
                 stack.append(rootNode.to[0])
@@ -2185,6 +2219,10 @@ class PhyloParser():
         while stack:
             numNodes +=1
             node = stack.pop()
+            # node.getNodeInfo()
+            # self.drawNode(whatever, node)
+            # plt.imshow(whatever)
+            # plt.show()
             visit.append(node)
             node.origin = rootNode
             if node.to[0] :
@@ -2239,7 +2277,6 @@ class PhyloParser():
 
             if not node.isBinary:
                 for index, to in enumerate(node.otherTo):
-
                     if to:
                         if to not in seen:
                             seen.append(to)
@@ -2358,77 +2395,113 @@ class PhyloParser():
                     a.isBinary = False
 
                 nodeList.append(a)
-        nodeList = sorted(nodeList, key = lambda x: -x.branch[0])
-        for node in nodeList:
-            potentialUpperLeaves = []
-            potentialLowerLeaves = []
-            potentialInterLeaves = []
-            if not node.isBinary:
-                for line in node.interLeave:
-                    potentialInterLeaves.append([])
-            if not (node.isUpperAnchor and node.isLowerAnchor and node.isBinary):
-                for subNode in nodeList:
-                    if subNode!=node and subNode.branch != node.branch and subNode.root:
-                        if node.upperLeave and not node.isUpperAnchor:
-                            if self.isSameLine(subNode.root, node.upperLeave):
-                                score = self.evaluateNode(subNode)
-                                potentialUpperLeaves.append((subNode, score))
-                        if node.lowerLeave and not node.isLowerAnchor:
-                            if self.isSameLine(subNode.root, node.lowerLeave):
-                                score = self.evaluateNode(subNode)
-                                potentialLowerLeaves.append((subNode, score))
-                        if not node.isBinary:
-                            for index, interLine in enumerate(node.interLeave):
-                                if self.isSameLine(interLine, subNode.root):
-                                    score = self.evaluateNode(subNode)
-                                    potentialInterLeaves[index].append((subNode, score))
-            print "before", potentialUpperLeaves
-            potentialUpperLeaves = sorted(potentialUpperLeaves, key = lambda x: -x[1])
-            potentialLowerLeaves = sorted(potentialLowerLeaves, key = lambda x: -x[1])
-            print "after", potentialUpperLeaves
-            
-            tmpTo = list(node.to)
-            if len(potentialUpperLeaves) != 0:
-                tmpTo[0] = potentialUpperLeaves[0][0]
-                potentialUpperLeaves[0][0].whereFrom = node
-            if len(potentialLowerLeaves) !=0:
-                tmpTo[1] = potentialLowerLeaves[0][0]
-                potentialLowerLeaves[0][0].whereFrom = node
-            node.to = tuple(tmpTo)
-            print node.to
-            if len(potentialInterLeaves)!=0:               
-                for index, interLeave in enumerate(potentialInterLeaves):
-                    if len(interLeave)!=0:
-                        tmpList = sorted(interLeave, key = lambda x: -x[1])
-                        
-                        node.otherTo[index] = tmpList[0][0]
-                        tmpList[0][0].whereFrom = node
+        # nodeList = sorted(nodeList, key = lambda x: -x.branch[0])
+
         # for node in nodeList:
-        #     if node.root:
-        #         for subNode in nodeList:
-        #             if subNode != node and subNode.branch != node.branch:                   
-        #                 if subNode.upperLeave:
-        #                     if self.isSameLine(node.root, subNode.upperLeave):
-        #                         node.whereFrom = subNode
-        #                         tmp = list(subNode.to)
-        #                         tmp[0] = node
-        #                         subNode.to = tuple(tmp)
-        #                         break
-        #                 if subNode.lowerLeave:
-        #                     if self.isSameLine(node.root, subNode.lowerLeave):
-        #                         node.whereFrom = subNode
-        #                         tmp = list(subNode.to)
-        #                         tmp[1]= node
-        #                         subNode.to = tuple(tmp)
-        #                         break
-        #                 if not subNode.isBinary :
-        #                     for index, line in enumerate(subNode.interLeave):
-        #                         if self.isSameLine(node.root, line):
-        #                             node.whereFrom = subNode
-        #                             subNode.otherTo[index] = node
-        #                             break
+        #     if not node.isConnected:
+        #         potentialUpperLeaves = []
+        #         potentialLowerLeaves = []
+        #         potentialInterLeaves = []
+        #         if not node.isBinary:
+        #             for line in node.interLeave:
+        #                 potentialInterLeaves.append([])
+        #         if not (node.isUpperAnchor and node.isLowerAnchor and node.isBinary):
+        #             for subNode in nodeList:
+        #                 if subNode!=node and subNode.branch != node.branch and subNode.root:
+        #                     if node.upperLeave and not node.isUpperAnchor:
+        #                         if self.isSameLine(subNode.root, node.upperLeave):
+        #                             score = self.evaluateNode(subNode)
+        #                             potentialUpperLeaves.append((subNode, score))
+        #                     if node.lowerLeave and not node.isLowerAnchor:
+        #                         if self.isSameLine(subNode.root, node.lowerLeave):
+        #                             score = self.evaluateNode(subNode)
+        #                             potentialLowerLeaves.append((subNode, score))
+        #                     if not node.isBinary:
+        #                         for index, interLine in enumerate(node.interLeave):
+        #                             if self.isSameLine(interLine, subNode.root):
+        #                                 score = self.evaluateNode(subNode)
+        #                                 potentialInterLeaves[index].append((subNode, score))
+
+        #     potentialUpperLeaves = sorted(potentialUpperLeaves, key = lambda x: -x[1])
+        #     potentialLowerLeaves = sorted(potentialLowerLeaves, key = lambda x: -x[1])
+
+            
+        #     tmpTo = list(node.to)
+        #     if len(potentialUpperLeaves) != 0:
+        #         targetNode = potentialUpperLeaves[0][0]
+        #         if not targetNode.isConnected:
+        #             tmpTo[0] = targetNode
+        #             targetNode.isConnected = True
+        #             targetNode.whereFrom = node
+        #         else:
+        #             refNode = targetNode.whereFrom
+        #             if PhyloParser.betterNode(node, refNode):
+        #                 tmpTo[0] = targetNode
+        #                 targetNode.whereFrom = node
+
+        #     if len(potentialLowerLeaves) !=0:
+        #         targetNode = potentialLowerLeaves[0][0]
+        #         if not targetNode.isConnected:
+        #             tmpTo[1] = targetNode
+        #             targetNode.isConnected = True
+        #             targetNode.whereFrom = node
+        #         else:
+        #             refNode = targetNode.whereFrom
+        #             if PhyloParser.betterNode(node, refNode):
+        #                 tmpTo[1] = targetNode
+        #                 targetNode.whereFrom = node
+        #     node.to = tuple(tmpTo)
+        #     if not node.isBinary:               
+        #         for index, inter in enumerate(potentialInterLeaves):
+        #             if len(inter)!=0:
+        #                 # print interLeave
+        #                 tmpList = sorted(inter, key = lambda x: -x[1])
+        #                 targetNode = tmpList[0][0]
+        #                 if not targetNode.isConnected:
+        #                     node.otherTo[index] = targetNode
+        #                     targetNode.isConnected = True
+        #                     targetNode.whereFrom = node
+        #                 else:
+        #                     refNode = targetNode.whereFrom
+        #                     if PhyloParser.betterNode(node, refNode):
+        #                         node.otherTo[index] = targetNode
+        #                         targetNode.whereFrom = node
+
         image_data.nodeList = nodeList
         return image_data
+
+    @staticmethod
+    def betterNode(node1, node2):
+        score1 = 0
+        score2 = 0
+        if node1.score:
+            score1 = node1.score
+        else:
+            score1 = PhyloParser.evaluateNode(node1)
+        if node2.score:
+            score2 = node2.score
+        else:
+            score1 = PhyloParser.evaluateNode(node2)
+        score1 += math.sqrt(int(PhyloParser.countNodeArea(node1)))
+        score2 += math.sqrt(int(PhyloParser.countNodeArea(node2)))
+
+        if score1> score2:
+            return True
+        else:
+            return False
+
+
+    @staticmethod
+    def countNodeArea(node):
+        if node.branch:
+            if node.lowerLeave:
+                return abs((node.lowerLeave[2] - node.branch[0]) * (node.branch[1] - node.lowerLeave[1]))
+            if node.upperLeave:
+                return abs((node.branch[0] - node.upperLeave[2]) * (node.branch[4]))
+            return 0
+        else:
+            return 0
+
     @staticmethod
     def evaluateNode(node):
         score = 0
