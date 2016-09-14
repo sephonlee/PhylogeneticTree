@@ -5,6 +5,7 @@ from ImageData import *
 from sets import Set
 import pytesseract
 import time
+from ete2.phylo.phylotree import PhyloTree
 
 try:
     import Image
@@ -33,7 +34,7 @@ class PhyloParser():
         image_data.originalImage = image.copy() 
 
         #purify background
-        image, image_data.varianceMask, image_data.textMask, image_data.varMap = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
+        image, image_data.varianceMask, image_data.varMap = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
         if debug:
             print "Display image with removed background"
             PhyloParser.displayImage(image)
@@ -187,7 +188,7 @@ class PhyloParser():
 
         dim = image.shape
         mask = np.zeros(dim, dtype=np.uint8)   # 1:keep 0:remove
-        text_mask = np.zeros(dim, dtype=np.uint8)
+        mask_2 = np.zeros(dim, dtype=np.uint8)
         var_map = np.zeros(dim, dtype=np.float)  ## for debugging
 #         print image
          
@@ -236,15 +237,16 @@ class PhyloParser():
                     mask[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
                     
                 if patch_variance < threshold_var2:
-                    text_mask[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
+                    mask_2[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
 
 
+        # return mask if the image has color background
+        # return mask_1 if the image has no color background
         if hasColorBackGround:
-#             print "remove background"
+            # remove background
             image[np.where(mask == 255)] = 255
-        
-#         PhyloParser.displayImage(text_mask)
-#         PhyloParser.displayImage(mask)
+        else:
+            mask = mask_2
         
         # recover defect using morphology
         kernel = cv.getStructuringElement(cv.MORPH_RECT, morph_kernel_size)
@@ -264,7 +266,8 @@ class PhyloParser():
         
 #         PhyloParser.displayImage(var_map)
         
-        return image, mask, text_mask, var_map
+        
+        return image, mask, var_map
 
     
     ## end static method for preprocessing ##
@@ -1110,10 +1113,7 @@ class PhyloParser():
     
     
     def matchLines(self, image_data, debug = False):
-        
-        print hasattr(image_data, 'horLines')
-        print len(image_data.horLines)
-        
+                
         if image_data.lineDetected:
             image_data = self.matchParent(image_data)
             image_data = self.matchChildren(image_data)
@@ -1347,7 +1347,8 @@ class PhyloParser():
     # 1F2T: cut, recontour
     # 1F2F: drop 
     @staticmethod
-    def getSpecies_(image_data, debug = True):
+    def getSpecies(image_data, debug = True):
+
         image = image_data.image
         nonTreeMask = image_data.nonTreeMask
         treeMask = image_data.treeMask
@@ -1356,7 +1357,6 @@ class PhyloParser():
         varianceMask = image_data.varianceMask
         hierarchy = image_data.hierarchy
         textMask = image_data.textMask
-        
         
         # cut out anchor line
         dim = varianceMask.shape
@@ -1367,17 +1367,10 @@ class PhyloParser():
         for line in anchorLines:        
             varianceMask[max(0, line[1] - cut_height) : min(dim[0], line[1] + cut_height), max((line[2] - cut_width), 0) : min((line[2] + cut_width), dim[1])] = 255
 
-#         print "varianceMask"
-#         PhyloParser.displayImage(varianceMask)
-#         kernel = cv.getStructuringElement(cv.MORPH_RECT, (3,1))
-#         varianceMask = cv.morphologyEx(varianceMask, cv.MORPH_DILATE, kernel)
-#         print "varianceMask2"
-        PhyloParser.displayImage(varianceMask)
-        
+        # find contours        
         treeMask, nonTreeMask, contours, hierarchy = PhyloParser.findContours(varianceMask)
 
-
-        # transform contours to bonding boxs
+        # transform contours to bonding boxes
         contourBoxes = []
         for cnt in contours:
             contourBoxes.append(PhyloParser.getContourInfo(cnt))
@@ -1387,12 +1380,261 @@ class PhyloParser():
         anchorLines = sorted(anchorLines, key = lambda x: (x[3], x[2])) #top, right        
         
         # DEBUG
-        img = varianceMask.copy()
-        for b in contourBoxes:
-            cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
-        PhyloParser.displayLines(img, anchorLines)
+        if debug:
+            print "show variance mask with anchor lines"
+            img = varianceMask.copy()
+            for b in contourBoxes:
+                cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+            PhyloParser.displayLines(img, anchorLines)
+        
+        # group entangled boxes together
+        height_group, contour_group, textBoxes = PhyloParser.clusterBoxes(contourBoxes)
+        
+
+    
+        textGroup = []    
+        for i in range(0, len(contour_group)):
+            contours = contour_group[i]
+            heights = height_group[i]
+            group = zip(heights, contours)
+            group = sorted(group, key = lambda x: (x[0]))
+            
+            # split boxes in the group vertically
+            boundaries, boxes = PhyloParser.splitBoxGroup(group)
+            
+            # modified boundaries of boxes to attach each other
+            boundaries, boxes = PhyloParser.stitchBoundries(boundaries, boxes)
+
+
+#             print "show boundaries"
+#             img = image.copy()
+#             for b in boundaries:
+#                 cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+#             PhyloParser.displayImage(img)
+#             
+#             for box in boxes:
+#                 for b in box:
+#                     cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+#             PhyloParser.displayImage(img)
+
+            
+            # split boxes in the group horizontally
+            new_boundaries, boxes = PhyloParser.splitBoundaries(boundaries, boxes)
+
+            for i in range(0, len(boundaries)):
+                textGroup.append({"text_row":boundaries[i], "boxes":new_boundaries[i]})
+                #DUBUG
+#                 img = image.copy()
+#                 for b in new_boundaries[i]:
+#                     cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+#                 PhyloParser.displayImage(img)
+                
+                
+                
+            
+        if debug:
+            print "show bonding boxes"
+            img = image.copy()
+            for dict in textGroup:
+#                 b = dict["text_row"]
+                for b in dict["boxes"]:
+                    cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+            PhyloParser.displayImage(img)
+            
+        ### match anchorlines and textboxes
+        lineIndex2BoxIndex, boxIndex2LineIndex, noTextLineIndex, robbedLineIndex = PhyloParser.matchAnchorLineAndTextBox(anchorLines, textGroup)
+        
+        if debug:
+            ###debug
+            print "show matched line and textbox"
+            img = image.copy()
+            lines = []
+            for key in boxIndex2LineIndex:
+                index = key[0]
+                box_index = key[1]
+                line_indices = boxIndex2LineIndex[key]            
+                b = textGroup[index]["boxes"][box_index]
+                cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+                for line_index in line_indices:
+                    lines.append(anchorLines[line_index])
+                    
+            PhyloParser.displayLines(img, lines)
+
+            print "show noTextLines"
+            img = image.copy()
+            lines= []
+            for line_index in noTextLineIndex:
+                lines.append(anchorLines[line_index])
+            PhyloParser.displayLines(img, lines)
+             
+            print "show robbedLines"
+            img = image.copy()
+            lines= []
+            for line_index in robbedLineIndex:
+                lines.append(anchorLines[line_index])
+            PhyloParser.displayLines(img, lines)
+            
+            PhyloParser.extractText(image, anchorLines, textGroup, lineIndex2BoxIndex, boxIndex2LineIndex, noTextLineIndex, robbedLineIndex)
         
         
+        
+    @staticmethod
+    def extractText(image, anchorLines, textGroup, lineIndex2BoxIndex, boxIndex2LineIndex, noTextLineIndex, robbedLineIndex, padding = 2):
+        
+        dim = image.shape
+        line2species = {}
+        
+        for line_index in lineIndex2BoxIndex:
+            print "line_index", line_index, "line", anchorLines[line_index]
+            boxIncides = lineIndex2BoxIndex[line_index]
+            print boxIncides
+            
+            result = []
+            for element in boxIncides:
+                index = element[0]
+                box_index = element[1]
+                box = textGroup[index]["boxes"][box_index]
+                print "box", box
+            
+                aspect_ratio = float((box[1]-box[0])) / (box[3]-box[2]+0.00001)
+                
+            
+                subImage = image[max(0,box[0]-padding):min(dim[0],box[1]+padding), max(0,box[2]-padding):min(dim[1],box[3]+padding)]
+                
+                #increase size to increase accuracy of ocr
+                subImage = cv.resize(subImage, None, fx=2, fy=2, interpolation = cv.INTER_CUBIC)
+                subImage = cv.copyMakeBorder(subImage, padding, padding, padding, padding, cv.BORDER_CONSTANT, value = 255)
+                
+                if aspect_ratio <= 1:
+                    cv.imwrite("tmp.tiff", subImage)
+                    text = pytesseract.image_to_string(Image.open('tmp.tiff'))
+                    if text != "":
+                        result.append(text)
+                    print text
+                    PhyloParser.displayImage(subImage)
+                else:
+                    subImage = PhyloParser.rotateImage(subImage)
+                    cv.imwrite("tmp.tiff", subImage)
+                    text = pytesseract.image_to_string(Image.open('tmp.tiff'))
+#                     if text != "":
+#                         result.append(text)
+                    print text
+                    PhyloParser.displayImage(subImage)
+                        
+                    
+            if len(result) > 0:
+                text = " ".join(result)    
+            else:
+                text = ""
+                
+            line2species[anchorLines[line_index]] = {"text": text, "status": "from_box"}
+            
+        for line_index in noTextLineIndex:
+            line2species[anchorLines[line_index]] = {"text": "", "status": "no_box"}
+           
+        for line_index in robbedLineIndex:
+            line2species[anchorLines[line_index]] = {"text": "", "status": "robbed"}       
+            
+        print "final result"
+        for key in line2species:
+            print key, line2species[key]
+                
+        return
+    
+#     labelBox = image[labelSpot[0]-margin:labelSpot[1]+margin, labelSpot[2]-margin:labelSpot[3]+margin]
+#             
+#             cv.imwrite("tmp.tiff", labelBox)
+#             label = pytesseract.image_to_string(Image.open('tmp.tiff'))
+#             anchorLabelList[line] = label
+
+        
+        
+    
+    @staticmethod
+    def matchAnchorLineAndTextBox(anchorLines, textGroup, horizontal_anchor_margin = 5, verticle_anchor_margin = 2):
+
+        index = 0        
+        boxIndex2LineIndex = {}
+        lineIndex2BoxIndex={}
+        noTextLineIndex = []
+        
+        for line_index, line in enumerate(anchorLines):
+            y = line[1]
+            right = line[2]
+            target_box_index = []
+            target_boxes = []
+            while index < len(textGroup):
+                textBox = textGroup[index]
+                text_row = textBox["text_row"]
+    
+                if  text_row[0] <= y - verticle_anchor_margin <= text_row[1] \
+                    or text_row[0] <= y <= text_row[1] \
+                    or text_row[0] <= y + verticle_anchor_margin <= text_row[1]:
+                    
+                    start_index = index
+                    for i, box in enumerate(textBox["boxes"]):
+                        
+                        # find corresponding box
+                        # (give a small margin to tolerate the overlapping between line and box)
+                        if right - horizontal_anchor_margin <= box[2]:
+
+                            target_boxes.append(box)
+                            target_box_index.append((index, i))
+                            
+                            #push into boxIndex2LineIndex
+                            if (index, i) in boxIndex2LineIndex:
+                                boxIndex2LineIndex[(index, i)].append(line_index)
+                            else:
+                                boxIndex2LineIndex[(index, i)] = [line_index]
+                            
+                    index += 1
+                elif text_row[0] < y + verticle_anchor_margin:
+                    index += 1
+                else:
+                    index = start_index ## go back to the start_index, since the multiple lines can match with the same box
+                    break
+
+            if len(target_box_index) > 0:
+                lineIndex2BoxIndex[line_index] = target_box_index
+            else:
+                noTextLineIndex.append(line_index)
+        
+     
+        ## select the best line among multiple matched lines
+        robbedLineIndex = Set()
+        for key in boxIndex2LineIndex:
+            index = key[0]
+            box_index = key[1]
+            line_indices = boxIndex2LineIndex[key]
+            
+            # multiple lines take the same text box
+            if len(line_indices) > 1:
+
+                closest_distance = 999999999
+#                 selected_index = 0
+                for line_index in line_indices:
+                    line = anchorLines[line_index]
+                    box = textGroup[index]["boxes"][box_index]
+                    
+                    distance = box[2] - (line[2] - horizontal_anchor_margin)    
+                    if distance < closest_distance:
+                        closest_distance = distance
+                        selected_line_index = line_index
+
+                boxIndex2LineIndex[key] = [selected_line_index]
+                
+                for line_index in line_indices:
+                    if line_index != selected_line_index:
+                        if line_index in lineIndex2BoxIndex:
+                            del lineIndex2BoxIndex[line_index]
+                            robbedLineIndex.add(line_index)
+        
+        return lineIndex2BoxIndex, boxIndex2LineIndex, noTextLineIndex, robbedLineIndex
+            
+        
+            
+    @staticmethod
+    def clusterBoxes(contourBoxes): 
         contour_group = [] # a list of groups of contour boxes 
         height_group = [] # a list of groups of box height corresponding to contour_group
 
@@ -1410,9 +1652,7 @@ class PhyloParser():
         
         index = 1
         while index < len(contourBoxes):
-            
             box =  contourBoxes[index]
-            print "index", index, box
             # current overlaps the previous box or entirely locates in the previous box
             if box[0] <= bot:
                 tmp.append(box)
@@ -1440,240 +1680,194 @@ class PhyloParser():
             if index == len(contourBoxes):
                 contour_group.append(tmp)
                 height_group.append(tmp_h)
-                textBoxes.append([top, bot, left, right])
-            
-
-        print textBoxes
-        print contour_group
-        print height_group
-        
-        group = zip(height_group, contour_group)
-        
-        newTextBoxes = []
-        
-        for i in range(0, len(contour_group)):
-            contours = contour_group[i]
-            heights = height_group[i]
-            group = zip(heights, contours)
-            group = sorted(group, key = lambda x: (x[0]))
-            
-            #DUBUG
-#             print "show textBoxes"
-#             b = textBoxes[i]
-#             img = image.copy()
-#             cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
-#             PhyloParser.displayImage(img)
-            
-            print "group index", i
-            print "sorted group", group
-            group = PhyloParser.splitBoxGroup(group)
-            print "refined group", group
-            group = PhyloParser.stitchBoxes(group)
-            print "stitched group", group
-            
-            newTextBoxes += group
-            
-            #DUBUG
-#             print "show stitched group"
-#             img = image.copy()
-#             for b in group:
-#                 cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
-#             PhyloParser.displayImage(img)
-            
-        
-        print newTextBoxes
-        img = image.copy()
-        for b in newTextBoxes:
-            cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
-            
-        PhyloParser.displayImage(img)
-        
-#         print "test"
-#         test = zip(height_group[2], contour_group[2])
-#                 
-#         print test
-#         
-#         test = sorted(test, key = lambda x: (x[0]))
-#         print test
-#         print "splitBoxGroup"
-#         sub_group = PhyloParser.splitBoxGroup(test)
-#         sub_group = PhyloParser.stitchBoxes(sub_group)
-
-
-
-#         for b in sub_group:
-#             cv.rectangle(varianceMask,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
-# #             PhyloParser.displayImage(varianceMask)
-#             PhyloParser.displayImage(image[b[0]:b[1], b[2]:b[3]])
-                    
-            
-            
-        
-#         textBoxes = sorted(textBoxes, key = lambda x: (x[0], x[2]), reverse = True) #top, left
-        
-#         for g in contour_group:
-#             for i in range(0, len(g)):
-#                 cnt = g[i]
-#                 cv.rectangle(varianceMask,(cnt[2],cnt[0]),(cnt[3],cnt[1]),(0,125,0),2)
-#                 PhyloParser.displayImage(varianceMask)
-                
-                
-#         for i in range(0, len(textBoxes)):
-#             box = textBoxes[i]
-#             cv.rectangle(varianceMask,(box[2],box[0]),(box[3],box[1]),(0,125,0),2)
-#             PhyloParser.displayImage(varianceMask)
-            
-
-        
-
-                
-
-#         
-        
-
-#         for line in anchorLines:
-#             print line
-# #             varianceMask[max(0, line[1] - margin) : min(dim[0], line[1] + margin), min(dim[1], (line[2] + margin)):] = 0
-#             
-#             varianceMask[max(0, line[1] - margin) : min(dim[0], line[1] + margin), max((line[2] - 2), 0) : min((line[2] + 2), dim[1])] = 255
-#             
-# #             PhyloParser.displayLines(varianceMask, [line])
-# 
-#         PhyloParser.displayImage(varianceMask)
-#         return
+                textBoxes.append([top, bot, left, right]) 
+                     
+        return height_group, contour_group, textBoxes
     
     @staticmethod
-    def splitBoxGroup(boxGroup, text_height_threshold = 5):
+    # split boxes in the group vertically
+    def splitBoxGroup(boxGroup, text_height_threshold = 6, text_length_threshold = 5):
         
-        print boxGroup
-        index = 0
-        while index < len(boxGroup) and boxGroup[index][1][1] - boxGroup[index][1][0] < text_height_threshold:
-            index += 1
+        #data structure: sub_group = [boundary, [original boxes]]
         
-        # all boxes can't pass threshold
-        if index == len(boxGroup):
-            top = min(boxGroup[0][1][0], boxGroup[-1][1][0])
-            bot = max(boxGroup[0][1][1], boxGroup[-1][1][1])
-            left = min(boxGroup[0][1][2], boxGroup[-1][1][2])
-            right = max(boxGroup[0][1][3], boxGroup[-1][1][3])
-            return [[top, bot, left, right]]
+        if len(boxGroup) == 1:
+            if boxGroup[0][1][1] - boxGroup[0][1][0] < text_height_threshold:
+                # only one element that does not pass the threshold in this group
+                sub_group = []
+            else:
+                # only on element in this group and it passes the threshold in this group
+                box = boxGroup[0][1]
+                sub_group = [{"boundary": box, "boxes" : [box]}]
+                
+        else:
+            index = 0
+            while index < len(boxGroup) and boxGroup[index][1][1] - boxGroup[index][1][0] < text_height_threshold:
+                index += 1
         
-        print "start from index ", index
-        if len(boxGroup) > 1:
-            sub_group = [boxGroup[index][1]]
-            print sub_group
+            # all boxes can't pass threshold, merge them all
+            if index == len(boxGroup):
+                
+                top = min(boxGroup[0][1][0], boxGroup[-1][1][0])
+                bot = max(boxGroup[0][1][1], boxGroup[-1][1][1])
+                left = min(boxGroup[0][1][2], boxGroup[-1][1][2])
+                right = max(boxGroup[0][1][3], boxGroup[-1][1][3])
+                return [[top, bot, left, right]], [[x[1] for x in boxGroup]]###
+            ###########################################
+
+            # not all boxes can't pass threshold
+            # drop disqualified boxes and start from the first qualified box
+            box = boxGroup[index][1]
+            sub_group = [{"boundary": box, "boxes" : [box]}] # push the first boxes
+            
             for i in range(index+1, len(boxGroup)):
 
                 box = boxGroup[i][1]
-                print "i=,", i, box
-                print "sub_group=", sub_group
-                
-                to_sg_index = []
+                to_sg_index = [] #target group to merge
                 count = 0
-                for j, sg in enumerate(sub_group):
-                    print "scan sub_group j=",j, sg, PhyloParser.isOverLap(sg, box)
-                    if PhyloParser.isOverLap(sg, box):
+                for j, dict in enumerate(sub_group):
+
+                    boundary = dict["boundary"]
+#                     print "scan sub_group j=",j, boundary, PhyloParser.isOverLap(boundary, box)
+                    if PhyloParser.isOverLap(boundary, box):
                         to_sg_index.append(j)
                         
-                    print "to_sg_index", to_sg_index
+#                     print "to_sg_index", to_sg_index
+
                 # belong to only one sub_group
                 if len(to_sg_index) == 1:
-                    print "update sub_group"
                     #update sub_group
                     index = to_sg_index[0]
-                    top = min(sub_group[index][0], box[0])
-                    bot = max(sub_group[index][1], box[1])
-                    left = min(sub_group[index][2], box[2])
-                    right = max(sub_group[index][3], box[3])
-                    print [top, bot, left, right]
-                    sub_group[index] = [top, bot, left, right]
+                    boundary = sub_group[index]["boundary"]
+                    top = min(boundary[0], box[0])
+                    bot = max(boundary[1], box[1])
+                    left = min(boundary[2], box[2])
+                    right = max(boundary[3], box[3])
+                    sub_group[index]["boundary"] = [top, bot, left, right] # update boundaries
+                    sub_group[index]["boxes"].append(box) # add the box into the box set
+                    
                 # belong to no sub_group
                 # add a new sub_group
                 elif len(to_sg_index) == 0:
-                    sub_group.append(box)
-                    print "add new elemenet in sub group"
-                    # sort from top to bot
-                    sub_group = sorted(sub_group, key = lambda x: (x[0]))
+                    sub_group.append({"boundary": box, "boxes" : [box]})
+#                     print "add new elemenet in sub group"
+                    # re-sort from top to bot
+                    sub_group = sorted(sub_group, key = lambda x: (x["boundary"][0])) # sorted by boundary's top
                     
                 # overlap move then 2 sub groups, split the current box
                 else:
-                    print "split"
-#                     print to_sg_index
-                    for index in to_sg_index:
+                    for j, index in enumerate(to_sg_index):
                         # top one
+                        dict = sub_group[index]
+                        boundary = dict["boundary"] # the boundary of assigned box
                         if index == 0:
-                            top = min(sub_group[index][0], box[0])
+                            top = min(boundary[0], box[0])
+                            box_top = top
                         else:
-                            top = sub_group[index][0]
+                            top = boundary[0]
+                            ## preserve mutli-row box's top
+                            ## which will align with the new boundary created in stitchBoundaries
+                            previous_boundary = sub_group[index-1]["boundary"]
+                            box_top = (boundary[0]+previous_boundary[1])/2
                             
                         # bot one
                         if index == len(sub_group) - 1:
-                            bot = max(sub_group[index][1], box[1])
+                            bot = max(boundary[1], box[1])
+                            box_bot = bot 
                         else:
-                            bot = sub_group[index][1]
+                            bot = boundary[1]
+                            ## preserve mutli-row box's bot
+                            ## which will align with the new boundary created in stitchBoundaries
+                            next_boundary = sub_group[index+1]["boundary"]
+                            box_bot = (boundary[1]+next_boundary[0])/2 
                             
-                        left = min(sub_group[index][2], box[2])
-                        right = max(sub_group[index][3], box[3])
+                        left = min(boundary[2], box[2])
+                        right = max(boundary[3], box[3])
                     
-                        sub_group[index] = [top, bot, left, right]
-            
-        else:
-            if boxGroup[0][1][1] - boxGroup[0][1][0] < text_height_threshold:
-                sub_group = []
-            else:
-                sub_group = [boxGroup[0][1]]
-                
-        # modify boundaries
-#         sub_group = PhyloParser.stitchBoxes(sub_group)
+                        sub_group[index]["boundary"] = [top, bot, left, right] #update boundary
+                        sub_group[index]["boxes"].append([box_top, box_bot, box[2], box[3]]) #push splitted box, use new top and bot
         
-        return sub_group
+        boundries = [x["boundary"] for x in sub_group]
+        boxes = [x["boxes"] for x in sub_group]
+        return boundries, boxes
   
     
     @staticmethod
-    def stitchBoxes(sub_group, text_height_threshold = 5):
-            
+    # modified boxes to attached each other 
+    def stitchBoundries(boundaries, boxes, text_height_threshold = 5):
+     
         current_index = 0
-        while current_index < len(sub_group) - 1:
-            box = sub_group[current_index]
+        while current_index < len(boundaries) - 1:
+
             next_index = current_index + 1
 
-            while next_index < len(sub_group) - 1 and (sub_group[next_index][1] - sub_group[next_index][0]) < text_height_threshold:
+            while next_index < len(boundaries) - 1 and (boundaries[next_index][1] - boundaries[next_index][0]) < text_height_threshold:
                 next_index += 1
                 
             # current box does not pass threshold
             # jump to the first qualified box 
             # update the qualified box
-            if (sub_group[current_index][1] - sub_group[current_index][0]) < text_height_threshold:
-                sub_group[next_index][0] = sub_group[current_index][0]
+            if (boundaries[current_index][1] - boundaries[current_index][0]) < text_height_threshold:
+                boundaries[next_index][0] = boundaries[current_index][0]
                 # remove previous disqualified elements
                 for i in range(next_index-1, current_index-1, -1):
-                    del sub_group[i]
+                    del boundaries[i]
+                    del boxes[i]
             
             # next box is not qualified
-            elif (sub_group[next_index][1] - sub_group[next_index][0]) < text_height_threshold:
-                sub_group[current_index][1] = sub_group[current_index][1]
+            elif (boundaries[next_index][1] - boundaries[next_index][0]) < text_height_threshold:
+                boundaries[current_index][1] = boundaries[next_index][1]
                 for i in range(next_index, current_index, -1):
-                    del sub_group[i]
+                    del boundaries[i]
+                    del boxes[i]
                     
                 
             # next box is a qualified
             else:
                 # update current box bot
-                print sub_group
-                boundary = (sub_group[current_index][1] + sub_group[next_index][0])/2
-                sub_group[current_index][1] = boundary
+                boundary = (boundaries[current_index][1] + boundaries[next_index][0])/2
+                boundaries[current_index][1] = boundary
                 # update next box top
-                sub_group[next_index][0] = boundary
+                boundaries[next_index][0] = boundary
                 
                 # remove previous disqualified elements
                 for i in range(next_index-1, current_index, -1):
-                    del sub_group[i]
+                    del boundaries[i]
+                    del boxes[i]
                                 
                 current_index += 1 
                 
-        return sub_group
-    
-    
+        return boundaries, boxes
+ 
+    @staticmethod
+    # split boxes in the group horizontally
+    def splitBoundaries(boundaries, boxes, split_threshold = 25):
+        new_boundaries = []
+        for i in range(0, len(boundaries)):
+            boundary = boundaries[i]         
+            box_set = sorted(boxes[i], key = lambda x: (x[2])) # by boundary's top
+            index = 0
+            box = box_set[index]
+            
+#             sub_boundaries = [[boundary[0], boundary[1], box[2], box[3]]]
+            sub_boundaries = [box]
+            
+            index += 1
+            while index < len(box_set):
+                box = box_set[index]
+                # merge this box with previous box
+                # update the previous box right, top and bot
+                if box[2] - sub_boundaries[-1][3] <= split_threshold: # can be a negative value
+                    sub_boundaries[-1][3] = max(box[3], sub_boundaries[-1][3]) # right 
+                    sub_boundaries[-1][0] = min(box[0], sub_boundaries[-1][0]) # top
+                    sub_boundaries[-1][1] = max(box[1], sub_boundaries[-1][1]) # bot
+                else:
+                    sub_boundaries.append(box)
+        
+                index += 1
+                
+            new_boundaries.append(sub_boundaries)
+
+        return new_boundaries, boxes
     
     @staticmethod
     def isOverLap(box1, box2):
@@ -1688,7 +1882,7 @@ class PhyloParser():
 
     # TODO: not implemented yet, if you have, put it here
     @staticmethod
-    def getSpecies(image_data, debug = False):
+    def getSpecies_(image_data, debug = False):
 
         image = image_data.image
         # displayImage = cv.cvtColor(image, cv.COLOR_GRAY2RGB)
@@ -1805,7 +1999,7 @@ class PhyloParser():
         
 
             # Detect Label and Create Label List
-            image_data = self.getSpecies(image_data)
+#             image_data = self.getSpecies_(image_data)
 
             # Create node from matched lines
             image_data = self.createNodes(image_data)
@@ -2473,3 +2667,89 @@ class PhyloParser():
             return True
         else:
             return False        
+        
+#     @staticmethod
+#     def splitBoxGroup_(boxGroup, text_height_threshold = 5):
+#         
+#         print boxGroup
+#         index = 0
+#         while index < len(boxGroup) and boxGroup[index][1][1] - boxGroup[index][1][0] < text_height_threshold:
+#             index += 1
+#         
+#         # all boxes can't pass threshold
+#         if index == len(boxGroup):
+#             top = min(boxGroup[0][1][0], boxGroup[-1][1][0])
+#             bot = max(boxGroup[0][1][1], boxGroup[-1][1][1])
+#             left = min(boxGroup[0][1][2], boxGroup[-1][1][2])
+#             right = max(boxGroup[0][1][3], boxGroup[-1][1][3])
+#             return [[top, bot, left, right]]
+#         
+#         print "start from index ", index
+#         if len(boxGroup) > 1:
+#             sub_group = [boxGroup[index][1]]
+#             print sub_group
+#             for i in range(index+1, len(boxGroup)):
+# 
+#                 box = boxGroup[i][1]
+#                 print "i=,", i, box
+#                 print "sub_group=", sub_group
+#                 
+#                 to_sg_index = []
+#                 count = 0
+#                 for j, sg in enumerate(sub_group):
+#                     print "scan sub_group j=",j, sg, PhyloParser.isOverLap(sg, box)
+#                     if PhyloParser.isOverLap(sg, box):
+#                         to_sg_index.append(j)
+#                         
+#                     print "to_sg_index", to_sg_index
+#                 # belong to only one sub_group
+#                 if len(to_sg_index) == 1:
+#                     print "update sub_group"
+#                     #update sub_group
+#                     index = to_sg_index[0]
+#                     top = min(sub_group[index][0], box[0])
+#                     bot = max(sub_group[index][1], box[1])
+#                     left = min(sub_group[index][2], box[2])
+#                     right = max(sub_group[index][3], box[3])
+#                     print [top, bot, left, right]
+#                     sub_group[index] = [top, bot, left, right]
+#                 # belong to no sub_group
+#                 # add a new sub_group
+#                 elif len(to_sg_index) == 0:
+#                     sub_group.append(box)
+#                     print "add new elemenet in sub group"
+#                     # sort from top to bot
+#                     sub_group = sorted(sub_group, key = lambda x: (x[0]))
+#                     
+#                 # overlap move then 2 sub groups, split the current box
+#                 else:
+#                     print "split"
+# #                     print to_sg_index
+#                     for index in to_sg_index:
+#                         # top one
+#                         if index == 0:
+#                             top = min(sub_group[index][0], box[0])
+#                         else:
+#                             top = sub_group[index][0]
+#                             
+#                         # bot one
+#                         if index == len(sub_group) - 1:
+#                             bot = max(sub_group[index][1], box[1])
+#                         else:
+#                             bot = sub_group[index][1]
+#                             
+#                         left = min(sub_group[index][2], box[2])
+#                         right = max(sub_group[index][3], box[3])
+#                     
+#                         sub_group[index] = [top, bot, left, right]
+#             
+#         else:
+#             if boxGroup[0][1][1] - boxGroup[0][1][0] < text_height_threshold:
+#                 sub_group = []
+#             else:
+#                 sub_group = [boxGroup[0][1]]
+#                 
+#         # modify boundaries
+# #         sub_group = PhyloParser.stitchBoxes(sub_group)
+#         
+#         return sub_group

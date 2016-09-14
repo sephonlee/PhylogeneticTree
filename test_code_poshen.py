@@ -54,25 +54,28 @@ if __name__ == '__main__':
 #     
 #     print time.time()-startTime
     
+    boundaries = [[335, 351, 185, 408], [351, 365, 212, 470]]
+    boxes = [[[336, 344, 382, 385], [335, 344, 315, 333], [336, 345, 337, 342], [336, 345, 389, 408], [335, 345, 185, 257], [335, 349, 262, 310], [335, 349, 346, 404]], [[355, 362, 446, 448], [355, 363, 452, 470], [354, 363, 410, 435], [355, 365, 212, 292], [354, 365, 298, 347], [354, 365, 346, 404]]]
 
+    boundaries, boxes = PhyloParser.stitchBoundries(boundaries, boxes)
+    print boundaries
+    print boxes
     
-    
-    group = [[75, 89, 207, 496], [98, 110, 180, 496], [115, 128, 180, 433]]
-    new_group = PhyloParser.stitchBoxes(group)
-    print "new_group", new_group
-    
+#     new_boundaries, boxes =  PhyloParser.splitBoundaries(boundaries, boxes)
+
     phyloPaser = PhyloParser()
     
     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC1474148_ijbsv02p0133g05.jpg'
     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2324105_1471-2148-8-100-1.jpg'
-#     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2323573_pone.0002033.g002.jpg'
-
+    filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2323573_pone.0002033.g002.jpg'
+    filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_5569.jpg'
 
 
     # bg example
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2287175_1471-2148-8-57-2.jpg'
     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_336.jpg'
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_337.jpg'
+    ##
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2397417_1471-2164-9-215-5.jpg'
     
     # wide line example
@@ -83,12 +86,16 @@ if __name__ == '__main__':
     
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC184354_1471-2148-3-16-7.jpg"
     
-    
+    #perfect case
+#     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_5217.jpg"
     #hard case
-#     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC535349_1471-2148-4-46-1.jpg"
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2174949_1471-213X-7-118-3.jpg"
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2614493_gb-2008-9-11-r161-3.jpg"
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_6477.jpg"
+#     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC428588_1741-7007-2-13-4.jpg"
+#     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC535349_1471-2148-4-46-1.jpg"
+    filename = "/Users/sephon/Downloads/tree3.jpg"
+
 #     mask = np.ones((663,600), dtype = np.uint8)
 #     mask[0:,385:] = 0
     
@@ -98,40 +105,13 @@ if __name__ == '__main__':
     print filename
     image = cv.imread(filename, 0)
     print image.shape
-    
-#     
 
 
-
-
-#     image = np.ones((18,18), dtype = np.uint8)
-#     image = image * 255
-# #     
-#     image[10:13,7:] = 0
-#     image[3:,7:10] = 0
-#      
-#      
-# #     image[0:,10:13] = 0
-# #     image[8:11,0:10] = 0
-#     image[0:1, 0:1] = 190
-# #     image[7,11] = 0
-
-
-#     image = image[15:70, 320:350]
-    
-#     image = image[10:50,  330:340]
-
-#     image = image[350:375 , 90:115]
     print "original image"
     PhyloParser.displayImage(image)
 
     
-#     varianceMask = np.ones((200,200), dtype = np.uint8)*255
-#     varianceMask[20:180,10:40] = 0
-#     varianceMask[50:70,20:30] = 255
-#     varianceMask[55:60,22:24] = 0
-#      
-#     varianceMask[20:180,70:120] = 0
+
 # #         
 #     PhyloParser.displayImage(varianceMask)
 #     
@@ -142,7 +122,10 @@ if __name__ == '__main__':
 #     image, mask = PhyloParser.purifyBackGround(image, kernel_size=(3, 3))
 #     print time.time() - startTime
     
-#     image = image[260:285, 275:290]
+#     image = image[645:660, 230:250]
+#     print image
+#     image = image[0:20, 220:]
+    phyloPaser.displayImage(image)
     image_data = ImageData(image)
 
     image_data = phyloPaser.preprocces(image_data, debug = False)
@@ -158,8 +141,8 @@ if __name__ == '__main__':
 
     image_data = phyloPaser.matchLines(image_data, debug = False)
 
-# #      
-    image_data = phyloPaser.getSpecies_(image_data)
+
+    image_data = phyloPaser.getSpecies(image_data, debug = True)
 # #      
 # #      
 #     image_data = phyloPaser.makeTree(image_data, debug = True)
