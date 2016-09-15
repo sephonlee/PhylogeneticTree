@@ -196,6 +196,8 @@ class ImageData():
                         cv.rectangle(whatever , (x1, y1), (x2, y2), color=color, thickness=2)
             if target == 'final':
                 break
+            else:
+                pass
 
             count +=1
         plt.imshow(whatever)
