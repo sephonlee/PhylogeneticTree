@@ -56,7 +56,9 @@ class ImageData():
     lineMatched = False
 
     # filled by getSpecies
-    species = {}
+    line2Text = {} # key: line,  value: text
+    boxID2Text = {} #key: box_id, value:text; textGroup[box_id[0]]["boxes"][box_id[1]] will reture the corresponding box
+    textGroup = [] #element: key: "text_row" value: bonding box; key: "boxes" value: sub-boxes in the bonding box
     speciesNameReady = False
 
     # filled by makeTree

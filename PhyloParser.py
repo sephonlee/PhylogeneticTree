@@ -7,6 +7,7 @@ import pytesseract
 import time
 from ete2.phylo.phylotree import PhyloTree
 import math
+from dask.array.core import ceil
 
 
 try:
@@ -186,7 +187,7 @@ class PhyloParser():
     
     @staticmethod
     # remove color back ground
-    def purifyBackGround(image, threshold_var = 0.008, threshold_var2 = 0.001, threshold_pixel = 60, threshold_hist = 10, kernel_size = (3,3), morph_kernel_size = (3,5)):
+    def purifyBackGround(image, threshold_var = 0.008, threshold_var2 = 0.008, threshold_pixel = 60, threshold_hist = 10, kernel_size = (3,3), morph_kernel_size = (3,5)):
 
         dim = image.shape
         mask = np.zeros(dim, dtype=np.uint8)   # 1:keep 0:remove
@@ -238,21 +239,25 @@ class PhyloParser():
                 if patch_variance < threshold_var and patch_mean > threshold_pixel:                 
                     mask[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
                     
-                if patch_variance < threshold_var2:
+                if patch_variance < threshold_var2 and patch_mean > threshold_pixel:
                     mask_2[i:i+kernel_size[0], j:j+kernel_size[1]] = 255
 
 
         # return mask if the image has color background
         # return mask_1 if the image has no color background
+        PhyloParser.displayImage(mask)
+        
         if hasColorBackGround:
             # remove background
             image[np.where(mask == 255)] = 255
+            # recover defect using morphology
+            kernel = cv.getStructuringElement(cv.MORPH_RECT, morph_kernel_size)
+            mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
         else:
             mask = mask_2
         
-        # recover defect using morphology
-        kernel = cv.getStructuringElement(cv.MORPH_RECT, morph_kernel_size)
-        mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
+        
+        PhyloParser.displayImage(mask_2)
         
         var_map= var_map * 255/(np.max(var_map) - np.min(var_map)) ## for debugging
 
@@ -1341,24 +1346,15 @@ class PhyloParser():
     ## end static method for matchLines ##
 
 
-    # 1. check contours
-    # 2. check the right 5 pixel in the mask
-    # 1T2F: combines contours and set the very left as the line right
-    # 1T2T: cut, recontour
-    #    if invovle h>w contour, drop, it not, include the new contour
-    # 1F2T: cut, recontour
-    # 1F2F: drop 
     @staticmethod
-    def getSpecies(image_data, debug = False):
-
-        image = image_data.image
-        nonTreeMask = image_data.nonTreeMask
-        treeMask = image_data.treeMask
-        anchorLines = image_data.anchorLines
-        contours = image_data.contours       
+    # padding: enlarge box area
+    # margin: height of scan zone after line with no assigned box
+    def getSpecies(image_data, padding = 2, margin = 5, debug = False):
+        
+        
+        image = image_data.image.copy()
+        anchorLines = image_data.anchorLines       
         varianceMask = image_data.varianceMask
-        hierarchy = image_data.hierarchy
-        textMask = image_data.textMask
         
         # cut out anchor line
         dim = varianceMask.shape
@@ -1368,8 +1364,8 @@ class PhyloParser():
         # cut out anchorlines from text
         for line in anchorLines:        
             varianceMask[max(0, line[1] - cut_height) : min(dim[0], line[1] + cut_height), max((line[2] - cut_width), 0) : min((line[2] + cut_width), dim[1])] = 255
-
-        # find contours        
+            
+        # get contours
         treeMask, nonTreeMask, contours, hierarchy = PhyloParser.findContours(varianceMask)
 
         # transform contours to bonding boxes
@@ -1392,9 +1388,8 @@ class PhyloParser():
         # group entangled boxes together
         height_group, contour_group, textBoxes = PhyloParser.clusterBoxes(contourBoxes)
         
-
-    
-        textGroup = []    
+        # re-arange boxes in cluster
+        textGroup = []
         for i in range(0, len(contour_group)):
             contours = contour_group[i]
             heights = height_group[i]
@@ -1406,45 +1401,24 @@ class PhyloParser():
             
             # modified boundaries of boxes to attach each other
             boundaries, boxes = PhyloParser.stitchBoundries(boundaries, boxes)
-
-
-#             print "show boundaries"
-#             img = image.copy()
-#             for b in boundaries:
-#                 cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
-#             PhyloParser.displayImage(img)
-#             
-#             for box in boxes:
-#                 for b in box:
-#                     cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
-#             PhyloParser.displayImage(img)
-
             
             # split boxes in the group horizontally
             new_boundaries, boxes = PhyloParser.splitBoundaries(boundaries, boxes)
 
             for i in range(0, len(boundaries)):
                 textGroup.append({"text_row":boundaries[i], "boxes":new_boundaries[i]})
-                #DUBUG
-#                 img = image.copy()
-#                 for b in new_boundaries[i]:
-#                     cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
-#                 PhyloParser.displayImage(img)
-                
-                
-                
+            
             
         if debug:
             print "show bonding boxes"
             img = image.copy()
             for dict in textGroup:
-#                 b = dict["text_row"]
                 for b in dict["boxes"]:
                     cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
             PhyloParser.displayImage(img)
             
         ### match anchorlines and textboxes
-        lineIndex2BoxIndex, boxIndex2LineIndex, noTextLineIndex, robbedLineIndex = PhyloParser.matchAnchorLineAndTextBox(anchorLines, textGroup)
+        lineIndex2BoxIndex, boxIndex2LineIndex, lineIndex2ShareBoxIndex, lineInTextIndex, noTextLineIndex = PhyloParser.matchAnchorLineAndTextBox(anchorLines, textGroup)
         
         if debug:
             ###debug
@@ -1459,9 +1433,25 @@ class PhyloParser():
                 cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
                 for line_index in line_indices:
                     lines.append(anchorLines[line_index])
-                    
             PhyloParser.displayLines(img, lines)
-
+            
+            print "show matched line and sharebox"
+            img = image.copy()
+            lines = []
+            for line_index in lineIndex2ShareBoxIndex:
+                img = image.copy()
+                lines.append(anchorLines[line_index])
+                b = lineIndex2ShareBoxIndex[line_index]
+                cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+            PhyloParser.displayLines(img, lines)
+            
+            print "show lineInTextIndex"
+            img = image.copy()
+            lines= []
+            for line_index in lineInTextIndex:
+                lines.append(anchorLines[line_index])
+            PhyloParser.displayLines(img, lines)
+            
             print "show noTextLines"
             img = image.copy()
             lines= []
@@ -1469,102 +1459,128 @@ class PhyloParser():
                 lines.append(anchorLines[line_index])
             PhyloParser.displayLines(img, lines)
              
-            print "show robbedLines"
-            img = image.copy()
-            lines= []
-            for line_index in robbedLineIndex:
-                lines.append(anchorLines[line_index])
-            PhyloParser.displayLines(img, lines)
-            
-            PhyloParser.extractText(image, anchorLines, textGroup, lineIndex2BoxIndex, boxIndex2LineIndex, noTextLineIndex, robbedLineIndex)
+        # extract text in all boxes     
+        boxID2Text = PhyloParser.box2Text(image, textGroup, padding = padding)
         
+        # connect text to lines
+        line2Text = PhyloParser.line2Text(image, anchorLines, boxID2Text, lineIndex2BoxIndex, lineIndex2ShareBoxIndex, noTextLineIndex, lineInTextIndex, padding = padding, margin = margin)
+        if debug:
+            for line in line2Text:
+                print "line:", line, "text", line2Text[line]
         
+        image_data.line2Text = line2Text
+        image_data.boxID2Text = boxID2Text
+        image_data.textGroup = textGroup
+        image_data.speciesNameReady = True 
         
+        return image_data
+       
+    ## static method for getSpecies ## 
     @staticmethod
-    def extractText(image, anchorLines, textGroup, lineIndex2BoxIndex, boxIndex2LineIndex, noTextLineIndex, robbedLineIndex, padding = 2):
-        
+    # padding: enlarge box area
+    def box2Text(image, textGroup, padding = 2):
         dim = image.shape
-        line2species = {}
-        
-        for line_index in lineIndex2BoxIndex:
-            print "line_index", line_index, "line", anchorLines[line_index]
-            boxIncides = lineIndex2BoxIndex[line_index]
-            print boxIncides
-            
-            result = []
-            for element in boxIncides:
-                index = element[0]
-                box_index = element[1]
-                box = textGroup[index]["boxes"][box_index]
-                print "box", box
-            
+        boxID2Text={}
+        for i, textBox in enumerate(textGroup):
+            for j, box in enumerate(textBox["boxes"]):
+                box_id = (i,j)
                 aspect_ratio = float((box[1]-box[0])) / (box[3]-box[2]+0.00001)
-                
-            
                 subImage = image[max(0,box[0]-padding):min(dim[0],box[1]+padding), max(0,box[2]-padding):min(dim[1],box[3]+padding)]
+                rotate = aspect_ratio > 1
                 
-                #increase size to increase accuracy of ocr
-                subImage = cv.resize(subImage, None, fx=2, fy=2, interpolation = cv.INTER_CUBIC)
-                subImage = cv.copyMakeBorder(subImage, padding, padding, padding, padding, cv.BORDER_CONSTANT, value = 255)
+                text = PhyloParser.image2text(subImage, rotate = rotate, padding = padding)
+            
+                boxID2Text[box_id] = {"text": text, "rotate": rotate}
                 
-                if aspect_ratio <= 1:
-                    cv.imwrite("tmp.tiff", subImage)
-                    text = pytesseract.image_to_string(Image.open('tmp.tiff'))
-                    if text != "":
+        return boxID2Text
+
+    @staticmethod
+    # padding: enlarge box area
+    # margin: height of scan zone after line with no assigned box
+    def line2Text(image, anchorLines, boxID2Text, lineIndex2BoxIndex, lineIndex2ShareBoxIndex, noTextLineIndex, lineInTextIndex, padding = 2, margin = 5):
+    
+        dim = image.shape
+        line2Text = {}
+        
+        for line_index in lineIndex2BoxIndex:        
+            if line_index in lineIndex2ShareBoxIndex:
+                box = lineIndex2ShareBoxIndex[line_index]
+                line = anchorLines[line_index]
+                box[2] = line[2]+1 # update box left to line right
+                box[0] = min(line[1]-margin, box[0])
+                box[1] = max(line[1]+margin, box[1])
+                
+                aspect_ratio = float((box[1]-box[0])) / (box[3]-box[2]+0.00001)
+                subImage = image[max(0,box[0]-padding):min(dim[0],box[1]+padding), max(0,box[2]-padding):min(dim[1],box[3]+padding)]
+                rotate = aspect_ratio > 1
+                species = PhyloParser.image2text(subImage, rotate = rotate, padding = padding)
+                
+                line2Text[anchorLines[line_index]] = {"text": species, "status": "from_share_box"}
+                
+            else:    
+                result = []
+                boxIncides = lineIndex2BoxIndex[line_index]
+                for box_id in boxIncides:
+                    dict = boxID2Text[box_id]
+                    text = dict["text"]
+                    rotate = dict["rotate"]
+
+                    if not rotate and text != "":
                         result.append(text)
-                    print text
-                    PhyloParser.displayImage(subImage)
-                else:
-                    subImage = PhyloParser.rotateImage(subImage)
-                    cv.imwrite("tmp.tiff", subImage)
-                    text = pytesseract.image_to_string(Image.open('tmp.tiff'))
-#                     if text != "":
-#                         result.append(text)
-                    print text
-                    PhyloParser.displayImage(subImage)
                         
-                    
-            if len(result) > 0:
-                text = " ".join(result)    
-            else:
-                text = ""
-                
-            line2species[anchorLines[line_index]] = {"text": text, "status": "from_box"}
+                if len(result) > 0:
+                    species = " ".join(result)    
+                else:
+                    species = ""
+
+                line2Text[anchorLines[line_index]] = {"text": species, "status": "from_box"}
+            
+        for line_index in lineInTextIndex:
+            text = PhyloParser.recycleText(image, anchorLines[line_index])
+            line2Text[anchorLines[line_index]] = {"text": text, "status": "in_box"}
             
         for line_index in noTextLineIndex:
-            line2species[anchorLines[line_index]] = {"text": "", "status": "no_box"}
-           
-        for line_index in robbedLineIndex:
-            line2species[anchorLines[line_index]] = {"text": "", "status": "robbed"}       
-            
-        print "final result"
-        for key in line2species:
-            print key, line2species[key]
+            text = PhyloParser.recycleText(image, anchorLines[line_index])
+            line2Text[anchorLines[line_index]] = {"text": text, "status": "no_box"}
                 
-        return
+        return line2Text
+  
     
-#     labelBox = image[labelSpot[0]-margin:labelSpot[1]+margin, labelSpot[2]-margin:labelSpot[3]+margin]
-#             
-#             cv.imwrite("tmp.tiff", labelBox)
-#             label = pytesseract.image_to_string(Image.open('tmp.tiff'))
-#             anchorLabelList[line] = label
 
+    @staticmethod
+    # padding: enlarge box area
+    def image2text(image, rotate = False, padding = 2):
         
+        #increase size to increase accuracy of ocr
+        image = cv.resize(image, None, fx=2, fy=2, interpolation = cv.INTER_CUBIC)
+        image = cv.copyMakeBorder(image, padding, padding, padding, padding, cv.BORDER_CONSTANT, value = 255)
         
+        if rotate:
+            image = PhyloParser.rotateImage(image)
+
+        cv.imwrite("tmp.tiff", image)
+        text = pytesseract.image_to_string(Image.open('tmp.tiff'))
+
+        return text  
     
     @staticmethod
-    def matchAnchorLineAndTextBox(anchorLines, textGroup, horizontal_anchor_margin = 5, verticle_anchor_margin = 2):
+    #coef : coefficient of horizontal distance for sorting lines that corresponds to the same box
+    #horizontal_anchor_margin: roll back distance to tolerate overlapping between line and box
+    #verticle_anchor_margin: tolerance to y-displacement between line and box
+    def matchAnchorLineAndTextBox(anchorLines, textGroup, coef = 10, horizontal_anchor_margin = 5, verticle_anchor_margin = 2):
 
         index = 0        
         boxIndex2LineIndex = {}
         lineIndex2BoxIndex={}
         noTextLineIndex = []
+        lineInTextIndex = []
         
         for line_index, line in enumerate(anchorLines):
             y = line[1]
             right = line[2]
             target_box_index = []
             target_boxes = []
+            row_found = False
             while index < len(textGroup):
                 textBox = textGroup[index]
                 text_row = textBox["text_row"]
@@ -1573,13 +1589,15 @@ class PhyloParser():
                     or text_row[0] <= y <= text_row[1] \
                     or text_row[0] <= y + verticle_anchor_margin <= text_row[1]:
                     
+                    row_found = True
                     start_index = index
                     for i, box in enumerate(textBox["boxes"]):
                         
                         # find corresponding box
                         # (give a small margin to tolerate the overlapping between line and box)
+                        # will get every box in the right hand side
                         if right - horizontal_anchor_margin <= box[2]:
-
+                                                
                             target_boxes.append(box)
                             target_box_index.append((index, i))
                             
@@ -1599,42 +1617,107 @@ class PhyloParser():
             if len(target_box_index) > 0:
                 lineIndex2BoxIndex[line_index] = target_box_index
             else:
-                noTextLineIndex.append(line_index)
+                if row_found:
+                    lineInTextIndex.append(line_index)
+                else:
+                    noTextLineIndex.append(line_index)
         
      
-        ## select the best line among multiple matched lines
+        # handle multiple lines to the same box
         robbedLineIndex = Set()
+        lineIndex2ShareBoxIndex={}
+        
         for key in boxIndex2LineIndex:
             index = key[0]
             box_index = key[1]
+            box = textGroup[index]["boxes"][box_index]
             line_indices = boxIndex2LineIndex[key]
             
             # multiple lines take the same text box
             if len(line_indices) > 1:
+                
+                ## select the line among multiple matched lines
+                lines = []
+                for line_index in line_indices:
+                    line = anchorLines[line_index]
+                    dist = math.sqrt((pow((line[3]-box[0]),2) + coef*pow((line[2]-box[2]),2)))
+                    lines.append((line, line_index,dist))
 
+                lines = sorted(lines, key = lambda x: (x[1]))                
+                line_indices = [y for x,y,z in lines]
+                lines = [x for x,y,z in lines]
+                
+                ceil = box[0]
+                for i in range(0, len(line_indices)):
+                    line_index = line_indices[i]
+                    line = anchorLines[line_index]
+             
+                    if i != len(line_indices)-1:
+                        next_line_index = line_indices[i+1]
+                        next_line = anchorLines[next_line_index]
+                        
+                        #next line under this line
+                        #next line' tail < this line's head
+                        if line[1] < next_line[1] and line[2] > next_line[0]:
+                            floor = (lines[i+1][1] + lines[i][1])/2
+                            next_ceil = floor
+                        #next line above this line, this line is the bottom line in this tier
+                        else:
+                            floor = box[1]
+                            next_ceil = box[0]
+                    #last line            
+                    else:
+                        floor = box[1] 
+                                   
+                    if line_index in lineIndex2ShareBoxIndex:
+                        new_box = lineIndex2ShareBoxIndex[line_index]
+                        new_box = [min(ceil, new_box[0]), max(floor, new_box[1]), min(box[2], new_box[2]), max(box[3], new_box[3])]
+
+                    else:
+                        new_box = [ceil, floor, box[2], box[3]]
+                            
+                    lineIndex2ShareBoxIndex[line_index] = new_box
+                    ceil = next_ceil
+                   
+
+                ############NOT USE#############
+                ## select the line among multiple matched lines
                 closest_distance = 999999999
 #                 selected_index = 0
                 for line_index in line_indices:
-                    line = anchorLines[line_index]
-                    box = textGroup[index]["boxes"][box_index]
-                    
+                    line = anchorLines[line_index]                   
                     distance = box[2] - (line[2] - horizontal_anchor_margin)    
                     if distance < closest_distance:
                         closest_distance = distance
                         selected_line_index = line_index
 
-                boxIndex2LineIndex[key] = [selected_line_index]
+#                 boxIndex2LineIndex[key] = [selected_line_index] ## NOT UPDATE
                 
                 for line_index in line_indices:
                     if line_index != selected_line_index:
                         if line_index in lineIndex2BoxIndex:
-                            del lineIndex2BoxIndex[line_index]
+#                             del lineIndex2BoxIndex[line_index]  ## NOT DELETE
                             robbedLineIndex.add(line_index)
+                ############NOT USE#############
         
-        return lineIndex2BoxIndex, boxIndex2LineIndex, noTextLineIndex, robbedLineIndex
+        return lineIndex2BoxIndex, boxIndex2LineIndex, lineIndex2ShareBoxIndex, lineInTextIndex, noTextLineIndex
             
         
-            
+    @staticmethod
+    # padding: enlarge box area
+    # margin: height of scan zone after line with no assigned box
+    def recycleText(image, line, margin = 5):
+
+        dim = image.shape   
+        y = line[1]
+        right = line[2]
+        subImage = image[max(0,y-margin):min(dim[0], y+margin), right:]
+        subImage = cv.resize(subImage, None, fx=2, fy=2, interpolation = cv.INTER_CUBIC)      
+        cv.imwrite("tmp.tiff", subImage)
+        text = pytesseract.image_to_string(Image.open('tmp.tiff'))
+
+        return text
+
     @staticmethod
     def clusterBoxes(contourBoxes): 
         contour_group = [] # a list of groups of contour boxes 
@@ -1881,6 +1964,8 @@ class PhyloParser():
         
         return (box1_top < box2_bot <= box1_bot) or (box1_top <= box2_top < box1_bot) or (box2_top < box1_bot <= box2_bot) or (box2_top <= box1_top < box2_bot)
         
+        
+    ## end static method for getSpecies ## 
 
     # TODO: not implemented yet, if you have, put it here
     @staticmethod

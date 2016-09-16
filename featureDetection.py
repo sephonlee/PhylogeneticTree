@@ -5,6 +5,9 @@ from preProcess import preProcess
 
 class scaleCornerDetection():
 	def __init__(self, image, thickness):
+		
+		ret, image = cv.threshold(image, 180, 255, 0)####
+		
 		self.image = image
 		self.size = thickness
 		self.upperCorner = []
@@ -15,10 +18,10 @@ class scaleCornerDetection():
 	def pipeline(self):
 		kernel = self.createKernel(1)
 		self.upperCorner = self.cornerDetect(kernel)
-		kernel = self.createKernel(0)
-		self.jointPoints = self.cornerDetect(kernel)
-		kernel = self.createKernel(-1)
-		self.downCorner = self.cornerDetect(kernel)
+# 		kernel = self.createKernel(0)
+# 		self.jointPoints = self.cornerDetect(kernel)
+# 		kernel = self.createKernel(-1)
+# 		self.downCorner = self.cornerDetect(kernel)
 		self.displayCorners()
 
 	def negateImage(self, image):
@@ -74,7 +77,7 @@ class scaleCornerDetection():
 			for i in range(width):
 				for x in range(kernelSize):
 					kernel[i][x] = 1
-					kernel[x][i] = 1	
+					kernel[x][i] = 1
 		elif mode==0:
 			for i in range(width):
 				for x in range(kernelSize):
@@ -86,6 +89,9 @@ class scaleCornerDetection():
 					kernel[x][i] = 1
 					kernel[kernelSize-1 - i][x] = 1
 		kernelPackage = self.normalizeKernel(kernel)
+		print 
+		print "kernel: ", kernel
+		print "kernel, pixel", kernelPackage
 		return kernelPackage
 
 
@@ -96,12 +102,22 @@ class scaleCornerDetection():
 		kernelSize = width * 3	
 		kernel, value = kernelPackage	
 		filteredImage = cv.filter2D(self.image, -1, kernel)
+		
+		print "filterImage", filteredImage.dtype
+		print filteredImage
+		print "image"
+		print self.image
+		
+		print size
+		
 		# plt.imshow(filteredImage, cmap='Greys_r')
 		# plt.show()
 
 		mmin = np.amin(filteredImage)
 		# print mmin
 		threshold= value * pow(size,1.5) * 255
+		
+		print "threshold: ", threshold
 		# print threshold
 		if mmin - threshold < 0:
 			lowerBound = 0
@@ -110,8 +126,36 @@ class scaleCornerDetection():
 		upperBound = mmin + threshold
 		print mmin, lowerBound, upperBound
 		indices = np.where(filteredImage >lowerBound) and np.where( filteredImage < upperBound)
+		
 		# indices = np.where(filteredImage == mmin)
 		cornerList = zip(indices[1], indices[0])
+		
+		new_cornerList = []
+		
+		for corner in cornerList:
+			print corner 
+			
+			if(corner[0]+2 <= self.image.shape[0] and corner[1]+2 <= self.image.shape[1]):
+				patch = self.image[corner[0]-1:corner[0]+2, corner[1]-1:corner[1]+2].copy().astype("float")/255	  
+				patch_variance =  np.var(patch)
+				patch_sum = max(np.amax(np.sum(patch, 0)), np.amax(np.sum(patch, 1)))
+				print "patch"
+				print patch
+				print "sum, ", patch_sum
+				
+				print max(np.amax(np.sum(patch, 0)), np.amax(np.sum(patch, 1)))
+				
+				print "filter value,", filteredImage[corner[0], corner[1]]
+				print "var,", patch_variance
+
+				if patch_variance > 0.2 and patch_sum <= 2:
+					new_cornerList.append(corner)
+				
+		print "cornerList", len(cornerList)
+		print "new_cornerList", len(new_cornerList)
+		
+# 		print cornerList
+		cornerList = new_cornerList
 		tmpImage = self.image.copy()
 		cornerList = sorted(cornerList, key=self.sortByLeftTop)
 		cornerList = self.removeRepeatCorner(cornerList)

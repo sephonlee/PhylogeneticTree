@@ -155,7 +155,7 @@ class preProcess():
 if __name__ == '__main__':
 
 
-	# filePath = 'test.png'
+	# filePath = 'test_code_poshen.png'
 
 	# a = preProcess(filePath)
 	# # a.negate()
