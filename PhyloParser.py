@@ -37,24 +37,24 @@ class PhyloParser():
         #save original image
         image_data.originalImage = image.copy() 
 
-        #purify background
-        image, image_data.varianceMask, image_data.varMap = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
-        if debug:
-            print "Display image with removed background"
-            PhyloParser.displayImage(image)
-            print "Display variance mask"
-            PhyloParser.displayImage(image_data.varianceMask)
+#         #purify background
+#         image, image_data.varianceMask, image_data.varMap = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
+#         if debug:
+#             print "Display image with removed background"
+#             PhyloParser.displayImage(image)
+#             print "Display variance mask"
+#             PhyloParser.displayImage(image_data.varianceMask)
 
-        #determine effective area and save the masks into image_data        
-        image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(image_data.varianceMask)
-#         image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.textMask)
+#         #determine effective area and save the masks into image_data        
+#         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(image_data.varianceMask)
+# #         image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.textMask)
         
         
-        if debug:
-            print "display tree mask"
-            PhyloParser.displayImage(image_data.treeMask)
-            print "display non-tree mask"
-            PhyloParser.displayImage(image_data.nonTreeMask)
+#         if debug:
+#             print "display tree mask"
+#             PhyloParser.displayImage(image_data.treeMask)
+#             print "display non-tree mask"
+#             PhyloParser.displayImage(image_data.nonTreeMask)
 
         image = PhyloParser.bilateralFilter(image)
         if debug:
@@ -218,6 +218,7 @@ class PhyloParser():
         hasColorBackGround = False;
         if sum(hist[-threshold_hist:]) / float(dim[0]*dim[1]) <= (255-4*threshold_hist)/float(255):
             hasColorBackGround = True;
+        print hasColorBackGround
         
         for i in range(0, dim[0] - kernel_size[0] + 1):
             for j in range(0, dim[1] - kernel_size[1] + 1):
@@ -2825,6 +2826,7 @@ class PhyloParser():
 
 
         rootList = sorted(rootList, key = lambda x: -x.area)
+
 
         image_data.rootList = rootList
         return image_data
