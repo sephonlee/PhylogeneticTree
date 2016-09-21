@@ -188,7 +188,7 @@ class PhyloParser():
     
     @staticmethod
     # remove color back ground
-    def purifyBackGround(image, threshold_var = 0.008, threshold_var2 = 0.008, threshold_pixel = 60, threshold_hist = 10, kernel_size = (3,3), morph_kernel_size = (3,5)):
+    def purifyBackGround(image, threshold_var = 0.008, threshold_var2 = 0.004, threshold_pixel = 60, threshold_hist = 10, kernel_size = (3,3), morph_kernel_size = (3,5)):
 
         dim = image.shape
         mask = np.zeros(dim, dtype=np.uint8)   # 1:keep 0:remove
@@ -246,9 +246,12 @@ class PhyloParser():
 
         # return mask if the image has color background
         # return mask_1 if the image has no color background
-        PhyloParser.displayImage(mask)
+#         PhyloParser.displayImage(mask)
+#         print "show mask_2"
+#         PhyloParser.displayImage(mask)
         
         if hasColorBackGround:
+            print "bg removal"
             # remove background
             image[np.where(mask == 255)] = 255
             # recover defect using morphology
@@ -257,8 +260,8 @@ class PhyloParser():
         else:
             mask = mask_2
         
-        
-        PhyloParser.displayImage(mask_2)
+#         print "show mask_2"
+#         PhyloParser.displayImage(mask_2)
         
         var_map= var_map * 255/(np.max(var_map) - np.min(var_map)) ## for debugging
 
@@ -1395,6 +1398,9 @@ class PhyloParser():
                 cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
             PhyloParser.displayLines(img, anchorLines)
         
+#         PhyloParser.matchAnchorLineAndContourBox(image, anchorLines, contourBoxes)
+        
+        
         # group entangled boxes together
 #         height_group, contour_group, textBoxes = PhyloParser.clusterBoxes(contourBoxes)
 #         print "show textBoxes"
@@ -1606,6 +1612,182 @@ class PhyloParser():
         text = pytesseract.image_to_string(Image.open('tmp.tiff'))
 
         return text  
+
+    @staticmethod
+    #coef : coefficient of horizontal distance for sorting lines that corresponds to the same box
+    #horizontal_anchor_margin: roll back distance to tolerate overlapping between line and box
+    #verticle_anchor_margin: tolerance to y-displacement between line and box
+    def matchAnchorLineAndContourBox(image, anchorLines, contourBoxes, coef = 10, horizontal_anchor_margin = 5, verticle_anchor_margin = 2):
+
+        # sort boxes and anchorlines from top to bot for further matching       
+        contourBoxes = sorted(contourBoxes, key = lambda x: (x[0], x[2])) #top, left
+        anchorLines = sorted(anchorLines, key = lambda x: (x[3], x[2])) #top, right      
+        
+        
+        index = 0
+        start_index = index
+        boxIndex2LineIndex = {}
+        lineIndex2BoxIndex={}
+        noTextLineIndex = []
+        lineInTextIndex = []
+        
+        for line_index, line in enumerate(anchorLines):
+            y = line[1]
+            right = line[2]
+            target_box_index = []
+            target_boxes = []
+            row_found = False
+            
+#             print "line", line, "startline", index, "/", len(textGroup)
+    
+            while index < len(textGroup):
+                textBox = textGroup[index]
+                text_row = textBox["text_row"]
+                
+#                 print "text_row", text_row, index
+    
+                if  text_row[0] <= y - verticle_anchor_margin <= text_row[1] \
+                    or text_row[0] <= y <= text_row[1] \
+                    or text_row[0] <= y + verticle_anchor_margin <= text_row[1]:
+                    
+#                     print "in, index", index
+                    row_found = True
+                    start_index = index
+#                     print "start_index", index
+                    for i, box in enumerate(textBox["boxes"]):
+                        
+                        # find corresponding box
+                        # (give a small margin to tolerate the overlapping between line and box)
+                        # will get every box in the right hand side
+                        if right - horizontal_anchor_margin <= box[2]:
+#                             print "in box", box
+                                                
+                            target_boxes.append(box)
+                            target_box_index.append((index, i))
+                            
+                            #push into boxIndex2LineIndex
+                            if (index, i) in boxIndex2LineIndex:
+                                boxIndex2LineIndex[(index, i)].append(line_index)
+                            else:
+                                boxIndex2LineIndex[(index, i)] = [line_index]
+                            
+                    index += 1
+                elif text_row[0] < y + verticle_anchor_margin:
+                    index += 1
+                else:
+                    index = start_index ## go back to the start_index, since the multiple lines can match with the same box
+                    break
+                
+            if index == len(textGroup):
+                index = start_index
+
+            if len(target_box_index) > 0:
+                lineIndex2BoxIndex[line_index] = target_box_index
+            else:
+                if row_found:
+                    lineInTextIndex.append(line_index)
+                else:
+                    noTextLineIndex.append(line_index)
+        
+#             print "target_box_index", target_box_index
+#             print 
+#             img = image.copy()
+#             PhyloParser.displayLines(img, [line])
+            
+     
+        # handle multiple lines to the same box
+        robbedLineIndex = Set()
+        lineIndex2ShareBoxIndex={}
+        
+        for key in boxIndex2LineIndex:
+            index = key[0]
+            box_index = key[1]
+            box = textGroup[index]["boxes"][box_index]
+            line_indices = boxIndex2LineIndex[key]
+            
+            # multiple lines take the same text box
+            if len(line_indices) > 1:
+                
+                ## select the line among multiple matched lines
+                lines = []
+                for line_index in line_indices:
+                    line = anchorLines[line_index]
+                    dist = math.sqrt((pow((line[3]-box[0]),2) + coef*pow((line[2]-box[2]),2)))
+                    lines.append((line, line_index, dist))
+
+                lines = sorted(lines, key = lambda x: (x[2]))       
+                         
+                line_indices = [y for x,y,z in lines]
+                lines = [x for x,y,z in lines]
+                
+#                 print "multiple", lines
+                
+                ceil = box[0]
+                for i in range(0, len(line_indices)):
+                    line_index = line_indices[i]
+                    line = anchorLines[line_index]
+             
+#                     print "line", line, "box", box
+                    if i != len(line_indices)-1:
+                        next_line_index = line_indices[i+1]
+                        next_line = anchorLines[next_line_index]
+#                         print "next line", next_line
+                        
+                        # next line under this line
+                        # this line's head < next line' tail
+                        if line[1] < next_line[1] and line[0] < next_line[2]:
+#                             print "under"
+                            floor = (lines[i+1][1] + lines[i][1])/2
+                            next_ceil = floor
+                        #next line above this line, this line is the bottom line in this tier
+                        else:
+#                             print "above"
+                            floor = box[1]
+                            next_ceil = box[0]
+                            
+#                         print "floor", floor
+#                         print "ceil", ceil
+                    #last line            
+                    else:
+#                         print "last line"
+                        floor = box[1] 
+                                   
+                    if line_index in lineIndex2ShareBoxIndex:
+#                         print "existed"
+                        new_box = lineIndex2ShareBoxIndex[line_index]
+                        new_box = [min(ceil, new_box[0]), max(floor, new_box[1]), min(box[2], new_box[2]), max(box[3], new_box[3])]
+
+                    else:
+#                         print "not existed"
+                        new_box = [ceil, floor, box[2], box[3]]
+                            
+#                     print "new box", new_box
+                    lineIndex2ShareBoxIndex[line_index] = new_box
+                    ceil = next_ceil
+                   
+
+                ############NOT USE#############
+                ## select the line among multiple matched lines
+                closest_distance = 999999999
+#                 selected_index = 0
+                for line_index in line_indices:
+                    line = anchorLines[line_index]                   
+                    distance = box[2] - (line[2] - horizontal_anchor_margin)    
+                    if distance < closest_distance:
+                        closest_distance = distance
+                        selected_line_index = line_index
+
+#                 boxIndex2LineIndex[key] = [selected_line_index] ## NOT UPDATE
+                
+                for line_index in line_indices:
+                    if line_index != selected_line_index:
+                        if line_index in lineIndex2BoxIndex:
+#                             del lineIndex2BoxIndex[line_index]  ## NOT DELETE
+                            robbedLineIndex.add(line_index)
+                ############NOT USE#############
+        
+        return lineIndex2BoxIndex, boxIndex2LineIndex, lineIndex2ShareBoxIndex, lineInTextIndex, noTextLineIndex
+    
     
     @staticmethod
     #coef : coefficient of horizontal distance for sorting lines that corresponds to the same box
@@ -2183,7 +2365,7 @@ class PhyloParser():
             
     @staticmethod
     # split boxes in the group vertically
-    def splitBoxGroup(boxGroup, text_height_threshold = 6, text_length_threshold = 5):
+    def splitBoxGroup(boxGroup, text_height_threshold = 5):
         
         #data structure: sub_group = [boundary, [original boxes]]
         
