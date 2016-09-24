@@ -57,8 +57,9 @@ class ImageData():
 
     # filled by getSpecies
     line2Text = {} # key: line,  value: text
-    boxID2Text = {} #key: box_id, value:text; textGroup[box_id[0]]["boxes"][box_id[1]] will reture the corresponding box
+    box2Text = {} #key: box, value:text;
     textGroup = [] #element: key: "text_row" value: bonding box; key: "boxes" value: sub-boxes in the bonding box
+    orphanBox2Text = {} #key: box value: text; orphan boxes are boxes with not matched anchor lines
     speciesNameReady = False
 
     # filled by makeTree

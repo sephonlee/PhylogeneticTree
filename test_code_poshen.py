@@ -82,6 +82,7 @@ if __name__ == '__main__':
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2287175_1471-2148-8-57-2.jpg'
     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_336.jpg'
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_337.jpg'
+    filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/tree16.jpg'
     ##
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2397417_1471-2164-9-215-5.jpg'
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2259423_1471-2105-9-S1-S22-5.jpg'
@@ -150,6 +151,7 @@ if __name__ == '__main__':
         image_data = phyloPaser.matchLines(image_data, debug = False)
     
     
+        image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
         image_data = phyloPaser.getSpecies(image_data, debug = True)
 # #      
 # #      
