@@ -1479,8 +1479,7 @@ class PhyloParser():
         
         # group entangled boxes together
         height_group, contour_group, textBoxes = PhyloParser.clusterBoxes(image, contourBoxes)
-        
-        
+
         # TESTING STILL#
 #         print "contour_group", contour_group
 #         new_box_group = PhyloParser.mergeBoxesInGroup(image, contour_group)
