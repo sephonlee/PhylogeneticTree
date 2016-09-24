@@ -2789,7 +2789,7 @@ class PhyloParser():
             if node in tmpList:
                 if not node.isComplete:
                     for breakNode in node.breakSpot[:]:
-
+                        print node.branch, breakNode.branch
                         isFixed = False
                         isUpper = True
                         if not ((breakNode.to[0] or breakNode.upperLeave) or (breakNode.to[1] or breakNode.lowerLeave)):
@@ -2799,11 +2799,13 @@ class PhyloParser():
                             x1, y1, x2, y2, length = breakNode.branch
                             result = self.getNodeBranchOnTheRight((x2,y2), rootList)
                             if result:  
+
                                 to = list(breakNode.to)
                                 to[1] = result
                                 breakNode.to = tuple(to)
                                 result.whereFrom = breakNode
                                 result.origin = node
+                                node.area +=result.area
                                 if result.isComplete:
                                     print "remove"
                                     if result in tmpList:
@@ -2823,6 +2825,7 @@ class PhyloParser():
                                 breakNode.to = tuple(to)
                                 node.breakSpot.remove(breakNode)
                                 result.origin = node
+                                node.area+=result.area
                                 if result.isComplete:
                                     print "remove"
                                     if result in tmpList:
@@ -2840,9 +2843,9 @@ class PhyloParser():
         for node in rootList:
             if node in tmpList:
                 if len(node.breakSpot) == 0 and node.whereFrom != None:
-
                     tmpList.remove(node)
         rootList = tmpList[:]
+        rootList = sorted(rootList, key = lambda x: -x.area)
         if len(rootList) == 1:
             rootList[0].isComplete = True
 
@@ -2974,7 +2977,7 @@ class PhyloParser():
         nodeList = image_data.nodeList
         anchorLines = image_data.anchorLines
         seen = []
-        
+
         rootList = []
         count = 0
         for node in nodeList:
