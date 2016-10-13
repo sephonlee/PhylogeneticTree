@@ -37,24 +37,24 @@ class PhyloParser():
         #save original image
         image_data.originalImage = image.copy() 
 
-#         #purify background
-#         image, image_data.varianceMask, image_data.varMap = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
-#         if debug:
-#             print "Display image with removed background"
-#             PhyloParser.displayImage(image)
-#             print "Display variance mask"
-#             PhyloParser.displayImage(image_data.varianceMask)
+        #purify background
+        image, image_data.varianceMask, image_data.varMap = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
+        if debug:
+            print "Display image with removed background"
+            PhyloParser.displayImage(image)
+            print "Display variance mask"
+            PhyloParser.displayImage(image_data.varianceMask)
 
-#         #determine effective area and save the masks into image_data        
-#         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(image_data.varianceMask)
-# #         image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.textMask)
+        #determine effective area and save the masks into image_data        
+        image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(image_data.varianceMask)
+#         image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.textMask)
         
         
-#         if debug:
-#             print "display tree mask"
-#             PhyloParser.displayImage(image_data.treeMask)
-#             print "display non-tree mask"
-#             PhyloParser.displayImage(image_data.nonTreeMask)
+        if debug:
+            print "display tree mask"
+            PhyloParser.displayImage(image_data.treeMask)
+            print "display non-tree mask"
+            PhyloParser.displayImage(image_data.nonTreeMask)
 
         image = PhyloParser.bilateralFilter(image)
         if debug:
@@ -217,8 +217,8 @@ class PhyloParser():
 
         hasColorBackGround = False;
         if sum(hist[-threshold_hist:]) / float(dim[0]*dim[1]) <= (255-4*threshold_hist)/float(255):
-            hasColorBackGround = True;
-        print hasColorBackGround
+            hasColorBackGround = True
+        print 'This image has background:', hasColorBackGround
         
         for i in range(0, dim[0] - kernel_size[0] + 1):
             for j in range(0, dim[1] - kernel_size[1] + 1):
@@ -294,12 +294,12 @@ class PhyloParser():
         else:
             image = image_data.originalImage
         
-        # sub-preprocessing 
-        image = PhyloParser.binarize(image, thres = 180, mode = 3)
-        if debug:
-            print "detecting lines ..."
-            print "binerized image"
-            PhyloParser.displayImage(image)
+        # # sub-preprocessing 
+        # image = PhyloParser.binarize(image, thres = 180, mode = 3)
+        # if debug:
+        #     print "detecting lines ..."
+        #     print "binerized image"
+        #     PhyloParser.displayImage(image)
         
         # save the preprocessed image into image_data
         image_data.image_preproc_for_line_detection = image
@@ -310,7 +310,8 @@ class PhyloParser():
             image = PhyloParser.removeLabels(image, image_data.treeMask)
 
         image = PhyloParser.negateImage(image)
-        
+        PhyloParser.displayImage(image_data.varianceMask)
+        image = PhyloParser.negateImage(image_data.varianceMask)
         # find vertical lines
         mode = 0
         height, width = image_data.image.shape
@@ -360,7 +361,7 @@ class PhyloParser():
     # return the image_data
     def getLines(image, mode, minLength = 10):
         
-        tmp = cv.HoughLinesP(image, rho = 9, theta = np.pi, threshold = 10, minLineLength = minLength, maxLineGap = 0)
+        tmp = cv.HoughLinesP(image, rho = 100, theta = np.pi, threshold = 10, minLineLength = minLength, maxLineGap = 0)
         image_height, image_width =  image.shape
 
         lineList = []
@@ -1889,6 +1890,7 @@ class PhyloParser():
         
         # handle multiple lines to the same box
         lineIndex2SubBoxes={}
+        orphanBoxFromShareBox = []
         for box_index in shareBoxIndices:
             line_indices = boxIndex2LineIndex[box_index]
             box = contourBoxes[box_index]
