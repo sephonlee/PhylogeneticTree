@@ -30,22 +30,26 @@ if __name__ == '__main__':
     for index, fileName in enumerate(fileNameList):
         print index, fileName
 
-    for index in range(3, len(fileNameList)):
+    for index in range(15, len(fileNameList)):
         print index
         filePath = folderPath + fileNameList[index]
         if isfile(filePath) :
             image = cv.imread(filePath,0)
-            
+        PhyloParser.displayImage(image)
         image_data = ImageData(image)
-        image_data = phyloPaser.preprocces(image_data, debug=True)
-        image_data.updateImageDimension()
-        
-        image_data = phyloPaser.detectLines(image_data, debug = True)
-        
+        image_data = phyloPaser.preprocces(image_data, debug=False)
+        # image_data = phyloPaser.getCorners(image_data, debug = False)
+        image_data = phyloPaser.detectLines(image_data, debug = False)
+        # image_data = phyloPaser.makeLinesFromCorner(image_data, debug = False)
+        # image_data = phyloPaser.includeLinesFromCorners(image_data)
 #         image_data = phyloPaser.detectCorners(image_data)
 #         image_data = phyloPaser.refineLinesByCorners(image_data)
-        
-        image_data = phyloPaser.matchLines(image_data)
+        # image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
+        # image_data = phyloPaser.getSpecies(image_data, debug = True)
+        image_data = phyloPaser.matchLines(image_data, debug = False)
+        image_data = phyloPaser.getSpecies_v2(image_data, debug = False)
+        print image_data.orphanBox2Text
+        # image_data = phyloPaser.getSpecies(image_data, debug = True)
         treeString = phyloPaser.makeTree(image_data, debug = True)
         # image_data = phyloPaser.getSpecies(image_data)
         

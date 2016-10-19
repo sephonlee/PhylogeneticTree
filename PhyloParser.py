@@ -22,6 +22,7 @@ class PhyloParser():
     
     def __init__(self):
         return 
+
     
     
     @staticmethod
@@ -303,15 +304,14 @@ class PhyloParser():
         
         # save the preprocessed image into image_data
         image_data.image_preproc_for_line_detection = image
-        
+
         # remove text information
         if image_data.treeMask is not None:
             print "Found available tree mask! Applied the tree mask"
             image = PhyloParser.removeLabels(image, image_data.treeMask)
 
         image = PhyloParser.negateImage(image)
-        PhyloParser.displayImage(image_data.varianceMask)
-        image = PhyloParser.negateImage(image_data.varianceMask)
+
         # find vertical lines
         mode = 0
         height, width = image_data.image.shape
@@ -323,6 +323,8 @@ class PhyloParser():
             minVerLine = 10 + height / 250
             minHorLine = 4 + height / 150
         print 'minVerLine:', minVerLine, ' minHorLine:', minHorLine
+        plt.imshow(image, cmap='Greys_r')
+        plt.show()
         image_data.verLines = PhyloParser.getLines(image, mode, minLength = minVerLine)
 
         # find horizontal lines
@@ -3446,6 +3448,7 @@ class PhyloParser():
             if not image_data.treeReady:
                 ## Fix false-positive sub-trees and mandatorily connect sub-trees
                 image_data = self.fixTrees(image_data)
+                image_data = self.recoverLineFromText(image_data)
                 image_data = self.checkDone(image_data)
                 
             # fixTrees fixed everything
@@ -3593,6 +3596,70 @@ class PhyloParser():
         image_data.children = children
         return image_data
 
+    @staticmethod
+    def recoverLineFromText(image_data):
+        image_height = image_data.image_height
+        image_width = image_data.image_width
+        rootNode = image_data.rootList[0]
+        breakSpot = rootNode.breakSpot
+        nodeList = image_data.nodeList
+        line2Text = image_data.line2Text
+        orphanBox2Text = image_data.orphanBox2Text
+        anchorLines = image_data.anchorLines
+        refBreakSpot = breakSpot[:]
+        for node in refBreakSpot:
+            isMatched = False
+            branch = node.branch
+            branch_x1, branch_y1, branch_x2, branch_y2, branch_len = branch
+            print '-------------', branch, '----------------'
+            for textBox, textInfo in orphanBox2Text.items():
+                textBox_y1, textBox_y2, textBox_x1, textBox_x2 = textBox
+                if textBox_x1 > branch_x1 and textBox_y2 > branch_y1 and textBox_y1 < branch_y2:
+                    score1 = 200/(textBox_x1 - branch_x1)
+                    score2 = (textBox_x2 - textBox_x1 + 0.0 ) / image_width
+                    print textBox, score1, score2
+                    if score1 >= 10 and score2 > 0.07:
+
+                        if branch_y1 >= textBox_y1 and branch_y1 <= textBox_y2:
+                            newAnchor = (branch_x1, branch_y1, branch_x1 + 5, branch_y1, 5)
+                            node.upperLeave = newAnchor
+                            node.isUpperAnchor = True
+                        elif branch_y2 >= textBox_y1 and branch_y2 <= textBox_y2:
+                            newAnchor = (branch_x1, branch_y2, branch_x1 + 5, branch_y2, 5)
+                            node.lowerLeave = newAnchor
+                            node.isLowerAnchor = True
+                        else:
+                            textBox_y = int((textBox_y1 + textBox_y2)/2)
+                            newAnchor = (branch_x1, textBox_y, branch_x1 + 5, textBox_y, 5)
+                            node.interLeave.append(newAnchor)
+                            node.isInterAnchor.append(True)
+                            node.otherTo.append(None)
+                            node.interLabel.append(textInfo['text'])
+                            if node.isBinary:
+                                node.isBinary = False
+                        print textBox, textInfo
+                        image_data.displayNode(node)
+                        tmpDict = {}
+                        tmpDict['status'] = 'from_box'
+                        tmpDict['text'] = textInfo['text']
+                        line2Text[newAnchor] = tmpDict
+                        anchorLines.append(newAnchor)
+
+
+            if isMatched:
+                breakSpot.remove(node)
+
+        rootNode.breakSpot = breakSpot
+        image_data.rootList[0] = rootNode
+        image_data.line2Text = line2Text
+        image_data.orphanBox2Text = image_data.orphanBox2Text
+        image_data.anchorLines = anchorLines
+
+
+        return image_data
+
+
+            
 
     def checkDone(self, image_data):
         rootList = image_data.rootList

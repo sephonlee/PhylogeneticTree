@@ -240,6 +240,37 @@ class ImageData():
         plt.show()
 
 
+    def displayNode(self, node):
+        if len(self.image.shape) ==2:
+            whatever = self.image.copy()
+            whatever = cv.cvtColor(whatever, cv.COLOR_GRAY2RGB)
+        else:
+            whatever = self.image.copy()
+
+        count = 0
+
+        color = self.getColor(count)
+
+        if node.root:
+            x1, y1, x2, y2, length = node.root
+            cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+        if node.branch:
+            x1, y1, x2, y2, length = node.branch
+            cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+
+        if node.upperLeave:
+            x1, y1, x2, y2, length = node.upperLeave
+            cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+        if node.lowerLeave:
+            x1, y1, x2, y2, length = node.lowerLeave
+            cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+        if not node.isBinary:
+            for line in node.interLeave:
+                x1, y1, x2, y2, length = line
+                cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+
+        plt.imshow(whatever)
+        plt.show()
 
 
     def displayTargetLines(self, target):
