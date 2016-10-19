@@ -9,7 +9,9 @@ import time
 import math
 from dask.array.core import ceil
 from cgitb import text
+from TrunkNode import TrunkNode
 
+from sklearn.cluster import KMeans, MiniBatchKMeans
 
 try:
     import Image
@@ -284,7 +286,398 @@ class PhyloParser():
     
     ## end static method for preprocessing ##
     
+    
+    @staticmethod
+    def traceTree(image_data, debug = False):
+        image = image_data.image_preproc
+        image = PhyloParser.binarize(image, thres = 180, mode = 0)
+        print "trace tree"
+        PhyloParser.displayImage(image)
+    
+        verLines = image_data.verLines
+        verLines = sorted(verLines,  key = lambda x: int(x[0]))
+        
+#         for line in verLines:
+#             PhyloParser.displayLines(image, [line])
+            
+#         startPoint = ((verLines[0][1]+verLines[0][3])/2, verLines[0][0])
 
+        PhyloParser.getStartPoint(image, verLines)
+        startPoint = (553, 29)
+#         startPoint = (85, 259)
+#         startPoint = (242, 335)
+        print startPoint
+#         print image[startPoint]
+#         print image[startPoint[0]-1:startPoint[0]+2, startPoint[1]-1:startPoint[1]+2]
+#         PhyloParser.displayImage(image[startPoint[0]-1:startPoint[0]+1, startPoint[1]-1:startPoint[1]+1])
+        
+        history_map = np.zeros(image.shape, dtype = np.uint8)
+        point2Trunk = {}
+        
+        new_trunk = TrunkNode(startPoint)
+        queue_trunk = [new_trunk]
+        
+        while len(queue_trunk) != 0:
+            current_trunk = queue_trunk.pop(0)
+            current_trunk = PhyloParser.traceTrunk(image, history_map, current_trunk)
+            
+#             print "point2Trunk", point2Trunk
+#             PhyloParser.displayTrunk(image, current_trunk)
+            
+            point2Trunk[current_trunk.startPoint] = current_trunk
+            
+            for startPoint in current_trunk.nextStartPoint:
+                new_trunk = TrunkNode(startPoint)
+#                 print "new_trunk_bud", new_trunk.buds
+                queue_trunk.append(new_trunk)
+        
+        PhyloParser.displayTreeFromTrunk(image, point2Trunk)
+#         print "point2Trunk"
+#         for point in point2Trunk:
+#             PhyloParser.displayTrunk(image, point2Trunk[point])
+        
+        return
+    
+    @staticmethod
+    def getStartPoint(image, verLines):
+        verLines = sorted(verLines,  key = lambda x: int(x[0]))
+        PhyloParser.displayLines(image, [verLines[0]])
+        
+        veryLeftVerLine = verLines[0]
+        startPoint = ((veryLeftVerLine[1] + veryLeftVerLine[3])/2, veryLeftVerLine[2])
+        
+        
+        
+    @staticmethod
+    def displayTreeFromTrunk(image, point2Trunk):
+        plt.imshow(image, cmap='Greys_r')
+        for point in point2Trunk:
+            trunk = point2Trunk[point]
+
+            top = trunk.top
+            bot = trunk.bot
+            plt.plot([top[1],bot[1]],[top[0], bot[0]],'o', color="red")
+            plt.plot(trunk.startPoint[1], trunk.startPoint[0], 'x', color="red")
+            
+            for bud in trunk.buds:
+                plt.plot([bud[1], bud[1]+5],[bud[0], bud[0]],'-', color="yellow")
+            
+            
+            for line in trunk.interLines:
+                x1, y1, x2, y2, length = line
+                print "interline", line
+                plt.plot([x1, x2], [y1,y2], '-', color="blue", linewidth = 2)
+                
+            for line in trunk.leaves:
+                print "leave", line
+                x1, y1, x2, y2, length = line
+                plt.plot([x1, x2], [y1,y2], '-', color="green", linewidth = 2)
+                plt.plot(x2, y2, '*', color="red")      
+               
+        plt.show()
+    
+    
+    ## static method for tracking
+    @staticmethod
+    def traceLine(image, startPoint):
+        
+        history_map = np.zeros(image.shape, dtype = np.uint8)
+        
+#         print "image shape", image.shape
+#         print "history_map", history_map.shape
+        
+        point2Trunk = {}
+        
+        new_trunk = TrunkNode(startPoint)
+        
+#         new_trunk = {"startPoint": startPoint, "buds":[], "top":None, "bot":None}
+        
+        queue_trunk = [new_trunk]
+        
+        while len(queue_trunk) != 0:
+            current_trunk = queue_trunk.pop(0)
+            current_trunk = PhyloParser.traceTrunk(image, history_map, current_trunk)
+            
+            print "point2Trunk", point2Trunk
+            PhyloParser.displayTrunk(image, current_trunk)
+            
+            point2Trunk[current_trunk.startPoint] = current_trunk
+            
+            for startPoint in current_trunk.nextStartPoint:
+                new_trunk = TrunkNode(startPoint)
+                print "new_trunk_bud", new_trunk.buds
+                queue_trunk.append(new_trunk)
+            
+            
+    
+    @staticmethod
+    def traceTrunk(image, history_map, trunk, threshold = 10):
+        
+        print "startPoint", trunk.startPoint
+        # searching up
+        currentPoint = trunk.startPoint
+        currentPointValue = int(image[currentPoint])
+        history_map[currentPoint] = 1
+        while True:
+            nextPoint = (currentPoint[0]-1, currentPoint[1])
+            nextPointValue = int(image[nextPoint])
+            
+            
+            nextBud = (currentPoint[0], currentPoint[1]+1)
+            nextBudValue = int(image[nextBud])
+            
+#             print "current point", currentPoint, "value", currentPointValue
+            # top pixel is in the line            
+            if abs(nextPointValue - currentPointValue) <= threshold:
+#                 print "move on top"
+                currentPoint = nextPoint
+                currentPointValue = nextPointValue
+                history_map[currentPoint] = 1 # update value in map at next point
+            else:
+                trunk.top = currentPoint
+#                 print "end of the line"
+                break
+            
+            if abs(nextBudValue - currentPointValue) <= threshold:
+#                 print "find bud"
+#                 print "nextBud", nextBud, "value", nextBudValue
+                trunk.buds.append(nextBud)
+                history_map[nextBud] = 2 # update value in map at next bud
+                
+    
+    
+        # searching down
+        currentPoint = trunk.startPoint
+        currentPointValue = int(image[currentPoint])
+        while True:
+            nextPoint = (currentPoint[0]+1, currentPoint[1])
+            nextPointValue = int(image[nextPoint])
+             
+             
+            nextBud = (currentPoint[0], currentPoint[1]+1)
+            nextBudValue = int(image[nextBud])
+             
+#             print "current point", currentPoint, "value", currentPointValue
+            # bot pixel is in the line            
+            if abs(nextPointValue - currentPointValue) <= threshold:
+#                 print "move on bot"
+                currentPoint = nextPoint
+                currentPointValue = nextPointValue
+                history_map[currentPoint] = 1 # update value in map at next point
+            else:
+                trunk.bot = currentPoint
+#                 print "end of the line"
+                break
+             
+            if abs(nextBudValue - currentPointValue) <= threshold:
+#                 print "find bud"
+#                 print "nextBud", nextBud, "value", nextBudValue
+                trunk.buds.append(nextBud)
+                history_map[nextBud] = 2 # update value in map at next bud
+
+#         print "trunk buds", trunk.buds
+#         print "map", history_map[trunk["top"][0]-1:trunk["bot"][0]+2, trunk["top"][1]-1:trunk["top"][1]+2] 
+#         PhyloParser.displayTrunk(image, trunk)
+        
+        
+        trunk.leaves, trunk.interLines, trunk.nextStartPoint = PhyloParser.traceBuds(image, history_map, trunk.buds)
+#         print trunk.leaves
+#         print trunk.interLines
+#         PhyloParser.displayLines(image, trunk.leaves)
+#         PhyloParser.displayLines(image, trunk.interLines)
+#         print "new trunk", trunk
+#         print "map", history_map[trunk["top"][0]-1:trunk["bot"][0]+2, trunk["top"][1]-1:trunk["top"][1]+2] 
+#         PhyloParser.displayTrunk(image, trunk)
+
+        return trunk
+        
+        
+    @staticmethod
+    def traceBuds(image, history_map, buds, threshold = 10):
+        old_buds = buds
+        new_buds = []
+        buds = sorted(buds, key = lambda x: x[0])
+       
+        
+        if len(buds) > 0:
+            bud_group = []
+            tmp = [buds[0]]
+            for i in range(1, len(buds)):
+                previous_bud = buds[i-1]
+                bud = buds[i]
+                if bud[0]-1 == previous_bud[0] and bud[1] == previous_bud[1]:
+                    tmp.append(bud)
+                else:
+                    bud_group.append(tmp)
+                    tmp = [bud]
+                    
+                if i == len(buds) - 1:
+                    bud_group.append(tmp)
+                    
+            
+            for g in bud_group:
+                new_bud = g[len(g)/2]
+                new_bud_right = (new_bud[0], new_bud[1]+1) #move rightward
+                
+                
+                if abs(int(image[new_bud_right]) - int(image[new_bud])) <= threshold:
+                    # this mid bud can represent the group
+                    history_map[new_bud_right] = 2
+                    new_buds.append(new_bud_right)
+                else:
+                    # loop over all bud
+                    for new_bud in g:
+                        new_bud_right = (new_bud[0], new_bud[1]+1) #move rightward
+                        if abs(int(image[new_bud_right]) - int(image[new_bud])) <= threshold:
+                            history_map[new_bud_right] = 2
+                            new_buds.append(new_bud_right)
+                            break
+            buds = new_buds
+                
+        print "bud_group", bud_group
+        print "buds", buds
+
+        new_buds = []
+        while len(buds) != 0:
+            remove_index = []
+            for i, bud in enumerate(buds):
+                
+                
+                top_bud = (bud[0]-1, bud[1])
+                right_bud = (bud[0], bud[1]+1)
+                
+                print "bud", bud, "top map value", history_map[top_bud], "top",  image[top_bud],"right", image[right_bud] 
+
+                if history_map[top_bud] == 2:
+                    #this bud dies
+                    remove_index.append(i)
+                    print "kill", bud
+                    #stop this bud
+                else:
+                    
+                    is_reached = False
+                    #first move
+                    if abs(int(image[top_bud]) - int(image[bud])) <= threshold:
+                        #move top if possible
+                        print bud, "move top", top_bud
+                        bud = top_bud
+                        buds[i] = bud
+                        history_map[top_bud] = 2
+                    elif abs(int(image[right_bud]) - int(image[bud])) <= threshold:
+                        #move right if possible
+                        print bud, "move right", right_bud
+                        bud = right_bud
+                        buds[i] = bud
+                        history_map[right_bud] = 2
+                    else:
+                        # reach the destination
+                        dist = 99999
+                        target = 0
+                        for j, old_bud in enumerate(old_buds):
+                            if abs(old_bud[0] - bud[0]) < dist:
+                                dist = abs(old_bud[0] - bud[0])
+                                target = j
+                                
+#                         bud = (old_buds[target][0], bud[1])
+                        buds[i] = bud
+                        #align the y axis
+                        line = (old_buds[target][1], old_buds[target][0], bud[1], old_buds[target][0], abs(bud[1]-old_buds[target][1]))
+                        new_buds.append((bud, line))
+                        remove_index.append(i)
+                        print "index", target, "old_buds", old_buds
+                        print "reach"
+                        
+                        is_reached = True
+                        
+                    if not is_reached:
+                        top_bud = (bud[0]-1, bud[1])
+                        right_bud = (bud[0], bud[1]+1)
+                        #second move
+                        if abs(int(image[right_bud]) - int(image[bud])) <= threshold:
+                            #move right if possible
+#                             print bud, "move right", right_bud
+                            bud = right_bud
+                            buds[i] = bud
+                            history_map[right_bud] = 2
+                        else:
+                            # reach the destination
+                            dist = 99999
+                            target = 0
+                            for j, old_bud in enumerate(old_buds):
+#                                 print j, abs(old_bud[0] - bud[0])
+                                if abs(old_bud[0] - bud[0]) < dist:
+                                    dist = abs(old_bud[0] - bud[0])
+                                    target = j
+                                    
+#                             bud = (old_buds[target][0], bud[1])
+                            buds[i] = bud
+                            
+                            #align the y axis
+                            line = (old_buds[target][1], old_buds[target][0], bud[1], old_buds[target][0], abs(bud[1]-old_buds[target][1]))
+                            new_buds.append((bud,line)) 
+                            remove_index.append(i)
+
+                            print "index", target, "old_buds", old_buds
+                            print "reach"
+                            is_reached = True
+                
+            remove_index = sorted(list(Set(remove_index)), reverse = True)
+            
+            for index in remove_index:
+                del buds[index]
+           
+         
+        leaves = []
+        interlines = []
+        new_startPoint = []
+        for (bud,line) in new_buds:
+            top_bud = (bud[0]-1, bud[1])
+            print bud, "top value", int(image[top_bud]), "bud value", int(image[bud])
+            print image[bud[0]-3: bud[0]+4, bud[1]-3: bud[1]+4]
+            if abs(int(image[top_bud]) - int(image[bud])) > threshold:
+                #this bud is to leave
+                print "leave"
+                leaves.append(line)
+            else:
+                #this bud is to next trunk
+                print "next trunk"
+                interlines.append(line)
+                new_startPoint.append(bud)
+            
+        return leaves, interlines, new_startPoint      
+                    
+                    
+                
+        
+        
+    @staticmethod
+    def displayTrunk(image, trunk):
+        plt.imshow(image, cmap='Greys_r')
+        
+#         print "trunk", trunk
+
+        top = trunk.top
+        bot = trunk.bot
+        plt.plot([top[1],bot[1]],[top[0], bot[0]],'o', color="red")
+        plt.plot(trunk.startPoint[1], trunk.startPoint[0], 'x', color="red")
+        
+        for bud in trunk.buds:
+            plt.plot([bud[1], bud[1]+5],[bud[0], bud[0]],'-', color="yellow")
+        
+        
+        for line in trunk.interLines:
+            x1, y1, x2, y2, length = line
+            print "interline", line
+            plt.plot([x1, x2], [y1,y2], '-', color="blue", linewidth = 2)
+            
+        for line in trunk.leaves:
+            print "leave", line
+            x1, y1, x2, y2, length = line
+            plt.plot([x1, x2], [y1,y2], '-', color="green", linewidth = 2)          
+           
+        plt.show()
+        
+    
     @staticmethod
     def detectLines(image_data, debug = False):
         
@@ -4191,6 +4584,163 @@ class PhyloParser():
         else:
             return False        
         
+        
+        
+    @staticmethod
+    def clusterPixels(image_data, debug = False):
+        print "clusterpixel"
+        image = image_data.image_preproc
+        image = PhyloParser.binarize(image, thres = 180, mode = 0)
+#         PhyloParser.displayImage(image)
+        startTime = time.time()
+        X, position, effective = PhyloParser.getFeatures(image)
+        print time.time()-startTime
+        print X.shape
+        
+        x = []
+        y = []
+        for row in X:
+#             print row
+            x.append(row[0])
+            y.append(row[3])
+        
+        startTime = time.time()
+#         kmeans = KMeans(n_clusters=4, random_state=0).fit(X)
+        print "run kmeans"
+        kmeans = MiniBatchKMeans(init='k-means++', n_clusters=4, batch_size=1000,
+                      n_init=10, max_no_improvement=10, verbose=0)
+        
+#         MiniBatchKMeans(n_clusters = 4, n_init=10, batch_size = 1000, init = 'random')
+        kmeans.fit(X)
+        print "time consuming", time.time() -  startTime
+        labels = kmeans.labels_
+        print "labels", labels
+        colors = ["red","green","yellow","blue", "black"]
+        
+        
+
+        PhyloParser.displayCluster(image, labels, effective)
+#         for i in range(0,len(x)):
+# #             print x[i], y[i], colors[labels[i]]
+#             plt.plot(x[i], y[i], 'o', c=colors[labels[i]])
+#         plt.show()
+        
+        return image_data
+
+    @staticmethod
+    def displayCluster(image, labels, effective):
+        dim = image.shape
+        colors = ["red","green","yellow","blue", "black"]
+        plt.imshow(image, cmap='Greys_r')
+        index = 0
+        for i in range(0, dim[0]):
+            for j in range(0, dim[1]):
+                if effective[index] == 1:
+                    label = labels[index]
+                    plt.plot(j,i, '.', c=colors[label])
+                index += 1
+                
+        plt.show()
+        
+    
+    @staticmethod
+    def getFeatures(image, kernel_size = 10, debug = False):
+        
+#         image = image[290:315,210:245]
+        image = image[312:363, 410:480]
+#         print image
+        PhyloParser.displayImage(image)
+        dim = image.shape
+#         print "dim", dim
+        
+        X = []
+        position = []
+        effective = []
+        for i in range(0, dim[0]):
+            for j in range(0, dim[1]):
+    
+                verMin = max(0, i-kernel_size)
+                verMax = min(dim[0], verMin + 2*kernel_size+1)
+                verMin = max(0, verMax - 2*kernel_size-1)
+                
+                col = image[verMin:verMax, j:j+1]
+                
+                horMin = max(0, i-kernel_size)
+                horMax = min(dim[1], horMin + 2*kernel_size+1)
+                horMin = max(0, horMax - 2*kernel_size-1)
+                
+#                 print "position", i, j
+#                 print "verticle", verMin, i, verMax
+#                 print "horizontal", horMin, j, horMax
+                
+                row = image[i:i+1, horMin:horMax]
+                
+                col = col.T.tolist()[0]
+                row = row.tolist()[0]
+                
+
+                
+                if image[i,j] == 0:
+                    max_col = PhyloParser.getMaxLengthInLine(col)[0:3]
+                    max_row = PhyloParser.getMaxLengthInLine(row)[0:3]
+                    
+#                     print i,j
+#                     print "row", row
+#                     print "max_row", max_row
+#                     print "col",col
+#                     print "max_col", max_col
+                
+
+                    max_col += [0]*(3-len(max_col))
+                    max_row += [0]*(3-len(max_row))
+                    
+                    feature = max_col + max_row
+#                     print feature
+#                     X.append(feature)
+                    position.append((i,j))
+                    effective.append(1)
+                else:
+                    feature =[0,0,0,0,0,0]
+                    effective.append(0)
+                    
+                X.append(feature)
+    
+        X = np.array(X)
+        PhyloParser.displayImage(image)
+        return X, position, effective
+      
+
+
+#     @staticmethod(array)
+    
+    
+    @staticmethod
+    def getMaxLengthInLine(array, threshold = 10):
+
+        lengths = []
+        current = 0
+        current_length = 0
+        while current < len(array):
+            if array[current] == 0:
+                current_length += 1
+                current += 1
+            else:
+                if current_length > 0:
+                    lengths.append(current_length)
+                    current_length = 0
+                    current += 1
+                else:
+                    current_length = 0
+                    current += 1
+                    
+        if current_length  > 0:
+            lengths.append(current_length)
+        
+        return sorted(lengths, reverse=True)
+                    
+                
+            
+    
 #     @staticmethod
 #     def splitBoxGroup_(boxGroup, text_height_threshold = 5):
 #         

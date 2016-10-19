@@ -80,17 +80,18 @@ if __name__ == '__main__':
 
     # bg example
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2287175_1471-2148-8-57-2.jpg'
-    filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_336.jpg'
+#     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_336.jpg'
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/image_337.jpg'
-    filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/tree16.jpg'
+#     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/tree16.jpg'
     ##
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2397417_1471-2164-9-215-5.jpg'
+#     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/high_quality_tree/PMC1660551_1471-2148-6-95-3.jpg'
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2259423_1471-2105-9-S1-S22-5.jpg'
     # wide line example
 #     filename = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2467406_1471-2148-8-193-4.jpg'
     
     # wide line example
-#     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC184354_1471-2148-3-16-2.jpg"
+    filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC184354_1471-2148-3-16-2.jpg"
     
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC184354_1471-2148-3-16-7.jpg"
     
@@ -119,8 +120,8 @@ if __name__ == '__main__':
             if extension in ["jpg", "png"]:
                 fileList.append(os.path.join(dirPath, f))
     
-#     fileList = [filename]
-    for i in range(8, len(fileList)):    
+    fileList = [filename]
+    for i in range(0, len(fileList)):    
         filename =  fileList[i]
         print i, filename
         image = cv.imread(filename, 0)
@@ -128,31 +129,40 @@ if __name__ == '__main__':
         print image.shape
     
     
+#         image = np.zeros((35,22),dtype=np.uint8)
+#         array= [255, 255, 0,0,0,0,0,0,255,255,0,0,255,0,0,255,0,0,0,0,255,0,255,0,255,255]
+#         print PhyloParser.getMaxLengthInLine(array)
+#         PhyloParser.getFeatures(image)
+    
         
         print "original image"
         PhyloParser.displayImage(image)
 #         print PhyloParser.image2text(image[33:, 366:453])
     
-    
-        phyloPaser.displayImage(image)
         image_data = ImageData(image)
     
         image_data = phyloPaser.preprocces(image_data, debug = False)
+        
+        image_data = phyloPaser.clusterPixels(image_data, debug = True)
             
         image_data = phyloPaser.getCorners(image_data, debug = False)   
         image_data = phyloPaser.detectLines(image_data, debug = False)
         
-        image_data = phyloPaser.makeLinesFromCorner(image_data, debug = False)
-        image_data = phyloPaser.includeLinesFromCorners(image_data)
+#         image_data = phyloPaser.traceTree(image_data, debug = True)
+        
+        
+        
+#         image_data = phyloPaser.makeLinesFromCorner(image_data, debug = False)
+#         image_data = phyloPaser.includeLinesFromCorners(image_data)
     
     #     image_data = phyloPaser.refineLines(image_data, debug = False)
     
     
-        image_data = phyloPaser.matchLines(image_data, debug = False)
-    
-    
-        image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
-        image_data = phyloPaser.getSpecies(image_data, debug = True)
+#         image_data = phyloPaser.matchLines(image_data, debug = False)
+#     
+#     
+#         image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
+#         image_data = phyloPaser.getSpecies(image_data, debug = True)
 # #      
 # #      
 #     image_data = phyloPaser.makeTree(image_data, debug = True)
