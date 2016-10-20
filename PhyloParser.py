@@ -292,20 +292,15 @@ class PhyloParser():
     def traceTree(image_data, debug = False):
         image = image_data.image_preproc
         image = PhyloParser.binarize(image, thres = 180, mode = 0)
-        print "trace tree"
-        PhyloParser.displayImage(image)
     
         verLines = image_data.verLines
         verLines = sorted(verLines,  key = lambda x: int(x[0]))
         
-        print "getStartpoint"
-        verLines = sorted(verLines,  key = lambda x: int(x[0]))
-        print "verlines", verLines
+        #use the very left vertical line to get startpoint
         startPoint = PhyloParser.getStartPoint(image, verLines[0])
         
 #         startPoint = (553, 29)
 
-        
         history_map = np.zeros(image.shape, dtype = np.uint8)
         point2Trunk = {}
         
@@ -353,7 +348,6 @@ class PhyloParser():
             else:
                 break
             
-        print startPoint, startPoint2
         if startPoint2[1] > startPoint[1]:
             startPoint = startPoint
         else:
@@ -378,11 +372,11 @@ class PhyloParser():
             
             for line in trunk.interLines:
                 x1, y1, x2, y2, length = line
-                print "interline", line
+#                 print "interline", line
                 plt.plot([x1, x2], [y1,y2], '-', color="blue", linewidth = 2)
                 
             for line in trunk.leaves:
-                print "leave", line
+#                 print "leave", line
                 x1, y1, x2, y2, length = line
                 plt.plot([x1, x2], [y1,y2], '-', color="green", linewidth = 2)
                 plt.plot(x2, y2, '*', color="red")      
@@ -395,30 +389,23 @@ class PhyloParser():
     def traceLine(image, startPoint):
         
         history_map = np.zeros(image.shape, dtype = np.uint8)
-        
-#         print "image shape", image.shape
-#         print "history_map", history_map.shape
-        
-        point2Trunk = {}
-        
+ 
         new_trunk = TrunkNode(startPoint)
-        
-#         new_trunk = {"startPoint": startPoint, "buds":[], "top":None, "bot":None}
-        
         queue_trunk = [new_trunk]
+        point2Trunk = {}
         
         while len(queue_trunk) != 0:
             current_trunk = queue_trunk.pop(0)
             current_trunk = PhyloParser.traceTrunk(image, history_map, current_trunk)
             
-            print "point2Trunk", point2Trunk
-            PhyloParser.displayTrunk(image, current_trunk)
+#             print "point2Trunk", point2Trunk
+#             PhyloParser.displayTrunk(image, current_trunk)
             
             point2Trunk[current_trunk.startPoint] = current_trunk
             
             for startPoint in current_trunk.nextStartPoint:
                 new_trunk = TrunkNode(startPoint)
-                print "new_trunk_bud", new_trunk.buds
+#                 print "new_trunk_bud", new_trunk.buds
                 queue_trunk.append(new_trunk)
             
             
@@ -426,7 +413,7 @@ class PhyloParser():
     @staticmethod
     def traceTrunk(image, history_map, trunk, threshold = 10):
         
-        print "startPoint", trunk.startPoint
+#         print "startPoint", trunk.startPoint
         # searching up
         currentPoint = trunk.startPoint
         currentPointValue = int(image[currentPoint])
@@ -434,7 +421,6 @@ class PhyloParser():
         while True:
             nextPoint = (currentPoint[0]-1, currentPoint[1])
             nextPointValue = int(image[nextPoint])
-            
             
             nextBud = (currentPoint[0], currentPoint[1]+1)
             nextBudValue = int(image[nextBud])
@@ -511,7 +497,8 @@ class PhyloParser():
         new_buds = []
         buds = sorted(buds, key = lambda x: x[0])
        
-        
+       
+        # aggregate buds 
         if len(buds) > 0:
             bud_group = []
             tmp = [buds[0]]
@@ -547,9 +534,10 @@ class PhyloParser():
                             break
             buds = new_buds
                 
-        print "bud_group", bud_group
-        print "buds", buds
+#         print "bud_group", bud_group
+#         print "buds", buds
 
+        # trace buds(horizontal line)
         new_buds = []
         while len(buds) != 0:
             remove_index = []
@@ -559,12 +547,12 @@ class PhyloParser():
                 top_bud = (bud[0]-1, bud[1])
                 right_bud = (bud[0], bud[1]+1)
                 
-                print "bud", bud, "top map value", history_map[top_bud], "top",  image[top_bud],"right", image[right_bud] 
+#                 print "bud", bud, "top map value", history_map[top_bud], "top",  image[top_bud],"right", image[right_bud] 
 
                 if history_map[top_bud] == 2:
                     #this bud dies
                     remove_index.append(i)
-                    print "kill", bud
+#                     print "kill", bud
                     #stop this bud
                 else:
                     
@@ -572,13 +560,13 @@ class PhyloParser():
                     #first move
                     if abs(int(image[top_bud]) - int(image[bud])) <= threshold:
                         #move top if possible
-                        print bud, "move top", top_bud
+#                         print bud, "move top", top_bud
                         bud = top_bud
                         buds[i] = bud
                         history_map[top_bud] = 2
                     elif abs(int(image[right_bud]) - int(image[bud])) <= threshold:
                         #move right if possible
-                        print bud, "move right", right_bud
+#                         print bud, "move right", right_bud
                         bud = right_bud
                         buds[i] = bud
                         history_map[right_bud] = 2
@@ -597,8 +585,8 @@ class PhyloParser():
                         line = (old_buds[target][1], old_buds[target][0], bud[1], old_buds[target][0], abs(bud[1]-old_buds[target][1]))
                         new_buds.append((bud, line))
                         remove_index.append(i)
-                        print "index", target, "old_buds", old_buds
-                        print "reach"
+#                         print "index", target, "old_buds", old_buds
+#                         print "reach"
                         
                         is_reached = True
                         
@@ -630,30 +618,31 @@ class PhyloParser():
                             new_buds.append((bud,line)) 
                             remove_index.append(i)
 
-                            print "index", target, "old_buds", old_buds
-                            print "reach"
+#                             print "index", target, "old_buds", old_buds
+#                             print "reach"
                             is_reached = True
                 
+            # remove dead buds
             remove_index = sorted(list(Set(remove_index)), reverse = True)
-            
             for index in remove_index:
                 del buds[index]
            
          
+        # make the leaves (anchor lines), interlines and new startPoints (end of interlines)
         leaves = []
         interlines = []
         new_startPoint = []
         for (bud,line) in new_buds:
             top_bud = (bud[0]-1, bud[1])
-            print bud, "top value", int(image[top_bud]), "bud value", int(image[bud])
-            print image[bud[0]-3: bud[0]+4, bud[1]-3: bud[1]+4]
+#             print bud, "top value", int(image[top_bud]), "bud value", int(image[bud])
+#             print image[bud[0]-3: bud[0]+4, bud[1]-3: bud[1]+4]
             if abs(int(image[top_bud]) - int(image[bud])) > threshold:
                 #this bud is to leave
-                print "leave"
+#                 print "leave"
                 leaves.append(line)
             else:
                 #this bud is to next trunk
-                print "next trunk"
+#                 print "next trunk"
                 interlines.append(line)
                 new_startPoint.append(bud)
             

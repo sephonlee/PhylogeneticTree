@@ -143,12 +143,12 @@ if __name__ == '__main__':
     
         image_data = phyloPaser.preprocces(image_data, debug = False)
         
-        image_data = phyloPaser.clusterPixels(image_data, debug = True)
+#         image_data = phyloPaser.clusterPixels(image_data, debug = True)
             
         image_data = phyloPaser.getCorners(image_data, debug = False)   
         image_data = phyloPaser.detectLines(image_data, debug = False)
         
-#         image_data = phyloPaser.traceTree(image_data, debug = True)
+        image_data = phyloPaser.traceTree(image_data, debug = True)
         
         
         
