@@ -297,19 +297,13 @@ class PhyloParser():
         verLines = image_data.verLines
         verLines = sorted(verLines,  key = lambda x: int(x[0]))
         
-#         for line in verLines:
-#             PhyloParser.displayLines(image, [line])
-            
-#         startPoint = ((verLines[0][1]+verLines[0][3])/2, verLines[0][0])
+        print "getStartpoint"
+        verLines = sorted(verLines,  key = lambda x: int(x[0]))
+        print "verlines", verLines
+        startPoint = PhyloParser.getStartPoint(image, verLines[0])
+        
+#         startPoint = (553, 29)
 
-        PhyloParser.getStartPoint(image, verLines)
-        startPoint = (553, 29)
-#         startPoint = (85, 259)
-#         startPoint = (242, 335)
-        print startPoint
-#         print image[startPoint]
-#         print image[startPoint[0]-1:startPoint[0]+2, startPoint[1]-1:startPoint[1]+2]
-#         PhyloParser.displayImage(image[startPoint[0]-1:startPoint[0]+1, startPoint[1]-1:startPoint[1]+1])
         
         history_map = np.zeros(image.shape, dtype = np.uint8)
         point2Trunk = {}
@@ -339,14 +333,32 @@ class PhyloParser():
         return
     
     @staticmethod
-    def getStartPoint(image, verLines):
-        verLines = sorted(verLines,  key = lambda x: int(x[0]))
-        PhyloParser.displayLines(image, [verLines[0]])
+    def getStartPoint(image, verLine, threshold = 10):
+#         verLines = sorted(verLines,  key = lambda x: int(x[0]))
         
-        veryLeftVerLine = verLines[0]
-        startPoint = ((veryLeftVerLine[1] + veryLeftVerLine[3])/2, veryLeftVerLine[2])
+        startPoint = (int(verLine[1] + (verLine[3] - verLine[1])*3/4), verLine[0])
+        while True:
+            rightPoint = (startPoint[0], startPoint[1] + 1)
+            if abs(int(image[rightPoint]) - int(image[startPoint])) <= threshold:
+                startPoint = rightPoint
+            else:
+                break
+            
+        startPoint2 = (int(verLine[1] + (verLine[3] - verLine[1])*1/4), verLine[0])
+        while True:
+            rightPoint = (startPoint2[0], startPoint2[1] + 1)
+            if abs(int(image[rightPoint]) - int(image[startPoint2])) <= threshold:
+                startPoint2 = rightPoint
+            else:
+                break
+            
+        print startPoint, startPoint2
+        if startPoint2[1] > startPoint[1]:
+            startPoint = startPoint
+        else:
+            startPoint = startPoint2
         
-        
+        return startPoint2
         
     @staticmethod
     def displayTreeFromTrunk(image, point2Trunk):
@@ -4644,10 +4656,11 @@ class PhyloParser():
         
     
     @staticmethod
-    def getFeatures(image, kernel_size = 10, debug = False):
+    def getFeatures(image, kernel_size = 15, debug = False):
         
 #         image = image[290:315,210:245]
-        image = image[312:363, 410:480]
+#         image = image[312:363, 410:480]
+#         image = image[165:220, 140:200]
 #         print image
         PhyloParser.displayImage(image)
         dim = image.shape
@@ -4694,13 +4707,18 @@ class PhyloParser():
                     max_col += [0]*(3-len(max_col))
                     max_row += [0]*(3-len(max_row))
                     
+#                     max_col = PhyloParser.getMaxLengthToCenter(col) +  PhyloParser.getMaxLengthToCenter(col[::-1])
+#                     max_row = PhyloParser.getMaxLengthToCenter(row) +  PhyloParser.getMaxLengthToCenter(row[::-1])
                     feature = max_col + max_row
+#                     feature = col + row
+#                     print len(feature), feature
+                    
 #                     print feature
 #                     X.append(feature)
                     position.append((i,j))
                     effective.append(1)
                 else:
-                    feature =[0,0,0,0,0,0]
+                    feature = [0]*6
                     effective.append(0)
                     
                 X.append(feature)
@@ -4711,11 +4729,45 @@ class PhyloParser():
       
 
 
-#     @staticmethod(array)
+    @staticmethod
+    def getMaxLengthToCenter(array):
+        
+        mid = (len(array)/2)
+        lengths = []
+        current = 0
+        current_length = 0
+        
+        for i in range(0, mid):
+#             print "index", i, "/", mid
+#             print "value", array[i]
+            current = i
+            current_length = 0
+            if array[current] != 0:
+                lengths.append(current_length)
+            else:
+                while current <= mid:
+                    if array[current] == 0:
+                        current_length += 1
+                        current += 1
+                        
+                    else:
+                        if current_length > 0:
+                            lengths.append(current_length)
+                            current_length = 0
+                            break
+                        else:
+                            current_length = 0
+                            break
+                        
+                if current_length > 0:
+                    lengths.append(current_length)
+        
+        return lengths
+
     
     
     @staticmethod
-    def getMaxLengthInLine(array, threshold = 10):
+    def getMaxLengthInLine(array):
 
         lengths = []
         current = 0
@@ -4739,7 +4791,30 @@ class PhyloParser():
         return sorted(lengths, reverse=True)
                     
                 
-            
+    @staticmethod
+    def getMaxLengthInLine_(array):
+
+        lengths = []
+        current = 0
+        current_length = 0
+        max_length = 0
+        while current < len(array):
+            if array[current] == 0:
+                current_length += 1
+                current += 1
+            else:
+                current_length = 0
+                current += 1
+                
+            if current_length > max_length:
+                max_length = current_length
+                lengths.append(current_length)
+                    
+#         if current_length  > 0:
+#             lengths.append(current_length)
+        
+#         return lengths
+        return sorted(lengths, reverse=True)            
     
 #     @staticmethod
 #     def splitBoxGroup_(boxGroup, text_height_threshold = 5):
