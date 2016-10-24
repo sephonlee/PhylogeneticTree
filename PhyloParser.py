@@ -40,24 +40,24 @@ class PhyloParser():
         #save original image
         image_data.originalImage = image.copy() 
 
-        #purify background
-        image, image_data.varianceMask, image_data.varMap = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
-        if debug:
-            print "Display image with removed background"
-            PhyloParser.displayImage(image)
-            print "Display variance mask"
-            PhyloParser.displayImage(image_data.varianceMask)
+#         #purify background
+#         image, image_data.varianceMask, image_data.varMap = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
+#         if debug:
+#             print "Display image with removed background"
+#             PhyloParser.displayImage(image)
+#             print "Display variance mask"
+#             PhyloParser.displayImage(image_data.varianceMask)
 
-        #determine effective area and save the masks into image_data        
-        image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(image_data.varianceMask)
-#         image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.textMask)
+#         #determine effective area and save the masks into image_data        
+#         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(image_data.varianceMask)
+# #         image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.textMask)
         
         
-        if debug:
-            print "display tree mask"
-            PhyloParser.displayImage(image_data.treeMask)
-            print "display non-tree mask"
-            PhyloParser.displayImage(image_data.nonTreeMask)
+#         if debug:
+#             print "display tree mask"
+#             PhyloParser.displayImage(image_data.treeMask)
+#             print "display non-tree mask"
+#             PhyloParser.displayImage(image_data.nonTreeMask)
 
         image = PhyloParser.bilateralFilter(image)
         if debug:
@@ -286,7 +286,10 @@ class PhyloParser():
 
     
     ## end static method for preprocessing ##
-    
+
+
+
+
     
     @staticmethod
     def traceTree(image_data, debug = False):
@@ -320,13 +323,19 @@ class PhyloParser():
                 new_trunk = TrunkNode(startPoint)
 #                 print "new_trunk_bud", new_trunk.buds
                 queue_trunk.append(new_trunk)
-        
+
         PhyloParser.displayTreeFromTrunk(image, point2Trunk)
 #         print "point2Trunk"
 #         for point in point2Trunk:
 #             PhyloParser.displayTrunk(image, point2Trunk[point])
-        
+            
         return
+
+
+   
+
+
+
     
     @staticmethod
     def getStartPoint(image, verLine, threshold = 10):
@@ -360,6 +369,7 @@ class PhyloParser():
         plt.imshow(image, cmap='Greys_r')
         for point in point2Trunk:
             trunk = point2Trunk[point]
+
 
             top = trunk.top
             bot = trunk.bot
@@ -477,13 +487,30 @@ class PhyloParser():
 #         print "trunk buds", trunk.buds
 #         print "map", history_map[trunk["top"][0]-1:trunk["bot"][0]+2, trunk["top"][1]-1:trunk["top"][1]+2] 
 #         PhyloParser.displayTrunk(image, trunk)
-        
-        
+
+        trunk.trunkLine = (trunk.top[1], trunk.top[0], trunk.bot[1], trunk.bot[0], abs(trunk.bot[0] - trunk.bot[1]))
         trunk.leaves, trunk.interLines, trunk.nextStartPoint = PhyloParser.traceBuds(image, history_map, trunk.buds)
-#         print trunk.leaves
-#         print trunk.interLines
-#         PhyloParser.displayLines(image, trunk.leaves)
-#         PhyloParser.displayLines(image, trunk.interLines)
+
+        for line in trunk.leaves:
+            # print 'top:', trunk.top
+            # print 'bot:', trunk.bot
+            # print line
+            if trunk.top[0] + 1 == line[1]:
+                trunk.upperLine = line
+            elif trunk.bot[0] - 1 == line[1]:
+                trunk.lowerLine = line
+            else:
+                trunk.nonBinaryLines.append(line)
+        for line in trunk.interLines:
+            if trunk.top[0] + 1 == line[1]:
+                trunk.upperLine = line
+            elif trunk.bot[0] - 1 == line[1]:
+                trunk.lowerLine = line
+            else:
+                trunk.nonBinaryLines.append(line)            
+
+        # PhyloParser.displayLines(image, trunk.leaves)
+        # PhyloParser.displayLines(image, trunk.interLines)
 #         print "new trunk", trunk
 #         print "map", history_map[trunk["top"][0]-1:trunk["bot"][0]+2, trunk["top"][1]-1:trunk["top"][1]+2] 
 #         PhyloParser.displayTrunk(image, trunk)
@@ -636,6 +663,7 @@ class PhyloParser():
             top_bud = (bud[0]-1, bud[1])
 #             print bud, "top value", int(image[top_bud]), "bud value", int(image[bud])
 #             print image[bud[0]-3: bud[0]+4, bud[1]-3: bud[1]+4]
+
             if abs(int(image[top_bud]) - int(image[bud])) > threshold:
                 #this bud is to leave
 #                 print "leave"
@@ -684,11 +712,11 @@ class PhyloParser():
     def detectLines(image_data, debug = False):
         
         # use preprocessed image
-        if image_data.preprocessed:      
-            image = image_data.image_preproc
-        else:
-            image = image_data.originalImage
-        
+        # if image_data.preprocessed:      
+        #     image = image_data.image_preproc
+        # else:
+        #     image = image_data.originalImage
+        image = image_data.image
         # # sub-preprocessing 
         # image = PhyloParser.binarize(image, thres = 180, mode = 3)
         # if debug:
@@ -700,9 +728,9 @@ class PhyloParser():
         image_data.image_preproc_for_line_detection = image
 
         # remove text information
-        if image_data.treeMask is not None:
-            print "Found available tree mask! Applied the tree mask"
-            image = PhyloParser.removeLabels(image, image_data.treeMask)
+        # if image_data.treeMask is not None:
+        #     print "Found available tree mask! Applied the tree mask"
+        #     image = PhyloParser.removeLabels(image, image_data.treeMask)
 
         image = PhyloParser.negateImage(image)
 
@@ -737,7 +765,7 @@ class PhyloParser():
         
         image_data.lineDetected = True # Update image_data status
         return image_data
-        
+   
         
     ## static method for detectLine ##remremoveTextoveText
     @staticmethod
@@ -3832,6 +3860,7 @@ class PhyloParser():
 
             # Gather trees from nodes
             image_data = self.createRootList(image_data)
+
             if debug:
                 image_data.displayTrees('regular')
             
@@ -3892,11 +3921,12 @@ class PhyloParser():
         return item.branch[0]
 
     def getNodeBranchOnTheRight(self, dot, nodeList):
+        margin = 2
         x, y = dot
         potentialNodes = []
         for node in nodeList:
             x1, y1, x2, y2, length = node.branch
-            if y1 < y and y2 > y and x1>x:
+            if y1 < y and y2 > y and x1>x - margin:
                 potentialNodes.append(node)
         if len(potentialNodes) == 0:
             return False
@@ -4419,11 +4449,16 @@ class PhyloParser():
         
         if not image_data.speciesNameReady:
             print "Species names not found! Use dummy names."
-
+        image = image_data.image
+        image_height, image_width = image.shape
+        lineCoveredMask = np.zeros((image_height,image_width), dtype=np.uint8)
         parent = image_data.parent
         children = image_data.children
         anchorLines = image_data.anchorLines
         nodeList = []
+        brokenNodes = []
+
+
         for item in children:
             lines, dist = item
             (branch, hlines) = lines
@@ -4444,7 +4479,11 @@ class PhyloParser():
                     match = True
                     if len(hlines) <= 2:
                         upperLeave, lowerLeave = hlines
-                        a = Node(root, branch, upperLeave, lowerLeave) 
+                        a = Node(root, branch, upperLeave, lowerLeave)
+                        tmpLines = [root, branch, upperLeave, lowerLeave]
+                        lineCoveredMask = PhyloParser.doLineMask(lineCoveredMask, tmpLines)
+                        if not PhyloParser.isNodeComplete(a):
+                            brokenNodes.append(a)
                         a.isUpperAnchor = isAnchor[0]
                         a.isLowerAnchor = isAnchor[1]           
                     else:
@@ -4462,6 +4501,10 @@ class PhyloParser():
                         a.isUpperAnchor = isAnchor[0]
                         a.isLowerAnchor = isAnchor[1]
                         a.interLeave = interLine
+                        tmpLines = [root, branch, upperLeave, lowerLeave] + interLine
+                        lineCoveredMask = PhyloParser.doLineMask(lineCoveredMask, tmpLines)
+                        if not PhyloParser.isNodeComplete(a):
+                            brokenNodes.append(a)
                         numInterLeave = len(hlines) - 2
                         for index in range(numInterLeave):
                             a.otherTo.append(None)
@@ -4474,6 +4517,9 @@ class PhyloParser():
                 if len(hlines) <=2:
                     upperLeave, lowerLeave = hlines
                     a = Node(None, branch ,upperLeave, lowerLeave)
+                    brokenNodes.append(a)
+                    tmpLines = [branch, upperLeave, lowerLeave]
+                    lineCoveredMask = PhyloParser.doLineMask(lineCoveredMask, tmpLines)
                     a.isUpperAnchor = isAnchor[0]
                     a.isLowerAnchor = isAnchor[1]
                 else:
@@ -4490,6 +4536,8 @@ class PhyloParser():
                     a.isUpperAnchor = isAnchor[0]
                     a.isLowerAnchor = isAnchor[1]
                     a.interLeave = interLine
+                    tmpLines = [branch, upperLeave, lowerLeave] + interLine
+                    lineCoveredMask = PhyloParser.doLineMask(lineCoveredMask, tmpLines)
                     numInterLeave = len(hlines) - 2
                     for index in range(numInterLeave):
                         a.interLabel.append(None)
@@ -4501,7 +4549,11 @@ class PhyloParser():
 
                 nodeList.append(a)
         nodeList = sorted(nodeList, key = lambda x: -x.branch[0])
+        PhyloParser.displayImage(lineCoveredMask)
 
+        lineCoveredMask, brokenNodes, nodeList = PhyloParser.findMissingLines(lineCoveredMask, brokenNodes, nodeList, image_data)
+
+        PhyloParser.displayImage(lineCoveredMask)
         for node in nodeList:
             if not node.isConnected:
                 potentialUpperLeaves = []
@@ -4574,6 +4626,165 @@ class PhyloParser():
 
         image_data.nodeList = nodeList
         return image_data
+
+
+    @staticmethod
+    def findMissingLines(mask, brokenNodes, nodeList, image_data):
+        refinedLines = []
+
+        # for node in brokenNodes:
+        #     image_data.displayNode(node)
+
+        for node in brokenNodes:
+            branch = node.branch
+            result = PhyloParser.traceTree_v2(image_data, mask, branch)
+
+            if result:
+                trunkList, isMulti = result
+                if not isMulti:
+                    trunk = trunkList[0]
+                    node, mask, refinedLines = PhyloParser.matchNodeAndTrunk(node, trunk, mask, refinedLines)
+                else:
+                    trunk = trunkList[0]
+                    node, mask, refinedLines = PhyloParser.matchNodeAndTrunk(node, trunk, mask, refinedLines)
+                    for index, trunk in enumerate(trunkList):
+                        if index!=0:
+                            newNode = Node(None, None, None, None)
+                            newNode, mask, refinedLines = PhyloParser.matchNodeAndTrunk(newNode, trunk, mask, refinedLines, mode = 'new')
+                            # brokenNodes.append(newNode)
+                            nodeList.append(newNode)
+        margin = 2
+        for node in brokenNodes:
+            if not node.root:
+                for line in refinedLines:
+                    x1, y1, x2, y2, length = line                    
+                    bx1, by1, bx2, by2, blength = node.branch
+                    if y1-y2 == 0:
+                        if x2 > bx1 - margin and x2 < bx2 + margin and y2 > by1 - margin and y2 < by2 + margin:
+                            node.root = line                            
+                            break
+
+        return mask, brokenNodes, nodeList
+
+
+    @staticmethod
+    def matchNodeAndTrunk(node, trunk, mask, refinedLines, mode = 'notNew'):
+        if not node.upperLeave and trunk.upperLine:
+            node.upperLeave = trunk.upperLine
+            x1, y1, x2, y2, length = trunk.upperLine
+            mask[y1, x1:x2] = 255
+            refinedLines.append(trunk.upperLine)
+        else:
+            if trunk.upperLine:
+                if not PhyloParser.isSameLine(node.upperLeave, trunk.upperLine):
+                    node.upperLeave = trunk.upperLine
+                    x1, y1, x2, y2, length = trunk.upperLine
+                    mask[y1, x1:x2] = 255
+        if not node.lowerLeave and trunk.lowerLine:
+            node.lowerLeave = trunk.lowerLine
+            x1, y1, x2, y2, length = trunk.lowerLine
+            mask[y1, x1:x2] = 255
+            refinedLines.append(trunk.lowerLine)
+        else:
+            if trunk.lowerLine:
+                if not PhyloParser.isSameLine(node.lowerLeave, trunk.lowerLine):
+                    node.lowerLeave = trunk.lowerLine
+                    x1, y1, x2, y2, length = trunk.lowerLine
+                    mask[y1, x1:x2] = 255
+        # if not node.isBinary:
+
+
+        if not node.branch:
+            if trunk.trunkLine:
+                node.branch = trunk.trunkLine
+
+                x1, y1, x2, y2, length = trunk.trunkLine
+
+                mask[y1:y2, x1] = 255
+
+                refinedLines.append(trunk.trunkLine)
+
+        return node, mask, refinedLines
+
+
+    @staticmethod
+    def isNodeComplete(node):
+        if not (node.branch and node.upperLeave and node.lowerLeave):
+            return False
+        else:
+            return True
+
+    @staticmethod
+    def doLineMask(mask, lineList):
+        for line in lineList:
+            if line:
+                x1, y1, x2, y2, length = line
+                isHor = False
+                if x2 - x1 != 0:
+                    isHor = True
+                if isHor:
+                    mask[y1,x1:x2] = 255
+                else:
+                    mask[y1:y2, x1] = 255
+        return mask
+
+    @staticmethod
+    def traceTree_v2(image_data, mask, branch):
+        image = image_data.image_preproc
+        height, width = image.shape
+        image = PhyloParser.binarize(image, thres = 180, mode = 0)
+        
+        #use the very left vertical line to get startpoint
+        startPoint = PhyloParser.getStartPoint(image, branch)
+        
+        y, x = startPoint
+
+        if x < width and y < height and image[y, x] != 0:
+            return None
+
+#         startPoint = (553, 29)
+
+        history_map = np.zeros(image.shape, dtype = np.uint8)
+        trunkList = []        
+        new_trunk = TrunkNode(startPoint)
+        queue_trunk = [new_trunk]
+        
+        while len(queue_trunk) != 0:
+            current_trunk = queue_trunk.pop(0)
+            current_trunk = PhyloParser.traceTrunk(image, history_map, current_trunk)
+            
+#             print "point2Trunk", point2Trunk
+#             PhyloParser.displayTrunk(image, current_trunk)
+            
+            trunkList.append(current_trunk)
+            
+            for startPoint in current_trunk.nextStartPoint:
+                if not PhyloParser.isCoveredByNodes(startPoint, mask):
+                    new_trunk = TrunkNode(startPoint)
+    #                 print "new_trunk_bud", new_trunk.buds
+                    queue_trunk.append(new_trunk)
+        
+        # PhyloParser.displayTreeFromTrunk(image, point2Trunk)
+#         print "point2Trunk"
+#         for point in point2Trunk:
+#             PhyloParser.displayTrunk(image, point2Trunk[point])
+        if len(trunkList) != 1:
+            return (trunkList, True)
+        else:
+            return (trunkList, False)
+
+
+
+    @staticmethod
+    def isCoveredByNodes(startPoint, mask):
+        x, y = startPoint
+        margin = 2
+        if 255 in mask[y-margin:y+margin, x-margin:x+margin]:
+            return True
+        else:
+            return False
+
+
 
     @staticmethod
     def betterNode(node1, node2):

@@ -7,6 +7,11 @@ class TrunkNode:
     bot = None
     interLines = []
     leaves = []
+
+    upperLine = None
+    lowerLine = None
+    trunkLine = None
+    nonBinaryLines = []
     
     def __init__(self, startPoint):
         self.startPoint = startPoint
@@ -19,3 +24,10 @@ class TrunkNode:
 #         +  ", buds: " + str(self.buds) \
 #         + ", top: ", self.top.toString() + ", bot: ", self.bot.toString() \
 #         + ", interLines: ", str(self.interLines), ", leaves: " + str(self.leaves)
+
+    def getTrunkInfo(self):
+        print '------trunk Information-------'
+        print 'branch: ', self.branch
+        print 'upperLeave: ', self.upperLeave
+        print 'lowerLeave: ', self.lowerLeave
+        print 'nonBinaryLines', self.nonBinaryLines

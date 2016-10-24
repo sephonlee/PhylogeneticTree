@@ -65,6 +65,7 @@ class ImageData():
     # filled by makeTree
     nodeList = []
     rootList = []
+    lineCoveredMask = None # It is a mask that indicates lines covered by nodes
     treeHead = None # Head of the tree
     treeReady = False
 
