@@ -204,8 +204,10 @@ class ImageData():
                 pass
 
             count +=1
+
         plt.imshow(whatever)
         plt.show()
+
 
     def displayNodes(self):
         if len(self.image.shape) ==2:

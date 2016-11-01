@@ -58,6 +58,7 @@ class Node():
             print 'Connected from the node (branch): ', self.whereFrom.branch
         print 'node score: ', self.score
         print 'node isComplete? ', self.isComplete
+        print 'node breakSpot:', self.breakSpot
         print '------------------------------'
 
 

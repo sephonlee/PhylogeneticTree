@@ -1,4 +1,4 @@
-class TrunkNode:
+class TrunkNode():
     
     startPoint = None
     nextStartPoint = []
@@ -11,11 +11,19 @@ class TrunkNode:
     upperLine = None
     lowerLine = None
     trunkLine = None
-    nonBinaryLines = []
+    rootLine = None    
+    nonBinaryLines = None
+    upperGo = None
+    lowerGo = None
+    interGo = None
     
     def __init__(self, startPoint):
         self.startPoint = startPoint
         self.buds = []
+        if self.nonBinaryLines == None:
+            self.nonBinaryLines = []
+        if self.interGo == None:
+            self.interGo = []
         
     def __str__(self):
 #         return "startPoint: (" + str(self.startPoint[0]) + "," + str(self.startPoint[1]) + ")"
@@ -27,7 +35,12 @@ class TrunkNode:
 
     def getTrunkInfo(self):
         print '------trunk Information-------'
-        print 'branch: ', self.branch
-        print 'upperLeave: ', self.upperLeave
-        print 'lowerLeave: ', self.lowerLeave
+        print 'branch: ', self.trunkLine
+        print 'upperLeave: ', self.upperLine
+        print 'lowerLeave: ', self.lowerLine
+        print 'interLines:', self.interLines
+        print 'leaves:', self.leaves
         print 'nonBinaryLines', self.nonBinaryLines
+        print 'upperGo:', self.upperGo
+        print 'lowerGo:', self.lowerGo
+        print 'interGo:', self.interGo
