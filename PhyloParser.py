@@ -19,7 +19,7 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 from skimage.transform import probabilistic_hough_line
 from skimage.feature import canny
 from scipy import stats
-
+import GroundTruthConverter
 try:
     import Image
 except:
@@ -35,7 +35,7 @@ class ExperimentExecutor():
 
     def autoRun(self, folderPath, groundTruthPath, outputPath):
         fileNameList = self.getFilesInFolder(folderPath)
-        groundTruth = self.getGroundtruthDict(groundTruthPath)
+        groundTruth = self.getGroundTruthDict(groundTruthPath)
         result = {}
         categories = ['line', 'line_corner', 'line_tracing', 'full']
         for cat in categories:
@@ -62,6 +62,13 @@ class ExperimentExecutor():
         fileNameList = [x.rstrip() for x in fileNameList]
 
         return fileNameList.sort()
+
+    @staticmethod
+    def getTreeObject(treeStructure):
+        t = PhyloTree(treeStructure + ';')
+        PhyloTree.rename_node(t, rename_all=True)
+
+        return t
 
 
     @staticmethod
@@ -91,7 +98,10 @@ class ExperimentExecutor():
                 splitPath = filePath.split('/')
                 fileName = splitPath[-1]
 
-                score = ExperimentExecutor.getEditDistance(image_data.treestructure, groundTruth[fileName])
+                resultTree = ExperimentExecutor.getTreeObject(image_data.treeStructure)
+                groundTruthTree = ExperimentExecutor.getTreeObject(groundTruth[fileName])
+
+                score = ExperimentExecutor.getEditDistance(resultTree, groundTruthTree)
 
                 if tracing and corner:
                     result['full'][fileName] = score
@@ -106,7 +116,13 @@ class ExperimentExecutor():
 
 
     @staticmethod
-    def getGroundtruthDict(filePath):
+    def getEditDistance(experiment, groundTruth):
+
+        return float(PhyloTree.zhang_shasha_distance(experiment, groundTruth)) / PhyloTree.getNodeNum(groundTruth)
+
+
+    @staticmethod
+    def getGroundTruthDict(filePath):
         groundTruth = {}
         with open(filePath, 'rb') as f:
             gf = f.readlines()
