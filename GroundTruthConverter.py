@@ -47,6 +47,7 @@ class PhyloTree(Tree):
             tree.name = label 
             
         return 
+    
 def getElement(str, index):
     
     element = str[index]
@@ -101,6 +102,8 @@ def getNextAlphabet(string):
     return new_string
             
 
+## Convert rapid hand-label string to normal expression
+## rename: rename all leaves' names to alphabet order
 def string2TreeString(str, rename = False):
     stack_down = []
     stack_sibling = []
@@ -318,7 +321,7 @@ if __name__ == '__main__':
     print "tree string", tree_string    
     tree = PhyloTree(tree_string+";")
     print tree
-    print PhyloTree.rename_node(tree, 0, rename_all=True)
+    print PhyloTree.rename_node(tree, rename_all=True)
     print tree
     
     ## show the tree and export
