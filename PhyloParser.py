@@ -1,5 +1,7 @@
 import cv2 as cv
 import numpy as np
+import peakutils
+
 from Node import *
 from ImageData import *
 from sets import Set
@@ -7,11 +9,16 @@ import pytesseract
 import time
 # from ete2.phylo.phylotree import PhyloTree
 import math
-from dask.array.core import ceil
+# from dask.array.core import ceil
 from cgitb import text
 from TrunkNode import TrunkNode
-
+from itertools import groupby
+from operator import itemgetter
 from sklearn.cluster import KMeans, MiniBatchKMeans
+
+from skimage.transform import probabilistic_hough_line
+from skimage.feature import canny
+from scipy import stats
 
 try:
     import Image
@@ -25,39 +32,48 @@ class PhyloParser():
     def __init__(self):
         return 
 
-    
+            
     
     @staticmethod
     def preprocces(image_data, debug = False):
         
         image = image_data.image
 
-        if debug:
-            print "Preprocessing image ..."
-            print "Input image:"
-            PhyloParser.displayImage(image)
+#         if debug:
+#             print "Preprocessing image ..."
+#             print "Input image:"
+#             PhyloParser.displayImage(image)
 
         #save original image
         image_data.originalImage = image.copy() 
 
-#         #purify background
-        image, image_data.varianceMask, image_data.varMap, image_data.hasColorBackground = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
-        if debug:
-            print "Display image with removed background"
-            PhyloParser.displayImage(image)
-            print "Display variance mask"
-            PhyloParser.displayImage(image_data.varianceMask)
+# #         #purify background
+#         image, image_data.varianceMask, image_data.varMap, image_data.hasColorBackground = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
+#         if debug:
+#             print "Display image with removed background"
+#             PhyloParser.displayImage(image)
+#             print "Display variance mask"
+#             PhyloParser.displayImage(image_data.varianceMask)
 
-        #determine effective area and save the masks into image_data        
-        image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(image_data.varianceMask)
-# #         image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.textMask)
+#         #determine effective area and save the masks into image_data        
+#         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(image_data.varianceMask)
+# # #         image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.textMask)
         
         
-        if debug:
-            print "display tree mask"
-            PhyloParser.displayImage(image_data.treeMask)
-            print "display non-tree mask"
-            PhyloParser.displayImage(image_data.nonTreeMask)
+#         if debug:
+#             print "display tree mask"
+#             PhyloParser.displayImage(image_data.treeMask)
+#             print "display non-tree mask"
+#             PhyloParser.displayImage(image_data.nonTreeMask)
+
+        
+
+        image, edgeMask= PhyloParser.removeBackground(image)
+
+        # PhyloParser.displayImage(image)
+
+        image_data.treeMask, image_data.nonTreeMask, image_data.controus, image_data.hierarchy = PhyloParser.findContours(edgeMask)
+
 
         image = PhyloParser.bilateralFilter(image)
         if debug:
@@ -70,6 +86,158 @@ class PhyloParser():
         return image_data
         
     ## static method for preprocessing ##
+
+    @staticmethod
+    def removeBackground(image):
+        hist1, bins = np.histogram(image.ravel(),256,[0,256])
+        # print hist1
+
+
+        CANNY_THRESH_1 = 100
+        CANNY_THRESH_2 = 200
+
+        edges = cv.Canny(image, CANNY_THRESH_1, CANNY_THRESH_2)
+
+        # edges = cv.dilate(edges, None)
+        # PhyloParser.displayImage(edges)
+        # edges = cv.erode(edges, None)
+        # PhyloParser.displayImage(edges)
+        kernel = np.ones((5,5),np.uint8)
+        edges = cv.morphologyEx(edges, cv.MORPH_CLOSE, kernel)
+        # PhyloParser.displayImage(edges)
+
+
+        # contour_info = []
+        # __, contours, _ = cv.findContours(edges, cv.RETR_LIST, cv.CHAIN_APPROX_NONE)
+        # for c in contours:
+        #     contour_info.append((
+        #         c,
+        #         cv.isContourConvex(c),
+        #         cv.contourArea(c),
+        #     ))
+        # contour_info = sorted(contour_info, key=lambda c: c[2], reverse=True)
+        # max_contour = contour_info[0]
+
+        # #-- Create empty mask, draw filled polygon on it corresponding to largest contour ----
+        # # Mask is black, polygon is white
+        # mask = np.zeros(edges.shape)
+        # cv.drawContours(mask, max_contour, 0, (255), thickness = -1)e
+        # cv.fillConvexPoly(mask, max_contour[0], (255))
+
+        # PhyloParser.displayImage(mask)
+
+        newImage = image.copy()
+        newImage[np.where(edges != 255)] = 255
+        hist2, bins = np.histogram(newImage.ravel(),256,[0,256])
+
+        # print bins
+        # PhyloParser.displayImage(newImage)
+        #################### we could try to use the following commented code to remove the background boundries######
+
+        hasBackground, backgroundList = PhyloParser.findBackgroundPixelPeak(hist1, hist2, bins)
+
+
+        print 'hasBackground?', hasBackground, backgroundList
+
+        if hasBackground:
+            newnewImage = np.zeros(image.shape,np.uint8)
+            for start, end in backgroundList:
+                newnewImage[np.where((newImage>=start) & (newImage<end))] = 255
+
+            testing = newImage.copy()
+            PhyloParser.displayImage(newnewImage)
+            horLines, verLines = PhyloParser.detectLines__v2(newnewImage)
+            for line in horLines:
+                x1, y1, x2, y2, length = line
+                newnewImage[y1:y2+1, x1:x2] = 0
+            for line in verLines:
+                x1, y1, x2, y2, length = line
+                newnewImage[y1:y2, x1:x2+1] = 0
+            PhyloParser.displayImage(newnewImage) 
+            testing[np.where(newnewImage==255)] = 255
+            kernel = np.ones((3,3),np.uint8)
+            # PhyloParser.displayImage(testing)
+        # newnewImage = cv.morphologyEx(newnewImage, cv.MORPH_OPEN, kernel)
+        # PhyloParser.displayImage(newnewImage)
+        # kernel = np.ones((3,3),np.uint8)
+        # newnewImage = cv.morphologyEx(newnewImage, cv.MORPH_CLOSE, kernel)
+        # newnewImage = cv.dilate(newnewImage, kernel, anchor = (1,1), iterations=3)
+
+        # PhyloParser.displayImage(newnewImage)
+
+            image = testing
+        # else:
+        #     image = newImage
+            
+
+        return image, edges
+
+
+    @staticmethod
+    def findBackgroundPixelPeak(hist1, hist2, bins, peakThreshold = 0.01, minDistThreshold = 1, peakRangeThreshold = 0.01):
+        diff = hist2 - hist1
+        sumDiff = -sum(diff[0:255])
+        diff = - ((diff+0.0)/sumDiff)
+        maxPeakValue = max(diff)
+        print maxPeakValue
+        peakThreshold = (maxPeakValue + 0.0) / 10
+        backgroundList = []
+        bins = bins[0:255]
+        diff = diff[0:255]
+        indexes = peakutils.indexes(diff, thres=peakThreshold, min_dist=minDistThreshold)
+        # print indexes
+        tmp = []
+        for index in indexes:
+            if index > 10 and index < 250:
+                tmp.append(index)
+        indexes = tmp[:]
+        # slope, intercept, r_value, p_value, std_err = stats.linregress(bins,diff)
+        # print slope, intercept
+        print indexes
+        for index in indexes:
+            peakRange = [index, index]
+            thres = diff[index] * peakRangeThreshold
+            stack = []
+            stack.append(index+1)
+            while stack:
+                pos = stack.pop()
+                if diff[pos] > thres and diff[pos]<diff[pos-1]:
+                    peakRange[1] = pos
+                    if pos+1<250:
+                        stack.append(pos+1)
+            stack.append(index-1)
+            while stack:
+                pos = stack.pop()
+                if diff[pos] > thres and diff[pos]<diff[pos+1]:
+                    peakRange[0] = pos
+                    stack.append(pos-1)
+            # if peakRange[0] == index:
+            #     peakRange[0] -=1
+            peakRange[1] +=1
+            print peakRange
+
+            # margin = 1
+            # if peakRange[1] + margin <255:
+            #     upRange = diff[peakRange[1] + margin]
+            # else:
+            #     upRange = diff[254]
+            # if peakRange[0] - margin > 0:
+            #     downRange = diff[peakRange[0] - margin]
+            # else:
+            #     downRange = diff[0]
+
+            # gradient = upRange - downRange
+            # print gradient  
+            print maxPeakValue, diff[peakRange[0]],diff[peakRange[1]]
+            if abs(diff[peakRange[0]] - diff[peakRange[1]]) < (maxPeakValue + 0.0) / 100 :
+                backgroundList.append(tuple(peakRange))
+            elif peakRange[0] == index and abs(diff[peakRange[0] - 1] - diff[peakRange[1]]) < (maxPeakValue + 0.0) / 100:
+                backgroundList.append(tuple(peakRange))
+
+        plt.plot(bins, diff)
+        plt.show()        
+
+        return len(backgroundList) > 0, backgroundList
     
     @staticmethod
     def sobelFilter(image, k=5, sigma = 3):
@@ -324,10 +492,12 @@ class PhyloParser():
 #                 print "new_trunk_bud", new_trunk.buds
                 queue_trunk.append(new_trunk)
 
+        print point2Trunk
+
         PhyloParser.displayTreeFromTrunk(image, point2Trunk)
 #         print "point2Trunk"
-#         for point in point2Trunk:
-#             PhyloParser.displayTrunk(image, point2Trunk[point])
+        for point in point2Trunk:
+            PhyloParser.displayTrunk(image, point2Trunk[point])
             
         return
 
@@ -431,29 +601,33 @@ class PhyloParser():
 
         while True:
             nextPoint = (currentPoint[0]-1, currentPoint[1])
-            nextPointValue = int(image[nextPoint])
-            
-            nextBud = (currentPoint[0], currentPoint[1]+1)
-            nextBudValue = int(image[nextBud])
-            
-#             print "current point", currentPoint, "value", currentPointValue
-            # top pixel is in the line            
-            if abs(nextPointValue - currentPointValue) <= threshold:
-#                 print "move on top"
-                currentPoint = nextPoint
-                currentPointValue = nextPointValue
-                history_map[currentPoint] = 1 # update value in map at next point
+            if currentPoint[0]-1 >-1:
+                nextPointValue = int(image[nextPoint])
+                
+                nextBud = (currentPoint[0], currentPoint[1]+1)
+                nextBudValue = int(image[nextBud])
+                
+    #             print "current point", currentPoint, "value", currentPointValue
+                # top pixel is in the line            
+                if abs(nextPointValue - currentPointValue) <= threshold:
+    #                 print "move on top"
+                    currentPoint = nextPoint
+                    currentPointValue = nextPointValue
+                    history_map[currentPoint] = 1 # update value in map at next point
+                else:
+                    trunk.top = currentPoint
+                    # print "end of the line", trunk.top, image[trunk.top[0], trunk.top[1]], image[trunk.top[0]-1, trunk.top[1]]
+    #                 print "end of the line"
+                    break
+                
+                if abs(nextBudValue - currentPointValue) <= threshold:
+    #                 print "find bud"
+    #                 print "nextBud", nextBud, "value", nextBudValue
+                    trunk.buds.append(nextBud)
+                    history_map[nextBud] = 2 # update value in map at next bud
             else:
                 trunk.top = currentPoint
-                # print "end of the line", trunk.top, image[trunk.top[0], trunk.top[1]], image[trunk.top[0]-1, trunk.top[1]]
-#                 print "end of the line"
                 break
-            
-            if abs(nextBudValue - currentPointValue) <= threshold:
-#                 print "find bud"
-#                 print "nextBud", nextBud, "value", nextBudValue
-                trunk.buds.append(nextBud)
-                history_map[nextBud] = 2 # update value in map at next bud
                 
     
     
@@ -462,29 +636,33 @@ class PhyloParser():
         currentPointValue = int(image[currentPoint])
         while True:
             nextPoint = (currentPoint[0]+1, currentPoint[1])
-            nextPointValue = int(image[nextPoint])
-             
-             
-            nextBud = (currentPoint[0], currentPoint[1]+1)
-            nextBudValue = int(image[nextBud])
-             
-#             print "current point", currentPoint, "value", currentPointValue
-            # bot pixel is in the line            
-            if abs(nextPointValue - currentPointValue) <= threshold:
-#                 print "move on bot"
-                currentPoint = nextPoint
-                currentPointValue = nextPointValue
-                history_map[currentPoint] = 1 # update value in map at next point
+            if currentPoint[0] +1 < image.shape[0]:
+                nextPointValue = int(image[nextPoint])
+                 
+                 
+                nextBud = (currentPoint[0], currentPoint[1]+1)
+                nextBudValue = int(image[nextBud])
+                 
+    #             print "current point", currentPoint, "value", currentPointValue
+                # bot pixel is in the line            
+                if abs(nextPointValue - currentPointValue) <= threshold:
+    #                 print "move on bot"
+                    currentPoint = nextPoint
+                    currentPointValue = nextPointValue
+                    history_map[currentPoint] = 1 # update value in map at next point
+                else:
+                    trunk.bot = currentPoint
+    #                 print "end of the line"
+                    break
+                 
+                if abs(nextBudValue - currentPointValue) <= threshold:
+    #                 print "find bud"
+    #                 print "nextBud", nextBud, "value", nextBudValue
+                    trunk.buds.append(nextBud)
+                    history_map[nextBud] = 2 # update value in map at next bud
             else:
                 trunk.bot = currentPoint
-#                 print "end of the line"
                 break
-             
-            if abs(nextBudValue - currentPointValue) <= threshold:
-#                 print "find bud"
-#                 print "nextBud", nextBud, "value", nextBudValue
-                trunk.buds.append(nextBud)
-                history_map[nextBud] = 2 # update value in map at next bud
 
 #         print "trunk buds", trunk.buds
 #         print "map", history_map[trunk["top"][0]-1:trunk["bot"][0]+2, trunk["top"][1]-1:trunk["top"][1]+2] 
@@ -711,14 +889,333 @@ class PhyloParser():
             plt.plot([x1, x2], [y1,y2], '-', color="green", linewidth = 2)          
            
         plt.show()
+
+
+
+    @staticmethod
+    def testing(image_data):
+        img = image_data.image
+        # image = PhyloParser.negateImage(image)
+
+        BLUR = 21
+
+        MASK_DILATE_ITER = 10
+        MASK_ERODE_ITER = 10
+        MASK_COLOR = (0.0,0.0,1.0) # In BGR format
+
+
+        #== Processing =======================================================================
+
+        #-- Read image -----------------------------------------------------------------------
+        # img = cv2.imread('C:/Temp/person.jpg')
+        # gray = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+
+        #-- Edge detection -------------------------------------------------------------------
+
+
+
+
+
+        #-- Find contours in edges, sort by area ---------------------------------------------
+        contour_info = []
+        __, contours, _ = cv.findContours(edges, cv.RETR_LIST, cv.CHAIN_APPROX_NONE)
+        for c in contours:
+            contour_info.append((
+                c,
+                cv.isContourConvex(c),
+                cv.contourArea(c),
+            ))
+        contour_info = sorted(contour_info, key=lambda c: c[2], reverse=True)
+        max_contour = contour_info[0]
+
+        #-- Create empty mask, draw filled polygon on it corresponding to largest contour ----
+        # Mask is black, polygon is white
+        mask = np.zeros(edges.shape)
+        cv.fillConvexPoly(mask, max_contour[0], (255))
+
+        PhyloParser.displayImage(mask)
+
+        #-- Smooth mask, then blur it --------------------------------------------------------
+        mask = cv.dilate(mask, None, iterations=MASK_DILATE_ITER)
+        mask = cv.erode(mask, None, iterations=MASK_ERODE_ITER)
+        mask = cv.GaussianBlur(mask, (BLUR, BLUR), 0)
+        PhyloParser.displayImage(mask)
+        mask_stack = np.dstack([mask]*3)    # Create 3-channel alpha mask
+
+        #-- Blend masked img into MASK_COLOR background --------------------------------------
+        mask_stack  = mask_stack.astype('float32') / 255.0          # Use float matrices, 
+        img         = img.astype('float32') / 255.0                 #  for easy blending
+
+        masked = (mask_stack * img) + ((1-mask_stack) * MASK_COLOR) # Blend
+        masked = (masked * 255).astype('uint8')                     # Convert back to 8-bit 
+
+        PhyloParser.displayImage(mask)
+
+        #cv2.imwrite('C:/Temp/person-masked.jpg', masked)           # Save
+
+
+
+        height, width = image.shape
+        _, contours, hierarchy= cv.findContours(image.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+        _, outercontours, outerhierarchy = cv.findContours(image.copy(), cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
+
+        # outerhierarchy = outerhierarchy[0].tolist()
+        # temp =  zip(outercontours, outerhierarchy)
+        # temp = sorted(temp, key = lambda x: -len(x[0]))
+        # outercontours = [x for x, y in temp]
+        # outerhierarchy = [y for x, y in temp]
         
-    
+        # print outercontours
+
+        
+        # mask = np.zeros((height,width), dtype=np.uint8)
+        # PhyloParser.displayImage(mask)
+        # cv.drawContours(mask, outercontours, 0, (255), thickness = 1)
+
+        # PhyloParser.displayImage(mask)
+
+
+
+
+        hierarchy = hierarchy[0].tolist()
+        temp =  zip(contours, hierarchy)
+        temp = sorted(temp, key = lambda x: -len(x[0]))
+        contours = [x for x, y in temp]
+        hierarchy = [y for x, y in temp]
+        
+
+        
+        mask = np.zeros((height,width), dtype=np.uint8)
+
+        cv.drawContours(mask, contours, 0, (255), thickness = -1)
+
+        indices = np.where(mask == 255)            
+        treeMaskPts = zip(indices[1], indices[0])
+        treeMaskPts = sorted(treeMaskPts, key = lambda x: (x[0], x[1]))
+        
+        tmp = []
+        verLines = []
+        verMask = np.zeros((height, width), dtype = np.uint8)
+        current = None
+        for x, y in treeMaskPts:
+            if not current or y == current+1:
+                tmp.append(y)
+            else:
+                if len(tmp) >5:
+                    line = (x, tmp[0], x, tmp[-1], len(tmp))
+                    verLines.append(line)
+                    cv.line(verMask, (x, tmp[0]), (x, tmp[-1]), color = 255)
+                    current = None
+                    tmp = []
+                else:
+                    tmp = []
+
+            current = y
+
+        treeMaskPts = sorted(treeMaskPts, key = lambda x:x[1])
+        tmp = []
+        horMask = np.zeros((height, width), dtype = np.uint8)
+        horLines = []
+        current = None
+        for x, y in treeMaskPts:
+            if not current or x == current+1:
+                tmp.append(x)
+            else:
+                if len(tmp) >5:
+                    line = (tmp[0], y, tmp[-1], y, len(tmp))
+                    horLines.append(line)
+                    cv.line(horMask, (tmp[0], y), (tmp[-1], y), color = 255)
+                    tmp = []
+                else:
+                    tmp = []
+
+            current = x
+
+        finalMask = np.zeros((height, width), dtype = np.uint8)
+
+        margin = 5
+        lenTolerance = 5
+        currentLine = None
+        currentX = None
+        coda = 5
+        newVerLines = []
+        newLine = None
+        seen = []
+        thicknessList = []
+        verLines = sorted(verLines, key = lambda x: (x[0], x[1]))
+        for index, refLine in enumerate(verLines):
+            if refLine not in seen: 
+
+                for j in range(index, len(verLines)):       
+                    line = verLines[j]         
+                    if not currentLine:
+                        currentLine = line
+                        currentX = line[0]
+                    if PhyloParser.isSameLine(line, currentLine):
+                        seen.append(line)
+                        if not newLine:
+                            newLine = line
+                        else:
+                            newLine = PhyloParser.updateLineByRef(newLine, line, 'ver')
+                            currentLine = line
+                            currentX = line[0]
+                    else:
+                        if line not in seen:
+                            if abs(line[0] - currentLine[0]) >5:
+                                newVerLines.append(newLine)
+                                thicknessList.append(newLine[2] - newLine[0]+1)
+                                currentLine = None
+                                currentX = None
+                                newLine = None
+                                break
+        print newVerLines
+        print thicknessList
+        thicknessArray = np.array(thicknessList)
+        std = np.std(thicknessArray)
+        counts = np.bincount(thicknessArray)
+        print np.argmax(counts), std
+        PhyloParser.displayImage(verMask)
+        PhyloParser.displayLines_v2(verMask, newVerLines, np.argmax(counts), 100)
+
+
+        # for line in horLines:
+        #     x1, y1, x2, y2, length = line
+
+        #     overlap = []
+        #     for x in range(x1, x2+1):
+        #         if verMask[y1, x] == 255:
+        #             overlap.append((x,y1))
+            
+        #     overlapRate = (len(overlap)+0.0)/length
+        #     if overlapRate >0:
+        #         cv.line(finalMask, (x1, y1), (x2, y2), color = 255)
+
+        # for line in verLines:
+        #     x1, y1, x2, y2, length = line
+        #     overlap = []
+        #     for y in range(y1, y2+1):
+        #         if horMask[y, x1] == 255:
+        #             overlap.append((x,y1))
+        #     overlapRate = (len(overlap)+0.0) / length
+        #     if overlapRate >0:
+        #         cv.line(finalMask, (x1, y1), (x2, y2), color = 255)
+
+
+        # lines = cv.HoughLines(mask,1,np.pi/180,200)
+        # rgbMask = cv.cvtColor(mask,cv.COLOR_GRAY2RGB)
+        # print lines
+        # for line in lines:
+        #     rho, theta = line[0]
+        #     print theta, 
+        #     margin  = abs(theta-np.pi/2)
+        #     if margin < 0.01 or abs(theta) < 0.01:
+        #         a = np.cos(theta)
+        #         b = np.sin(theta)
+        #         x0 = a*rho
+        #         y0 = b*rho
+        #         x1 = int(x0 + 1000*(-b))
+        #         y1 = int(y0 + 1000*(a))
+        #         x2 = int(x0 - 1000*(-b))
+        #         y2 = int(y0 - 1000*(a))
+
+        #         cv.line(rgbMask,(x1,y1),(x2,y2),(255,255,0),2)
+        # PhyloParser.displayImage(rgbMask)
+        
+#         PhyloParser.displayImage(var_mask1)
+#         PhyloParser.displayImage(255-var_mask2)
+#         PhyloParser.displayImage(mask)
+        
+        nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+
+        textContours = []
+        for index in range(1, len(contours)):
+#             print contours
+#             nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+            # draw only contour in level 0
+            if hierarchy[index][3] == -1:
+                cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
+                textContours.append(contours[index])
+#             print hierarchy[index][3] == -1
+#             PhyloParser.displayImage(nonTreeMask)
+
+#         PhyloParser.displayImage(nonTreeMask)
+
+    @staticmethod
+    def updateLineByRef(target, reference, mode):
+        newLine = list(target)
+
+        if newLine[0] > reference[0]:
+            newLine[0] = reference[0]
+        if newLine[1] > reference[1]:
+            newLine[1] = reference[1]
+        if newLine[2] < reference[2]:
+            newLine[2] = reference[2]
+        if newLine[3] <reference[3]:
+            newLine[3] = reference[3]
+
+        if mode == 'ver':
+            newLine[4] = abs(newLine[3] - newLine[1])
+        elif mode == 'hor':
+            newLine[4] = abs(newLine[2] - newLine[0])
+
+
+        return tuple(newLine)
+    @staticmethod
+    def lineTransform(lines):
+        lineList = []
+        for pt1, pt2, in lines:
+            if pt1[0] == pt2[0]:
+                length = abs(pt2[1] - pt1[1])
+            else:
+                length = abs(pt2[0] - pt1[0])
+            line = (pt1[0], pt1[1], pt2[0], pt2[1], length)
+            lineList.append(line)
+        return lineList
+
+
+    @staticmethod
+    def detectLines__v2(image, debug = False, heightThreshold = 500):
+        
+
+
+
+
+        # find vertical lines
+        mode = 0
+        height, width = image.shape
+        oriImage = image.copy()
+        if height>heightThreshold:
+            ratio = (height - heightThreshold) * 3 / 200
+            minVerLine = 12 + ratio
+            minHorLine = 7 + ratio
+        else:
+            minVerLine = 10 + height / 250
+            minHorLine = 4 + height / 150
+        print 'minVerLine:', minVerLine, ' minHorLine:', minHorLine
+
+        verLines = PhyloParser.getLines(image, mode, minLength = minVerLine)
+
+        # find horizontal lines
+        image = PhyloParser.rotateImage(image)
+        mode = 1
+        horLines = PhyloParser.getLines(image, mode, minLength = minHorLine)
+
+        # split horizontal lines that cut by vertical lines
+        # to solve the problem of Poseidon trigeminal stick
+
+        # PhyloParser.displayLines(oriImage, verLines)
+        # PhyloParser.displayLines(oriImage, horLines)
+
+        return horLines, verLines
+   
+
+
     @staticmethod
     def detectLines(image_data, debug = False, heightThreshold = 500):
         
         # use preprocessed image
-
-        if image_data.preprocessed and image_data.hasColorBackground:    
+        print image_data.preprocessed
+        if image_data.preprocessed:    
             image = image_data.image_preproc
         else:
             image = image_data.image
@@ -744,6 +1241,8 @@ class PhyloParser():
 
         image = PhyloParser.negateImage(image)
 
+
+
         # find vertical lines
         mode = 0
         height, width = image_data.image.shape
@@ -768,16 +1267,135 @@ class PhyloParser():
         # to solve the problem of Poseidon trigeminal stick
         image_data.horLines = PhyloParser.cutLines(image_data.horLines, image_data.verLines)
 
+
+        
+        image_data.horLines = PhyloParser.purifyLines(image_data.horLines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'hor')
+        image_data.verLines = PhyloParser.purifyLines(image_data.verLines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'ver')
         if debug:
             print "detectLines debugging"
             image_data.displayTargetLines('horLines')
             image_data.displayTargetLines('verLines')
-        
         image_data.lineDetected = True # Update image_data status
         return image_data
    
         
     ## static method for detectLine ##remremoveTextoveText
+    @staticmethod
+    def purifyLines(lineList, image, negatedImage,  mode,  varianceThreshold=60):
+        varList = []
+        varList_ = []
+        aveList = []
+        aveList_ = []
+        # PhyloParser.displayImage(image)
+        for line in lineList:
+            x1, y1, x2, y2, length = line
+            if mode == 'hor':
+                var = np.sqrt(np.var(image[y1:y2+1, x1:x2]))
+                ave = np.mean(image[y1:y2+1, x1:x2])
+            if mode == 'ver':
+                var = np.sqrt(np.var(image[y1:y2, x1:x2+1]))
+                ave = np.mean(image[y1:y2, x1:x2+1])
+
+            if var < varianceThreshold and not PhyloParser.isInRegion(line, negatedImage, mode):
+                varList.append(line)
+            else:
+                varList_.append(line)
+            # varList.append(var)
+            # aveList.append(ave)
+
+        # varList = sorted(varList, key = lambda x: -x)
+        # aveList = sorted(aveList, key = lambda x: -x)
+        # PhyloParser.displayLines(image, varList)
+        # PhyloParser.displayLines(image, varList_)
+
+        # print varList
+
+
+        return varList
+    @staticmethod
+    def isInRegion(line, negatedImage, mode, thres1= 0.8, thres2 = 0.5, marginRatio = 30, consecutiveThres = 10):
+        height, width = negatedImage.shape
+        # PhyloParser.displayImage(negatedImage)
+        x1, y1, x2, y2, length = line
+        if mode == 'hor':
+            result = []
+            margin = int(height/marginRatio)
+
+            for index in range(margin):
+
+                region = negatedImage[y1 + index:y2 + index +1, x1:x2]
+                lines = [line]
+                # PhyloParser.displayLines(negatedImage, lines)
+                indices = np.where(region == 255)
+                isWhite = (len(indices[0])+0.0)/(x2-x1)
+                # print isWhite
+                if isWhite>thres1:
+                    result.append(True)
+                else:
+                    result.append(False)
+            result.reverse()
+            for index in range(1,margin):
+
+                region = negatedImage[y1 - index:y2 - index +1, x1:x2]
+                indices = np.where(region == 255)
+                isWhite = (len(indices[0])+0.0)/(x2-x1)
+                if isWhite>thres1:
+                    result.append(True)
+                else:
+                    result.append(False)
+
+
+        if mode == 'ver':
+            result = []
+            margin = int(width/marginRatio)
+            for index in range(margin):
+
+                region = negatedImage[y1:y2, x1 + index:x2 + index + 1]
+                indices = np.where(region == 255)
+                isWhite = (len(indices[0])+0.0)/(y2-y1)
+
+                if isWhite>thres1:
+                    result.append(True)
+                else:
+                    result.append(False)
+            result.reverse()
+            for index in range(1,margin):
+
+                region = negatedImage[y1:y2, x1 - index:x2-index+1]
+                indices = np.where(region == 255)
+                isWhite = (len(indices[0])+0.0)/(y2-y1)
+                if isWhite>thres1:
+                    result.append(True)
+                else:
+                    result.append(False)           
+        # print result
+        # print (sum(result) + 0.0)/len(result)
+        # print margin
+        consecutiveCount = 0
+        current = None
+        isConsecutive = False
+        for pt in result:
+            if consecutiveCount > consecutiveThres:
+                isConsecutive = True
+                break
+            if not current:
+                current = pt
+            if pt:
+                consecutiveCount +=1
+                current = pt
+            else:
+                if current:
+                    consecutiveCount = 0
+                current = pt
+
+
+        if (sum(result) + 0.0)/len(result) > thres2 or isConsecutive:
+            return True
+        else:
+            return False
+
+
+
     @staticmethod
     def negateImage(image, thres = 30):
         image = 255 - image
@@ -800,17 +1418,19 @@ class PhyloParser():
 
         lineList = []
         if mode == 0:
-            for line in tmp:
-                x1, y1, x2, y2 = list(line[0])
-                lineInfo = (x1, y2, x2, y1, abs(y2-y1))
-                lineList.append(lineInfo)
+            if tmp != None:
+                for line in tmp:
+                    x1, y1, x2, y2 = list(line[0])
+                    lineInfo = (x1, y2, x2, y1, abs(y2-y1))
+                    lineList.append(lineInfo)
         elif mode == 1:
-            for line in tmp:
-                x1, y1, x2, y2 = line[0]
-                y1 = -y1 + image_height 
-                y2 = -y2 + image_height
-                lineInfo = (y1, x2, y2, x1, abs(y2-y1))
-                lineList.append(lineInfo)
+            if tmp != None:
+                for line in tmp:
+                    x1, y1, x2, y2 = line[0]
+                    y1 = -y1 + image_height 
+                    y2 = -y2 + image_height
+                    lineInfo = (y1, x2, y2, x1, abs(y2-y1))
+                    lineList.append(lineInfo)
                 
         return lineList
     
@@ -1527,6 +2147,39 @@ class PhyloParser():
         mean = np.mean(array)
 
         return variance < var_threshold and mean < mean_threshold
+
+
+    @staticmethod 
+    def getColor(count):
+        if count %5 == 0:
+            return (255, 0, 0)
+        elif count % 5 == 1:
+            return (0, 255, 0)
+        elif count % 5 == 2:
+            return (0, 0, 255)
+        elif count % 5 == 3:
+            return (255, 0, 255)
+        else:
+            return (0, 255, 255)
+
+    @staticmethod
+    #for debug
+    def displayLines_v2(image, lines, maxNum, sigma):
+                
+        if len(image.shape) == 2:
+            whatever = cv.cvtColor(image, cv.COLOR_GRAY2RGB)
+
+        count = 0
+
+        for line in lines:
+            if line[2] - line[0] < maxNum + sigma:
+                count +=1
+                color = PhyloParser.getColor(count)
+                x1, y1, x2, y2, length = line
+                cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=-1)
+        plt.imshow(whatever)
+        plt.show()
+
     
     @staticmethod
     #for debug
@@ -1535,9 +2188,13 @@ class PhyloParser():
         if len(image.shape) == 2:
             whatever = cv.cvtColor(image, cv.COLOR_GRAY2RGB)
 
+        count = 0
+
         for line in lines:
+            count +=1
+            color = PhyloParser.getColor(count)
             x1, y1, x2, y2, length = line
-            cv.rectangle(whatever, (x1, y1), (x2, y2), color=(255, 0, 0), thickness=2)
+            cv.rectangle(whatever, (x1, y1), (x2, y2), color=(255, 0, 0), thickness=-1)
         plt.imshow(whatever)
         plt.show()
                 
@@ -1614,15 +2271,19 @@ class PhyloParser():
             # print probParent
             minDist = None
             target = None
+            
+
             if len(probParent) >0:
 
                 for vline in probParent:
                     vx1, vy1, vx2, vy2, vlength= vline
                     dist = abs(vx2-x2)
                     if dist == 0:
-                        score = vlength
+                        score = np.log(vlength)
                     else:
-                        score = vlength * (1 - int(dist/margin)*0.1)
+                        score = np.log(vlength) * (1 - ((dist+0.0)/(margin))*0.2)
+                    if line == (84, 162, 107, 162, 23):
+                        print vline, score
                     if not target or score > minDist:
                         target = vline
                         minDist = score
@@ -1664,9 +2325,10 @@ class PhyloParser():
                 if x1 > hx1 - margin and x1 < hx1 + margin and y2 > hy1 - margin and y2 < hy1 + margin:
                     lowerLeave.append(hline)
                     isLowerLeave = True
-                if x1 -margin < hx1  and x1 + margin > hx1  and y1 + margin < hy1 and y2 - margin > hy1:
+                if PhyloParser.isDotWithinLine((hx1, hy1), line):
                     if not (isUpperLeave or isLowerLeave):
                         interLeave.append(hline)
+
             if len(upperLeave) > 0 or len(lowerLeave) > 0 or len(interLeave) > 0:
                 totalDist = 0
                 minDist = None
@@ -1701,6 +2363,7 @@ class PhyloParser():
                 if len(interLeave) > 0:
                     image_data.isBinary = False
                     interLeave = self.removeRepeatLinesBasic(interLeave)
+
                     for subline in interLeave:
                         subline = tuple(subline)
                         isAnchor = True
@@ -1710,6 +2373,8 @@ class PhyloParser():
                                 break
                         if isAnchor:
                             anchorLines.append(subline)
+
+
                 if upTarget:
                     upTarget = tuple(upTarget)
                     isAnchor = True
@@ -1735,6 +2400,7 @@ class PhyloParser():
                         tmpLineList = [upTarget, downTarget]
                         for subline in interLeave:
                             tmpLineList.append(subline)
+
                         children.append(((line, tuple(tmpLineList)), totalDist-100))
                 else:
                     if image_data.isBinary:
@@ -1743,6 +2409,7 @@ class PhyloParser():
                         tmpLineList = [upTarget, downTarget]
                         for subline in interLeave:
                             tmpLineList.append(subline)
+
                         children.append(((line, tuple(tmpLineList)), totalDist))
         children = sorted(children, key = image_data.sortByDist)
         children = self.removeRepeatLines(children)
@@ -3881,9 +4548,11 @@ class PhyloParser():
             if not image_data.treeReady:
                 ## Fix false-positive sub-trees and mandatorily connect sub-trees
                 image_data = self.fixTrees(image_data)
-                # image_data = self.recoverLineFromText(image_data)
+                image_data = self.recoverLineFromText(image_data)
                 image_data = self.checkDone(image_data)
                 
+
+
             # fixTrees fixed everything
             if image_data.treeReady:
                 image_data.defineTreeHead()
@@ -3937,9 +4606,12 @@ class PhyloParser():
 
     def getNodeBranchOnTheRight(self, breakNode, nodeList, mode):
         margin = 2
-
-        x = breakNode.branch[0]
-        y = breakNode.branch[1]
+        if mode == 'upper':
+            x = breakNode.branch[0]
+            y = breakNode.branch[1]
+        elif mode == 'lower':
+            x = breakNode.branch[0]
+            y = breakNode.branch[3]
         potentialNodes = []
 
 
@@ -3955,7 +4627,8 @@ class PhyloParser():
                 if breakNode.upperLeave and node.root:
                     if isSameLine(breakNode.upperLeave, node.root):
                         potentialNode.append(node)
-        print
+
+
         if len(potentialNodes) == 0:
             return False
         else:
@@ -3993,7 +4666,7 @@ class PhyloParser():
                             print "lower"
                             x1, y1, x2, y2, length = breakNode.branch
                             result = self.getNodeBranchOnTheRight(breakNode, rootList, mode = 'lower')
-                            print result
+
                             if result:  
 
                                 to = list(breakNode.to)
@@ -4001,7 +4674,7 @@ class PhyloParser():
                                 breakNode.to = tuple(to)
                                 result.whereFrom = breakNode
                                 result.origin = node
-                                node.area +=result.area
+                                node.numNodes +=result.numNodes
                                 if result.isComplete:
                                     print "remove"
                                     if result in tmpList:
@@ -4022,7 +4695,7 @@ class PhyloParser():
                                 breakNode.to = tuple(to)
                                 node.breakSpot.remove(breakNode)
                                 result.origin = node
-                                node.area+=result.area
+                                node.numNodes+=result.numNodes
                                 if result.isComplete:
                                     print "remove"
                                     if result in tmpList:
@@ -4042,7 +4715,7 @@ class PhyloParser():
                 if len(node.breakSpot) == 0 and node.whereFrom != None:
                     tmpList.remove(node)
         rootList = tmpList[:]
-        rootList = sorted(rootList, key = lambda x: -x.area)
+        rootList = sorted(rootList, key = lambda x: -x.numNodes)
         if len(rootList) == 1:
             rootList[0].isComplete = True
 
@@ -4334,6 +5007,7 @@ class PhyloParser():
 
         for node in nodeList:
             if node not in seen:
+
                 stack = []
                 count +=1
                 # print count
@@ -4366,16 +5040,15 @@ class PhyloParser():
 
         rootList = sorted(rootList, key = lambda x: -x.numNodes)
 
-
         if tracing:
 
             mask, breakNodes, newNodeList = PhyloParser.findMissingLines(rootList[0].breakSpot, [], image_data)
-
+            seen = []
             for node in newNodeList:
                 if not node.to[0] and not node.isUpperAnchor:
                     if node.upperLeave:
                         for newNode in newNodeList:
-                            if newNode.root and PhyloParser.isSameLine(node.upperLeave, newNode.root):
+                            if newNode.root and PhyloParser.isSameLine(node.upperLeave, newNode.root) and newNode not in seen:
                                 tmp = list(node.to)
                                 tmp[0] = newNode
                                 node.to = tuple(tmp)
@@ -4423,7 +5096,6 @@ class PhyloParser():
                                     if newNode.root and  PhyloParser.isSameLine(line, newNode.root):
                                         node.otherTo[index] = newNode
                                         newNode.whereFrom = node
-
 
         image_data.rootList = rootList
         return image_data
@@ -4646,12 +5318,14 @@ class PhyloParser():
         brokenNodes = []
 
 
+
         for item in children:
             lines, dist = item
             (branch, hlines) = lines
             match = False
             isAnchor = []
             hlines = list(hlines)
+
             for index, line in enumerate(hlines):
                 isAnchor.append(False)
                 if line:
@@ -4660,6 +5334,8 @@ class PhyloParser():
                             hlines[index] = anchorLine
                             isAnchor[index] = True
             hlines = tuple(hlines)
+            if branch == (110, 96, 110, 478, 382):
+                print hlines
             for pitem in parent:
                 ((root, pbranch), pdist) = pitem
                 if self.isSameLine(branch, pbranch):
@@ -4688,6 +5364,7 @@ class PhyloParser():
                         a.isUpperAnchor = isAnchor[0]
                         a.isLowerAnchor = isAnchor[1]
                         a.interLeave = interLine
+
                         tmpLines = [root, branch, upperLeave, lowerLeave] + interLine
                         lineCoveredMask = PhyloParser.doLineMask(lineCoveredMask, tmpLines)
                         if not PhyloParser.isNodeComplete(a):
@@ -4711,18 +5388,22 @@ class PhyloParser():
                     a.isLowerAnchor = isAnchor[1]
                 else:
                     hlines = list(hlines)
+                    interLine = []
                     for index, line in enumerate(hlines):
-                        interLine = []
+
                         if index == 0:
                             upperLeave = line
                         elif index == 1:
                             lowerLeave = line
                         else:
                             interLine.append(line)
+
+
                     a = Node(None, branch, upperLeave, lowerLeave)
                     a.isUpperAnchor = isAnchor[0]
                     a.isLowerAnchor = isAnchor[1]
                     a.interLeave = interLine
+
                     tmpLines = [branch, upperLeave, lowerLeave] + interLine
                     lineCoveredMask = PhyloParser.doLineMask(lineCoveredMask, tmpLines)
                     numInterLeave = len(hlines) - 2
@@ -4735,49 +5416,72 @@ class PhyloParser():
                     a.isBinary = False
 
                 nodeList.append(a)
-        
+
+        image_data.nodeList = nodeList
+        image_data.displayNodes()
+
+
         if tracing:
             print 'Before first Tracing'
-            PhyloParser.displayImage(lineCoveredMask)
+            # PhyloParser.displayImage(lineCoveredMask)
 
             lineCoveredMask, brokenNodes, nodeList = PhyloParser.findMissingLines(brokenNodes, nodeList, image_data, mask = lineCoveredMask)
             print 'After first Tracing'
-            PhyloParser.displayImage(lineCoveredMask)
+            # PhyloParser.displayImage(lineCoveredMask)
+
+
+
 
         nodeList = sorted(nodeList, key = lambda x: -x.branch[0])
+
         for node in nodeList:
+
             if not node.isConnected:
                 potentialUpperLeaves = []
                 potentialLowerLeaves = []
                 potentialInterLeaves = []
                 if not node.isBinary:
                     for line in node.interLeave:
-                        potentialInterLeaves.append([])
+                        potentialInterLeaves.append(    [])
                 if not (node.isUpperAnchor and node.isLowerAnchor and node.isBinary):
                     for subNode in nodeList:
-                        if subNode!=node and subNode.branch != node.branch and subNode.root:
+                        if subNode!=node and subNode.branch != node.branch:
                             if node.upperLeave and not node.isUpperAnchor:
                                 lineEndx = node.upperLeave[2]
                                 lineEndy = node.upperLeave[3]
-                                if self.isSameLine(subNode.root, node.upperLeave) or PhyloParser.isDotWithinLine((lineEndx, lineEndy), subNode.branch):
+                                if (subNode.root and self.isSameLine(subNode.root, node.upperLeave)) or PhyloParser.isDotWithinLine((lineEndx, lineEndy), subNode.branch):
                                     score = self.evaluateNode(subNode)
-                                    potentialUpperLeaves.append((subNode, score))
+                                    if abs(subNode.branch[0] - lineEndx) == 0:
+                                        distScore = 10
+                                    else:
+                                        distScore = (10+0.0)/abs(subNode.branch[0] - lineEndx)
+                                    potentialUpperLeaves.append((subNode, score + distScore))
                             if node.lowerLeave and not node.isLowerAnchor:
                                 lineEndx = node.lowerLeave[2]
                                 lineEndy = node.lowerLeave[3]
-                                if self.isSameLine(subNode.root, node.lowerLeave) or PhyloParser.isDotWithinLine((lineEndx, lineEndy), subNode.branch):
+
+                                if (subNode.root and self.isSameLine(subNode.root, node.lowerLeave)) or PhyloParser.isDotWithinLine((lineEndx, lineEndy), subNode.branch):
                                     score = self.evaluateNode(subNode)
-                                    potentialLowerLeaves.append((subNode, score))
+                                    if abs(subNode.branch[0] - lineEndx) == 0:
+                                        distScore = 10
+                                    else:
+                                        distScore = (10+0.0)/abs(subNode.branch[0] - lineEndx)
+                                    potentialLowerLeaves.append((subNode, score+distScore))
                             if not node.isBinary:
                                 for index, interLine in enumerate(node.interLeave):
                                     lineEndx = interLine[2]
                                     lineEndy = interLine[3]
-                                    if self.isSameLine(interLine, subNode.root) or PhyloParser.isDotWithinLine((lineEndx, lineEndy), subNode.branch):
+                                    if (subNode.root and self.isSameLine(interLine, subNode.root)) or PhyloParser.isDotWithinLine((lineEndx, lineEndy), subNode.branch):
                                         score = self.evaluateNode(subNode)
-                                        potentialInterLeaves[index].append((subNode, score))
+                                        if abs(subNode.branch[0] - lineEndx) == 0:
+                                            distScore = 10
+                                        else:
+                                            distScore = (10+0.0)/abs(subNode.branch[0] - lineEndx)
+                                        potentialInterLeaves[index].append((subNode, score+distScore))
 
             potentialUpperLeaves = sorted(potentialUpperLeaves, key = lambda x: -x[1])
             potentialLowerLeaves = sorted(potentialLowerLeaves, key = lambda x: -x[1])
+
             if not node.isBinary:
                 for index, interLeave in enumerate(potentialInterLeaves):
                     potentialInterLeaves[index] = sorted(interLeave, key = lambda x: -x[1])
@@ -4825,6 +5529,7 @@ class PhyloParser():
                                 targetNode.whereFrom = node
 
         image_data.nodeList = nodeList
+
         return image_data
 
 
@@ -4843,8 +5548,9 @@ class PhyloParser():
                         tmpLines.append(line)
                 PhyloParser.doLineMask(mask, tmpLines)
 
+
         for node in brokenNodes:
-            
+
             branch = node.branch
             result = PhyloParser.traceTree_v2(image_data, mask, branch)
 
@@ -4852,18 +5558,24 @@ class PhyloParser():
             # image_data.displayNode(node)
             if result:
                 trunkList, isMulti = result
+                # for trunk in trunkList:
+                #     PhyloParser.displayTrunk(image_data.image, trunk)
                 if not isMulti:
                     trunk = trunkList[0]
-                    node, mask, refinedLines = PhyloParser.matchNodeAndTrunk(node, trunk, mask, refinedLines)
+
+                    if not (len(trunk.leaves) == 0 and len(trunk.interLines) == 0):
+                        node, mask, refinedLines = PhyloParser.matchNodeAndTrunk(node, trunk, mask, refinedLines)
 
                 else:
                     trunk = trunkList[0]
-                    node, mask, refinedLines = PhyloParser.matchNodeAndTrunk(node, trunk, mask, refinedLines)
+                    if not (len(trunk.leaves) == 0 and len(trunk.interLines) == 0):
+                        node, mask, refinedLines = PhyloParser.matchNodeAndTrunk(node, trunk, mask, refinedLines)
                     for index, trunk in enumerate(trunkList):
-                        if index!=0:
+                        if index!=0 and len(trunk.leaves) == 0 and not len(trunk.interLines) == 0:
                             newNode = Node(None, None, None, None)
                             newNode, mask, refinedLines = PhyloParser.matchNodeAndTrunk(newNode, trunk, mask, refinedLines, mode = 'new')
                             # brokenNodes.append(newNode)
+
                             nodeList.append(newNode)
         margin = 2
         for node in brokenNodes:
@@ -4878,6 +5590,7 @@ class PhyloParser():
 
         # for node in brokenNodes:
         #     image_data.displayNode(node)
+
         return mask, brokenNodes, nodeList
 
 
@@ -4982,7 +5695,7 @@ class PhyloParser():
                     length, line = PhyloParser.findLineLengthFromPoint(node, image)
                     if branch[4] > length - lengthMargin and branch[4] < length + lengthMargin:
                         newBranch = line
-                        print line
+
                         isFound = True
 
                         return isFound, newBranch
@@ -5078,6 +5791,7 @@ class PhyloParser():
     def findLineLengthFromPoint(oriNode, image):
         stack = []
         seen = []
+        height, width = image.shape
         stack.append(oriNode)
         seen.append(oriNode)
         length = 0
@@ -5096,10 +5810,10 @@ class PhyloParser():
             length += 1
             newNode1 = (y+1, x)
             newNode2 = (y-1, x)
-            if image[y+1, x] == 0 and (y+1, x) not in seen:
+            if y+1 < height and image[y+1, x] == 0 and (y+1, x) not in seen:
                 stack.append((y+1, x))
                 seen.append((y+1, x))
-            if image[y-1, x] == 0 and (y-1, x) not in seen:
+            if y-1 > 0 and image[y-1, x] == 0 and (y-1, x) not in seen:
                 stack.append((y-1, x))
                 seen.append((y-1, x))
         line[4] = length
