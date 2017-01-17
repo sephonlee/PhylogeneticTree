@@ -24,6 +24,118 @@ try:
     import Image
 except:
     from PIL import Image
+from os import listdir
+from os.path import isfile, join
+
+class ExperimentExecutor():
+
+    def __init__(self):
+        pass
+
+
+    def autoRun(self, folderPath, groundTruthPath, outputPath):
+        fileNameList = self.getFilesInFolder(folderPath)
+        groundTruth = self.getGroundtruthDict(groundTruthPath)
+        result = {}
+        categories = ['line', 'line_corner', 'line_tracing', 'full']
+        for cat in categories:
+            result[cat] = {}
+
+
+        print 'Running Experiment with Full Functions.......'
+        result = self.execute(result, groundTruth, fileNameList, tracing = True, corner = True)
+
+        print 'Running Experiment with Line Detection and Corner Detection.......'
+        result = self.execute(result, groundTruth, fileNameList, tracing = False, corner = True)
+
+        print 'Running Experiment with Line Detection and Tracing.......'
+        result = self.execute(result, groundTruth, fileNameList, tracing = True, corner = False)
+
+        print 'Running Experiment with Line Detection.......'
+        result = self.execute(result, groundTruth, fileNameList, tracing = False, corner = False)
+
+        self.outputResult(result, outputPath, fileNameList, categories)
+
+    @staticmethod
+    def getFilesInFolder(folderPath):
+        fileNameList = [join(folderPath, f) for f in listdir(folderPath) if isfile(join(folderPath, f))]
+        fileNameList = [x.rstrip() for x in fileNameList]
+
+        return fileNameList.sort()
+
+
+    @staticmethod
+    def execute(result, groundTruth, fileNameList, tracing = False, corner = False):
+
+        phyloParser = PhyloParser()
+
+        for filePath in fileNameList:
+            if isfile(filePath):
+                image = cv.imread(filePath, 0)
+
+            if image != None:
+                image_data = ImageData(image)
+                image_data = phyloParser.preprocces(image_data, debug=False)
+                image_data = phyloParser.detectLines(image_data, debug = False)
+                if corner:
+                    image_data = phyloParser.getCorners(image_data, debug = True)        
+                    image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
+                    image_data = phyloParser.includeLinesFromCorners(image_data)
+                image_data = phyloParser.matchLines(image_data, debug = False)
+                if tracing:
+                    image_data = phyloParser.makeTree(image_data, debug = True, tracing = True, showResult = True)
+                else:
+                    image_data = phyloParser.makeTree(image_data, debug = True, tracing = False, showResult = True)
+
+
+                splitPath = filePath.split('/')
+                fileName = splitPath[-1]
+
+                score = ExperimentExecutor.getEditDistance(image_data.treestructure, groundTruth[fileName])
+
+                if tracing and corner:
+                    result['full'][fileName] = score
+                elif not tracing and corner:
+                    result['line_corner'][fileName] = score
+                elif not tracing and not corner:
+                    result['line'][fileName] = score
+                elif not tracing and corner:
+                    result['line_tracing'][fileName] = score
+
+        return result
+
+
+    @staticmethod
+    def getGroundtruthDict(filePath):
+        groundTruth = {}
+        with open(filePath, 'rb') as f:
+            gf = f.readlines()
+
+        gf = [x.rstrip().split(' ') for x in gf]
+
+        for fileName, value in gf:
+            groundTruth[fileName] = value
+
+        return groundTruth
+         
+    @staticmethod
+    def outputResult(result, outputFilePath, fileNameList, categories):
+
+        with open(outputFilePath, 'wb') as f:
+            csvwriter = csv.write(f, delimiter, '\t')
+            csvwriter.writerow(['fileName'] + categories)
+
+
+        with open(outputFilePath, 'ab') as f:
+            
+            for fileName in fileNameList:
+                data = [fileName]
+                for cat in categories:
+                    data.append(result[cat][fileName])
+
+                csvwriter.writerow(data)
+
+
 
 
 
@@ -32,8 +144,7 @@ class PhyloParser():
     def __init__(self):
         return 
 
-            
-    
+
     @staticmethod
     def preprocces(image_data, debug = False):
         
@@ -47,7 +158,7 @@ class PhyloParser():
         #save original image
         image_data.originalImage = image.copy() 
 
-# #         #purify background
+#         #purify background
 #         image, image_data.varianceMask, image_data.varMap, image_data.hasColorBackground = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
 #         if debug:
 #             print "Display image with removed background"
@@ -55,24 +166,26 @@ class PhyloParser():
 #             print "Display variance mask"
 #             PhyloParser.displayImage(image_data.varianceMask)
 
+
 #         #determine effective area and save the masks into image_data        
 #         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(image_data.varianceMask)
 # # #         image_data.treeMask, image_data.nonTreeMask, image_data.contours = PhyloParser.findContours(image_data.textMask)
         
-        
+
 #         if debug:
 #             print "display tree mask"
 #             PhyloParser.displayImage(image_data.treeMask)
 #             print "display non-tree mask"
 #             PhyloParser.displayImage(image_data.nonTreeMask)
 
-        
-
         image, edgeMask= PhyloParser.removeBackground(image)
 
-        # PhyloParser.displayImage(image)
 
-        image_data.treeMask, image_data.nonTreeMask, image_data.controus, image_data.hierarchy = PhyloParser.findContours(edgeMask)
+        image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(255 - PhyloParser.negateImage(image)) 
+
+        PhyloParser.displayImage(image_data.treeMask)
+
+        # image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(edgeMask)
 
 
         image = PhyloParser.bilateralFilter(image)
@@ -98,12 +211,19 @@ class PhyloParser():
 
         edges = cv.Canny(image, CANNY_THRESH_1, CANNY_THRESH_2)
 
+
+
+
+        treeMask, nonTreeMask, controus, hierarchy = PhyloParser.findContours(edges)
+
+
         # edges = cv.dilate(edges, None)
         # PhyloParser.displayImage(edges)
         # edges = cv.erode(edges, None)
         # PhyloParser.displayImage(edges)
         kernel = np.ones((5,5),np.uint8)
         edges = cv.morphologyEx(edges, cv.MORPH_CLOSE, kernel)
+
         # PhyloParser.displayImage(edges)
 
 
@@ -145,7 +265,7 @@ class PhyloParser():
                 newnewImage[np.where((newImage>=start) & (newImage<end))] = 255
 
             testing = newImage.copy()
-            PhyloParser.displayImage(newnewImage)
+
             horLines, verLines = PhyloParser.detectLines__v2(newnewImage)
             for line in horLines:
                 x1, y1, x2, y2, length = line
@@ -153,7 +273,7 @@ class PhyloParser():
             for line in verLines:
                 x1, y1, x2, y2, length = line
                 newnewImage[y1:y2, x1:x2+1] = 0
-            PhyloParser.displayImage(newnewImage) 
+
             testing[np.where(newnewImage==255)] = 255
             kernel = np.ones((3,3),np.uint8)
             # PhyloParser.displayImage(testing)
@@ -179,7 +299,7 @@ class PhyloParser():
         sumDiff = -sum(diff[0:255])
         diff = - ((diff+0.0)/sumDiff)
         maxPeakValue = max(diff)
-        print maxPeakValue
+
         peakThreshold = (maxPeakValue + 0.0) / 10
         backgroundList = []
         bins = bins[0:255]
@@ -193,7 +313,7 @@ class PhyloParser():
         indexes = tmp[:]
         # slope, intercept, r_value, p_value, std_err = stats.linregress(bins,diff)
         # print slope, intercept
-        print indexes
+
         for index in indexes:
             peakRange = [index, index]
             thres = diff[index] * peakRangeThreshold
@@ -214,7 +334,7 @@ class PhyloParser():
             # if peakRange[0] == index:
             #     peakRange[0] -=1
             peakRange[1] +=1
-            print peakRange
+
 
             # margin = 1
             # if peakRange[1] + margin <255:
@@ -228,14 +348,13 @@ class PhyloParser():
 
             # gradient = upRange - downRange
             # print gradient  
-            print maxPeakValue, diff[peakRange[0]],diff[peakRange[1]]
+            # print maxPeakValue, diff[peakRange[0]],diff[peakRange[1]]
             if abs(diff[peakRange[0]] - diff[peakRange[1]]) < (maxPeakValue + 0.0) / 100 :
                 backgroundList.append(tuple(peakRange))
             elif peakRange[0] == index and abs(diff[peakRange[0] - 1] - diff[peakRange[1]]) < (maxPeakValue + 0.0) / 100:
                 backgroundList.append(tuple(peakRange))
 
-        plt.plot(bins, diff)
-        plt.show()        
+   
 
         return len(backgroundList) > 0, backgroundList
     
@@ -467,8 +586,15 @@ class PhyloParser():
         verLines = image_data.verLines
         verLines = sorted(verLines,  key = lambda x: int(x[0]))
         
+        isFound, branch = PhyloParser.checkBranchIsBlack(branch, image)
+
         #use the very left vertical line to get startpoint
-        startPoint = PhyloParser.getStartPoint(image, verLines[0])
+
+        if isFound:
+            startPoint = PhyloParser.getStartPoint(image, branch)
+        else:
+            return None
+
         
 #         startPoint = (553, 29)
 
@@ -512,6 +638,7 @@ class PhyloParser():
 #         verLines = sorted(verLines,  key = lambda x: int(x[0]))
         
         startPoint = (int(verLine[1] + (verLine[3] - verLine[1])*3/4), verLine[0])
+        print image[startPoint], startPoint
         while True:
             rightPoint = (startPoint[0], startPoint[1] + 1)
             if abs(int(image[rightPoint]) - int(image[startPoint])) <= threshold:
@@ -1234,10 +1361,10 @@ class PhyloParser():
         # save the preprocessed image into image_data
         image_data.image_preproc_for_line_detection = image
 
-        # # remove text information
-        # if image_data.treeMask is not None:
-        #     print "Found available tree mask! Applied the tree mask"
-        #     image = PhyloParser.removeLabels(image, image_data.treeMask)
+        # remove text information
+        if image_data.treeMask is not None:
+            print "Found available tree mask! Applied the tree mask"
+            image = PhyloParser.removeLabels(image, image_data.treeMask)
 
         image = PhyloParser.negateImage(image)
 
@@ -1268,9 +1395,10 @@ class PhyloParser():
         image_data.horLines = PhyloParser.cutLines(image_data.horLines, image_data.verLines)
 
 
-        
+
         image_data.horLines = PhyloParser.purifyLines(image_data.horLines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'hor')
         image_data.verLines = PhyloParser.purifyLines(image_data.verLines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'ver')
+       
         if debug:
             print "detectLines debugging"
             image_data.displayTargetLines('horLines')
@@ -1491,6 +1619,7 @@ class PhyloParser():
                 print "use given mask"
             
         elif image_data.treeMask is not None:
+
             image = PhyloParser.removeLabels(image, image_data.treeMask)
             if debug:
                 print "use mask generated from preprocessing"
@@ -2208,7 +2337,12 @@ class PhyloParser():
             ver_lines = PhyloParser.pointSetToLine(image_data.pointSet_ver, type="corners")
             hor_lines_up =  PhyloParser.pointSetToLine(image_data.upPointSet_hor, type="joints")
             hor_lines_down =  PhyloParser.pointSetToLine(image_data.downPointSet_hor, type="joints")
-            
+
+            hor_lines_up = PhyloParser.purifyLines(hor_lines_up, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'hor')
+            hor_lines_down = PhyloParser.purifyLines(hor_lines_down, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'hor')
+            ver_lines = PhyloParser.purifyLines(ver_lines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'ver')
+
+
             image_data.horLines += hor_lines_up
             image_data.horLines += hor_lines_down
             image_data.verLines += ver_lines
@@ -2226,7 +2360,7 @@ class PhyloParser():
     
     
     def matchLines(self, image_data, debug = False):
-                
+
         if image_data.lineDetected:
             image_data = self.matchParent(image_data)
             image_data = self.matchChildren(image_data)
@@ -4556,7 +4690,8 @@ class PhyloParser():
             # fixTrees fixed everything
             if image_data.treeReady:
                 image_data.defineTreeHead()
-                print self.treeRecover(image_data)
+                image_data.treeStructure = self.treeRecover(image_data)
+
                 if debug or showResult:
                     print "TODO: draw something here"
                     image_data.displayTrees('final')
@@ -4566,6 +4701,7 @@ class PhyloParser():
                 print "unknown bad happens"
                 image_data.defineTreeHead()## For now, it still defines the tree head. However, we need something else returned to notice it's not perfect
                 print self.treeRecover(image_data)
+                image_data.treeStructure = self.treeRecover(image_data)
                 image_data.treeHead.getNodeInfo()
                 if debug or showResult:
                     print "TODO: draw something here"
@@ -5677,6 +5813,7 @@ class PhyloParser():
         dot = (int((branch[0]*3 + branch[2])/4), int((branch[1]*3 + branch[3])/4))
 
         x, y = dot
+
         if image[y, x] != 0:
             margin = 2
             lengthMargin = 5
@@ -5693,6 +5830,7 @@ class PhyloParser():
                 y1, x1 = node
                 if image[y1, x1] == 0:
                     length, line = PhyloParser.findLineLengthFromPoint(node, image)
+
                     if branch[4] > length - lengthMargin and branch[4] < length + lengthMargin:
                         newBranch = line
 
@@ -5709,7 +5847,32 @@ class PhyloParser():
             if not isFound:
                 return isFound, branch
         else:
-            return True, branch
+
+            stack = []
+            seen = [(y,x)]
+            if image[y+1,x] == 0:
+                stack.append((y+1,x))
+                seen.append((y+1, x))
+            if image[y-1, x] == 0:
+                stack.append((y-1, x)) 
+                seen.append((y-1,x))
+
+            while stack:
+                node = stack.pop()
+                y1, x1 = node
+                if y1+1 < height and image[y1+1, x1] == 0 and (y1+1, x1) not in seen:
+                    stack.append((y1+1,x1))
+                    seen.append((y1+1, x1))
+                if y1 - 1 >=0 and image[y1-1, x1] == 0 and (y1-1, x1) not in seen:
+                    stack.append((y1-1, x1))
+                    seen.append((y1-1, x1))
+
+            seen = sorted(seen, key = lambda x: x[0])
+            if len(seen)>1:
+                newBranch = (seen[0][1], seen[0][0], seen[-1][1], seen[-1][0], abs(seen[-1][0] - seen[0][0]))
+                return True, newBranch
+            else:
+                return False, None
 
 
     @staticmethod
@@ -5719,16 +5882,20 @@ class PhyloParser():
         image = PhyloParser.binarize(image, thres = 180, mode = 0)
 
 
+
         isFound, branch = PhyloParser.checkBranchIsBlack(branch, image)
+
+
 
         #use the very left vertical line to get startpoint
 
         if isFound:
+            print branch
+            if branch == (525, 291, 525, 301, 10):
+                PhyloParser.displayLines(image, [branch])
             startPoint = PhyloParser.getStartPoint(image, branch)
         else:
             return None
-
-
 
 #         startPoint = (553, 29)
 

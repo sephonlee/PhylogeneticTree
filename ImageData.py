@@ -69,6 +69,9 @@ class ImageData():
     lineCoveredMask = None # It is a mask that indicates lines covered by nodes
     treeHead = None # Head of the tree
     treeReady = False
+    treeStructure = None
+    fullTree = None
+
 
     
     def __init__(self, image):
@@ -160,6 +163,45 @@ class ImageData():
         else:
             return (0, 255, 255)
 
+    def displayATree(self, rootNode):
+        if len(self.image.shape) ==2:
+            whatever = self.image.copy()
+            whatever = cv.cvtColor(whatever, cv.COLOR_GRAY2RGB)
+        else:
+            whatever = self.image.copy()
+        count = 0
+        stack = []
+        stack.append(rootNode)
+        color = self.getColor(count)
+        while stack:
+            node = stack.pop()
+            if node.to[0]:
+                stack.append(node.to[0])
+            if node.to[1]:
+                stack.append(node.to[1])
+            if not node.isBinary:
+                for to in node.otherTo:
+                    if to:
+                        stack.append(to)
+            if node.root:
+                x1, y1, x2, y2, length = node.root
+                cv.rectangle(whatever , (x1, y1), (x2, y2), color=color, thickness=2)
+            if node.branch:
+                x1, y1, x2, y2, length = node.branch
+                cv.rectangle(whatever , (x1, y1), (x2, y2), color=color, thickness=2)
+            if node.upperLeave:
+                x1, y1, x2, y2, length = node.upperLeave
+                cv.rectangle(whatever , (x1, y1), (x2, y2), color=color, thickness=2)
+            if node.lowerLeave:
+                x1, y1, x2, y2, length = node.lowerLeave
+                cv.rectangle(whatever , (x1, y1), (x2, y2), color=color, thickness=2)
+            if not node.isBinary:
+                for line in node.interLeave:
+                    x1, y1, x2, y2, length = line
+                    cv.rectangle(whatever , (x1, y1), (x2, y2), color=color, thickness=2)
+
+        plt.imshow(whatever)
+        plt.show()
 
     def displayTrees(self, target = 'regular'):
         if len(self.image.shape) ==2:
