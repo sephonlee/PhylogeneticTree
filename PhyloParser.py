@@ -26,7 +26,7 @@ except:
     from PIL import Image
 from os import listdir
 from os.path import isfile, join
-
+import csv
 class ExperimentExecutor():
 
     def __init__(self):
@@ -37,9 +37,12 @@ class ExperimentExecutor():
         fileNameList = self.getFilesInFolder(folderPath)
         groundTruth = self.getGroundTruthDict(groundTruthPath)
         result = {}
-        categories = ['line', 'line_corner', 'line_tracing', 'full']
+        categories = ['line', 'line_corner', 'line_tracing', 'full', 'error']
         for cat in categories:
-            result[cat] = {}
+            if cat != 'error':
+                result[cat] = {}
+            else:
+                result[cat] = []
 
 
         print 'Running Experiment with Full Functions.......'
@@ -60,13 +63,14 @@ class ExperimentExecutor():
     def getFilesInFolder(folderPath):
         fileNameList = [join(folderPath, f) for f in listdir(folderPath) if isfile(join(folderPath, f))]
         fileNameList = [x.rstrip() for x in fileNameList]
+        fileNameList.sort()
 
-        return fileNameList.sort()
+        return fileNameList
 
     @staticmethod
     def getTreeObject(treeStructure):
-        t = PhyloTree(treeStructure + ';')
-        PhyloTree.rename_node(t, rename_all=True)
+        t = GroundTruthConverter.PhyloTree(treeStructure + ';')
+        GroundTruthConverter.PhyloTree.rename_node(t, rename_all=True)
 
         return t
 
@@ -77,40 +81,48 @@ class ExperimentExecutor():
         phyloParser = PhyloParser()
 
         for filePath in fileNameList:
-            if isfile(filePath):
-                image = cv.imread(filePath, 0)
+            
+            try:
 
-            if image != None:
-                image_data = ImageData(image)
-                image_data = phyloParser.preprocces(image_data, debug=False)
-                image_data = phyloParser.detectLines(image_data, debug = False)
-                if corner:
-                    image_data = phyloParser.getCorners(image_data, debug = True)        
-                    image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
-                    image_data = phyloParser.includeLinesFromCorners(image_data)
-                image_data = phyloParser.matchLines(image_data, debug = False)
-                if tracing:
-                    image_data = phyloParser.makeTree(image_data, debug = True, tracing = True, showResult = True)
-                else:
-                    image_data = phyloParser.makeTree(image_data, debug = True, tracing = False, showResult = True)
+                if isfile(filePath):
+                    image = cv.imread(filePath, 0)
+
+                if image != None:
+                    print filePath
+                    image_data = ImageData(image)
+                    image_data = phyloParser.preprocces(image_data, debug=False)
+                    image_data = phyloParser.detectLines(image_data, debug = False)
+                    if corner:
+                        image_data = phyloParser.getCorners(image_data, debug = False)        
+                        image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
+                        image_data = phyloParser.includeLinesFromCorners(image_data)
+                    image_data = phyloParser.matchLines(image_data, debug = False)
+                    if tracing:
+                        image_data = phyloParser.makeTree(image_data, debug = False, tracing = True, showResult = False)
+                    else:
+                        image_data = phyloParser.makeTree(image_data, debug = False, tracing = False, showResult = False)
 
 
-                splitPath = filePath.split('/')
-                fileName = splitPath[-1]
+                    splitPath = filePath.split('/')
+                    fileName = splitPath[-1]
 
-                resultTree = ExperimentExecutor.getTreeObject(image_data.treeStructure)
-                groundTruthTree = ExperimentExecutor.getTreeObject(groundTruth[fileName])
+                    resultTree = ExperimentExecutor.getTreeObject(image_data.treeStructure)
 
-                score = ExperimentExecutor.getEditDistance(resultTree, groundTruthTree)
 
-                if tracing and corner:
-                    result['full'][fileName] = score
-                elif not tracing and corner:
-                    result['line_corner'][fileName] = score
-                elif not tracing and not corner:
-                    result['line'][fileName] = score
-                elif not tracing and corner:
-                    result['line_tracing'][fileName] = score
+                    groundTruthTree = ExperimentExecutor.getTreeObject(groundTruth[fileName])
+
+                    score = ExperimentExecutor.getEditDistance(resultTree, groundTruthTree)
+
+                    if tracing and corner:
+                        result['full'][fileName] = score
+                    elif not tracing and corner:
+                        result['line_corner'][fileName] = score
+                    elif not tracing and not corner:
+                        result['line'][fileName] = score
+                    elif not tracing and corner:
+                        result['line_tracing'][fileName] = score
+            except:
+                result['error'].append(filePath)
 
         return result
 
@@ -118,7 +130,9 @@ class ExperimentExecutor():
     @staticmethod
     def getEditDistance(experiment, groundTruth):
 
-        return float(PhyloTree.zhang_shasha_distance(experiment, groundTruth)) / PhyloTree.getNodeNum(groundTruth)
+        print float(GroundTruthConverter.PhyloTree.zhang_shasha_distance(experiment, groundTruth)) / GroundTruthConverter.PhyloTree.getNodeNum(groundTruth)
+
+        return float(GroundTruthConverter.PhyloTree.zhang_shasha_distance(experiment, groundTruth)) / GroundTruthConverter.PhyloTree.getNodeNum(groundTruth)
 
 
     @staticmethod
@@ -127,20 +141,25 @@ class ExperimentExecutor():
         with open(filePath, 'rb') as f:
             gf = f.readlines()
 
-        gf = [x.rstrip().split(' ') for x in gf]
+        gf = [x.rstrip().split('\t') for x in gf]
 
-        for fileName, value in gf:
-            groundTruth[fileName] = value
+        for index, data in enumerate(gf):
+            fileName, value = data
+            if index!=0 and value.lower() != 'drop this one':
+                groundTruth[fileName] = GroundTruthConverter.string2TreeString(value, rename = True)
+
+        
 
         return groundTruth
          
     @staticmethod
     def outputResult(result, outputFilePath, fileNameList, categories):
 
-        with open(outputFilePath, 'wb') as f:
-            csvwriter = csv.write(f, delimiter, '\t')
-            csvwriter.writerow(['fileName'] + categories)
+        categories = categories[:-1]
 
+        with open(outputFilePath, 'wb') as f:
+            csvwriter = csv.writer(f, delimiter = '\t')
+            csvwriter.writerow(['fileName'] + categories)
 
         with open(outputFilePath, 'ab') as f:
             
@@ -150,6 +169,10 @@ class ExperimentExecutor():
                     data.append(result[cat][fileName])
 
                 csvwriter.writerow(data)
+
+        with open('errorImages.txt', 'ab') as f:
+            for filePath in result['error']:
+                f.write(filePath + '\n')
 
 
 
@@ -199,7 +222,7 @@ class PhyloParser():
 
         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(255 - PhyloParser.negateImage(image)) 
 
-        PhyloParser.displayImage(image_data.treeMask)
+        # PhyloParser.displayImage(image_data.treeMask)
 
         # image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(edgeMask)
 
@@ -654,7 +677,7 @@ class PhyloParser():
 #         verLines = sorted(verLines,  key = lambda x: int(x[0]))
         
         startPoint = (int(verLine[1] + (verLine[3] - verLine[1])*3/4), verLine[0])
-        print image[startPoint], startPoint
+
         while True:
             rightPoint = (startPoint[0], startPoint[1] + 1)
             if abs(int(image[rightPoint]) - int(image[startPoint])) <= threshold:
@@ -1076,13 +1099,13 @@ class PhyloParser():
         mask = np.zeros(edges.shape)
         cv.fillConvexPoly(mask, max_contour[0], (255))
 
-        PhyloParser.displayImage(mask)
+        # PhyloParser.displayImage(mask)
 
         #-- Smooth mask, then blur it --------------------------------------------------------
         mask = cv.dilate(mask, None, iterations=MASK_DILATE_ITER)
         mask = cv.erode(mask, None, iterations=MASK_ERODE_ITER)
         mask = cv.GaussianBlur(mask, (BLUR, BLUR), 0)
-        PhyloParser.displayImage(mask)
+        # PhyloParser.displayImage(mask)
         mask_stack = np.dstack([mask]*3)    # Create 3-channel alpha mask
 
         #-- Blend masked img into MASK_COLOR background --------------------------------------
@@ -1092,7 +1115,7 @@ class PhyloParser():
         masked = (mask_stack * img) + ((1-mask_stack) * MASK_COLOR) # Blend
         masked = (masked * 255).astype('uint8')                     # Convert back to 8-bit 
 
-        PhyloParser.displayImage(mask)
+        # PhyloParser.displayImage(mask)
 
         #cv2.imwrite('C:/Temp/person-masked.jpg', masked)           # Save
 
@@ -1217,7 +1240,7 @@ class PhyloParser():
         std = np.std(thicknessArray)
         counts = np.bincount(thicknessArray)
         print np.argmax(counts), std
-        PhyloParser.displayImage(verMask)
+        # PhyloParser.displayImage(verMask)
         PhyloParser.displayLines_v2(verMask, newVerLines, np.argmax(counts), 100)
 
 
@@ -1363,7 +1386,7 @@ class PhyloParser():
         else:
             image = image_data.image
 
-        PhyloParser.displayImage(image)
+        # PhyloParser.displayImage(image)
         # # sub-preprocessing 
         # image = PhyloParser.binarize(image, thres = 180, mode = 3)
         # if debug:
@@ -1397,8 +1420,8 @@ class PhyloParser():
             minVerLine = 10 + height / 250
             minHorLine = 4 + height / 150
         print 'minVerLine:', minVerLine, ' minHorLine:', minHorLine
-        plt.imshow(image, cmap='Greys_r')
-        plt.show()
+        # plt.imshow(image, cmap='Greys_r')
+        # plt.show()
         image_data.verLines = PhyloParser.getLines(image, mode, minLength = minVerLine)
 
         # find horizontal lines
@@ -4718,7 +4741,7 @@ class PhyloParser():
                 image_data.defineTreeHead()## For now, it still defines the tree head. However, we need something else returned to notice it's not perfect
                 print self.treeRecover(image_data)
                 image_data.treeStructure = self.treeRecover(image_data)
-                image_data.treeHead.getNodeInfo()
+                # image_data.treeHead.getNodeInfo()
                 if debug or showResult:
                     print "TODO: draw something here"
                     image_data.displayTrees('final')
@@ -4815,7 +4838,7 @@ class PhyloParser():
                         if not ((breakNode.to[0] or breakNode.upperLeave) or (breakNode.to[1] or breakNode.lowerLeave)):
                             pass
                         elif (breakNode.to[0] or breakNode.upperLeave) and not (breakNode.to[1] or breakNode.lowerLeave):
-                            print "lower"
+                            # print "lower"
                             x1, y1, x2, y2, length = breakNode.branch
                             result = self.getNodeBranchOnTheRight(breakNode, rootList, mode = 'lower')
 
@@ -4828,7 +4851,7 @@ class PhyloParser():
                                 result.origin = node
                                 node.numNodes +=result.numNodes
                                 if result.isComplete:
-                                    print "remove"
+                                    # print "remove"
                                     if result in tmpList:
                                         tmpList.remove(result)                                
                                 node.breakSpot.remove(breakNode)
@@ -4840,7 +4863,7 @@ class PhyloParser():
                         elif not (breakNode.to[0] or breakNode.upperLeave) and (breakNode.to[1] or breakNode.lowerLeave):
                             x1, y1, x2, y2, length = breakNode.branch
                             result = self.getNodeBranchOnTheRight(breakNode, rootList, mode = 'upper')
-                            print result
+                            # print result
                             if result:
                                 to = list(breakNode.to)
                                 to[0] = result
@@ -4849,7 +4872,7 @@ class PhyloParser():
                                 result.origin = node
                                 node.numNodes+=result.numNodes
                                 if result.isComplete:
-                                    print "remove"
+                                    # print "remove"
                                     if result in tmpList:
                                         tmpList.remove(result)
                                 result.whereFrom = breakNode
@@ -5486,8 +5509,8 @@ class PhyloParser():
                             hlines[index] = anchorLine
                             isAnchor[index] = True
             hlines = tuple(hlines)
-            if branch == (110, 96, 110, 478, 382):
-                print hlines
+            # if branch == (110, 96, 110, 478, 382):
+            #     print hlines
             for pitem in parent:
                 ((root, pbranch), pdist) = pitem
                 if self.isSameLine(branch, pbranch):
@@ -5570,7 +5593,7 @@ class PhyloParser():
                 nodeList.append(a)
 
         image_data.nodeList = nodeList
-        image_data.displayNodes()
+        # image_data.displayNodes()
 
 
         if tracing:
@@ -5677,8 +5700,9 @@ class PhyloParser():
                         else:
                             refNode = targetNode.whereFrom
                             if PhyloParser.betterNode(node, refNode):
-                                node.otherTo[index] = targetNode
-                                targetNode.whereFrom = node
+                                if index<len(node.otherTo):
+                                    node.otherTo[index] = targetNode
+                                    targetNode.whereFrom = node
 
         image_data.nodeList = nodeList
 
@@ -5906,9 +5930,9 @@ class PhyloParser():
         #use the very left vertical line to get startpoint
 
         if isFound:
-            print branch
-            if branch == (525, 291, 525, 301, 10):
-                PhyloParser.displayLines(image, [branch])
+            # print branch
+            # if branch == (525, 291, 525, 301, 10):
+            #     PhyloParser.displayLines(image, [branch])
             startPoint = PhyloParser.getStartPoint(image, branch)
         else:
             return None
@@ -6101,8 +6125,8 @@ class PhyloParser():
 #         PhyloParser.displayImage(image)
         startTime = time.time()
         X, position, effective = PhyloParser.getFeatures(image)
-        print time.time()-startTime
-        print X.shape
+        # print time.time()-startTime
+        # print X.shape
         
         x = []
         y = []

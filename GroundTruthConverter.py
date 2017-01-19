@@ -47,6 +47,15 @@ class PhyloTree(Tree):
             tree.name = label 
             
         return 
+    @staticmethod
+    def getNodeNum(tree, level = 0, num = 0):
+        children = tree.children
+        if children is not None:
+            for c in tree.get_children(tree):
+                num  = PhyloTree.getNodeNum(c, level = level +1, num = num) + 1
+        
+        return num
+
     
 def getElement(str, index):
     
@@ -110,7 +119,7 @@ def string2TreeString(str, rename = False):
 
     index = 0
     length = len(str)
-    print "length", length
+    # print "length", length
 #     pattern = r'[a-zA-Z]'
     
     id = "A"
@@ -292,37 +301,37 @@ def post_order(tree, level):
 
 if __name__ == '__main__':
     
-    # str = "A\B\C\D,E|F|G|H,I|"
-    str = "A0B0C0D,E2F1G2H,I3"
-    str = "A,B1C1D1E1F0G,H2I1J,K3L,M1N,O2P0Q,R4S1"
+    # # str = "A\B\C\D,E|F|G|H,I|"
+    # str = "A0B0C0D,E2F1G2H,I3"
+    # str = "A,B1C1D1E1F0G,H2I1J,K3L,M1N,O2P0Q,R4S1"
     
-    # str = "A,B;C|D|E|F\G,H|I|J,K|L,M;N,O|P\Q,R|S|"
+    # # str = "A,B;C|D|E|F\G,H|I|J,K|L,M;N,O|P\Q,R|S|"
     
-    # str = "A,B1C,D2E,F1G,H3I,J1K,L2M,N1O,P4"
-    str = "A0B,C2D0E0F,G3H0I0J0K,L6M0N,O2P0Q,R2S0T,U2V,W1X,Y6"
-    str = "A,B1C,D,E1F1G,H,I1*J2"
+    # # str = "A,B1C,D2E,F1G,H3I,J1K,L2M,N1O,P4"
+    # str = "A0B,C2D0E0F,G3H0I0J0K,L6M0N,O2P0Q,R2S0T,U2V,W1X,Y6"
+    # str = "A,B1C,D,E1F1G,H,I1*J2"
     
-    str = "A0B,C,D2E,F1G0*H0*I,J1K0*L0*M0*N0O0*P0*Q0*R1*S0T,U5"
+    # str = "A0B,C,D2E,F1G0*H0*I,J1K0*L0*M0*N0O0*P0*Q0*R1*S0T,U5"
     
-    # str = "A,B1C,D,E1F1G,H1I,J1*K,L1*N,O,P2*M2"
+    # # str = "A,B1C,D,E1F1G,H1I,J1*K,L1*N,O,P2*M2"
     
-    string = "A0B,C,D2E0F0G,H4"
-    string = "A0B0C0*D2E0F0G0H4"
-    # string = "A,B1C1D,E,E1F1G2"
-    string = "JJ0J,J2J,J,J1J0*J0J0*J0*J,J,J1*J1*J1*J1"
-    # string = "J0J0J2J0J0*J1J0*J0J0*J0*J0J0*J2*J2"
-    ##########
+    # string = "A0B,C,D2E0F0G,H4"
+    # string = "A0B0C0*D2E0F0G0H4"
+    # # string = "A,B1C1D,E,E1F1G2"
+    # string = "JJ0J,J2J,J,J1J0*J0J0*J0*J,J,J1*J1*J1*J1"
+    # # string = "J0J0J2J0J0*J1J0*J0J0*J0*J0J0*J2*J2"
+    # ##########
     
-    # string = "A0B,C2D,E1F1*K0L0*M0N0*O,P,Q2R0*S,T,U1V0*W1*X,Y2*Z0AA,AB1AC,AD5"
-    string = "A0B,C2D,E1F1*K0L0*M0N0*O,P,Q2*R0*S,T,U1V0*W1*X,Y2*Z0AA,AB1AC,AD4"
-    string = "A0B0C2D0E1F1*K0L0*M0N0*O0P0*Q2*R0*S0T0*U1V0*W1*X0Y2*Z0AA0AB1AC0AD4"
-    tree_string =  string2TreeString(string, rename = True)   
-    print "coded string:", string
-    print "tree string", tree_string    
-    tree = PhyloTree(tree_string+";")
-    print tree
-    print PhyloTree.rename_node(tree, rename_all=True)
-    print tree
+    # # string = "A0B,C2D,E1F1*K0L0*M0N0*O,P,Q2R0*S,T,U1V0*W1*X,Y2*Z0AA,AB1AC,AD5"
+    # string = "A0B,C2D,E1F1*K0L0*M0N0*O,P,Q2*R0*S,T,U1V0*W1*X,Y2*Z0AA,AB1AC,AD4"
+    # string = "A0B0C2D0E1F1*K0L0*M0N0*O0P0*Q2*R0*S0T0*U1V0*W1*X0Y2*Z0AA0AB1AC0AD4"
+    # tree_string =  string2TreeString(string, rename = True)   
+    # print "coded string:", string
+    # print "tree string", tree_string    
+    # tree = PhyloTree(tree_string+";")
+    # print tree
+    # print PhyloTree.rename_node(tree, rename_all=True)
+    # print tree
     
     ## show the tree and export
     # ts = TreeStyle()
@@ -331,7 +340,17 @@ if __name__ == '__main__':
     # tree.render("/Users/sephon/Downloads/tree_example.png", tree_style=ts)
     
 
-    
+    string = 'J0J1J1J1J0*J0*J0*J0J1J1J2J0J1J1J1J0J2J1J2J1J1'
+
+
+
+    t1 = PhyloTree(string2TreeString(string) + ';')
+
+    print t1
+
+    print PhyloTree.getNodeNum(t1)
+
+
     t1 = PhyloTree("((a,(b,c)),(d,(e,f)));")
     t2 = PhyloTree("((a,b),(c,(d,e)));")
     
