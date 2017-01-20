@@ -162,7 +162,7 @@ class ExperimentExecutor():
             csvwriter.writerow(['fileName'] + categories)
 
         with open(outputFilePath, 'ab') as f:
-            
+            csvwriter = csv.writer(f, delimiter = '\t')
             for fileName in fileNameList:
                 data = [fileName]
                 for cat in categories:
