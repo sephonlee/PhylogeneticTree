@@ -82,45 +82,47 @@ class ExperimentExecutor():
 
         for filePath in fileNameList:
             
+            try:
+
+                if isfile(filePath):
+                    image = cv.imread(filePath, 0)
+
+                if image != None:
+                    print filePath
+                    image_data = ImageData(image)
+                    image_data = phyloParser.preprocces(image_data, debug=False)
+                    image_data = phyloParser.detectLines(image_data, debug = False)
+                    if corner:
+                        image_data = phyloParser.getCorners(image_data, debug = False)        
+                        image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
+                        image_data = phyloParser.includeLinesFromCorners(image_data)
+                    image_data = phyloParser.matchLines(image_data, debug = False)
+                    if tracing:
+                        image_data = phyloParser.makeTree(image_data, debug = False, tracing = True, showResult = False)
+                    else:
+                        image_data = phyloParser.makeTree(image_data, debug = False, tracing = False, showResult = False)
 
 
-            if isfile(filePath):
-                image = cv.imread(filePath, 0)
+                    splitPath = filePath.split('/')
+                    fileName = splitPath[-1]
 
-            if image != None:
-                print filePath
-                image_data = ImageData(image)
-                image_data = phyloParser.preprocces(image_data, debug=False)
-                image_data = phyloParser.detectLines(image_data, debug = False)
-                if corner:
-                    image_data = phyloParser.getCorners(image_data, debug = False)        
-                    image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
-                    image_data = phyloParser.includeLinesFromCorners(image_data)
-                image_data = phyloParser.matchLines(image_data, debug = False)
-                if tracing:
-                    image_data = phyloParser.makeTree(image_data, debug = False, tracing = True, showResult = False)
-                else:
-                    image_data = phyloParser.makeTree(image_data, debug = False, tracing = False, showResult = False)
+                    resultTree = ExperimentExecutor.getTreeObject(image_data.treeStructure)
 
 
-                splitPath = filePath.split('/')
-                fileName = splitPath[-1]
+                    groundTruthTree = ExperimentExecutor.getTreeObject(groundTruth[fileName])
 
-                resultTree = ExperimentExecutor.getTreeObject(image_data.treeStructure)
+                    score = ExperimentExecutor.getEditDistance(resultTree, groundTruthTree)
 
-
-                groundTruthTree = ExperimentExecutor.getTreeObject(groundTruth[fileName])
-
-                score = ExperimentExecutor.getEditDistance(resultTree, groundTruthTree)
-
-                if tracing and corner:
-                    result['full'][fileName] = score
-                elif not tracing and corner:
-                    result['line_corner'][fileName] = score
-                elif not tracing and not corner:
-                    result['line'][fileName] = score
-                elif not tracing and corner:
-                    result['line_tracing'][fileName] = score
+                    if tracing and corner:
+                        result['full'][fileName] = score
+                    elif not tracing and corner:
+                        result['line_corner'][fileName] = score
+                    elif not tracing and not corner:
+                        result['line'][fileName] = score
+                    elif not tracing and corner:
+                        result['line_tracing'][fileName] = score
+            except:
+                result['result'].append(filePath)
 
         return result
 
