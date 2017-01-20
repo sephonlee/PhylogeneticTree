@@ -166,7 +166,10 @@ class ExperimentExecutor():
             for fileName in fileNameList:
                 data = [fileName]
                 for cat in categories:
-                    data.append(result[cat][fileName])
+                    if fileName in result[cat]:
+                        data.append(result[cat][fileName])
+                    else:
+                        data.append(' ')
 
                 csvwriter.writerow(data)
 
