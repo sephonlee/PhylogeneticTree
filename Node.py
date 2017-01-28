@@ -61,6 +61,21 @@ class Node():
         print 'node breakSpot:', self.breakSpot
         print '------------------------------'
 
+    def getAllLines(self):
+        lines = []
+        if self.upperLeave:
+            lines.append(self.upperLeave)
+        if self.lowerLeave:
+            lines.append(self.lowerLeave)
+        if self.branch:
+            lines.append(self.branch)
+        if self.root:
+            lines.append(self.root)
+        if not self.isBinary:
+            lines = lines + self.interLeave
+
+        return lines
+
 
     def getLabel(self):
         pass

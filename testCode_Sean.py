@@ -26,10 +26,16 @@ def getFilesInFolder(folderPath):
 
 if __name__ == '__main__':
 
+
+
+    ############ run experiment ######################
+
     a = ExperimentExecutor()
 
-    a.autoRun('high_quality_tree/', 'groundTruth.csv', 'compareResult.csv')
+    a.autoRun('high_quality_tree/', 'groundTruth.csv', 'compareResult_0124.csv')
 
+
+    ###################################################
 
 # PMC2323573_pone.0002033.g002.jpg
 
@@ -59,9 +65,13 @@ if __name__ == '__main__':
 #     fileNameList = [x.rstrip() for x in fileNameList]
 #     # fileNameList = [folderPath + x for x in fileNameList]
 
-#     for index in range(35, len(fileNameList)):
+#     for index in range(20, len(fileNameList)):
 #         print index, fileNameList[index]
 #         filePath = folderPath + fileNameList[index]
+#         fileName = fileNameList[index]
+#         fileName = 'PMC2674049_1471-2148-9-74-4.jpg'
+#         fileName = 'PMC2374995_gb-2007-8-8-r164-1.jpg'
+#         filePath = folderPath + fileName
 #         if isfile(filePath) :
 #             image = cv.imread(filePath,0)
 #         PhyloParser.displayImage(image)
@@ -72,13 +82,13 @@ if __name__ == '__main__':
 #         # imageData = PhyloParser.testing(imageData)
 
 #         image_data = ImageData(image)
-#         image_data = phyloParser.preprocces(image_data, debug=False)
+#         image_data = phyloParser.preprocces(image_data, debug= False)
 #         # PhyloParser.displayImage(image)
 
 #         image_data = phyloParser.detectLines(image_data, debug = False)
         
 #         # image_data = phyloPaser.traceTree(image_data, debug = True)
-#         image_data = phyloParser.getCorners(image_data, debug = True)        
+#         image_data = phyloParser.getCorners(image_data, debug = False)        
 #         image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
 #         image_data = phyloParser.includeLinesFromCorners(image_data)
 #         # image_data = phyloParser.detectCorners(image_data)
@@ -89,11 +99,20 @@ if __name__ == '__main__':
 #         # image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
 #         # print image_data.orphanBox2Text
 #         # image_data = phyloParser.getSpecies(image_data, debug = True)
-#         treeString = phyloParser.makeTree(image_data, debug = True, tracing = True, showResult = True)
-#         # image_data = phyloPaser.getSpecies(image_data)
+#         treeString = phyloParser.makeTree(image_data, debug = True, tracing = False, showResult = False)
+# #         # image_data = phyloPaser.getSpecies(image_data)
+ 
+
+# #         a = ExperimentExecutor()
+
+# #         resultTree = ExperimentExecutor.getTreeObject(image_data.treeStructure)
+
+# #         groundTruthDict = ExperimentExecutor.getGroundTruthDict('groundTruth.csv')
+
+# #         groundTruthTree = ExperimentExecutor.getTreeObject(groundTruthDict[fileName])
+
+# #         score = ExperimentExecutor.getEditDistance(resultTree, groundTruthTree)        
         
+# # # #         print treeString
         
-        
-# #         print treeString
-        
-        
+# #         
