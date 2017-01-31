@@ -30,9 +30,9 @@ if __name__ == '__main__':
 
     ############ run experiment ######################
 
-    a = ExperimentExecutor()
+    # a = ExperimentExecutor()
 
-    a.autoRun('high_quality_tree/', 'groundTruth.csv', 'compareResult_0124.csv')
+    # a.autoRun('high_quality_tree/', 'groundTruth.csv', 'compareResult_0124.csv')
 
 
     ###################################################
@@ -40,79 +40,88 @@ if __name__ == '__main__':
 # PMC2323573_pone.0002033.g002.jpg
 
 
-#     phyloParser = PhyloParser()
+    phyloParser = PhyloParser()
     
-#     folderPath = 'images/'
-#     folderPath = 'high_quality_tree/'
+    folderPath = 'images/'
+    folderPath = 'high_quality_tree/'
 
-#     fileNameList = getFilesInFolder(folderPath)
+    fileNameList = getFilesInFolder(folderPath)
 
-#     fileNameList.sort()
-#     # with open('image_fileName_list.txt', 'r')as f:
-#     #     fileNameList = f.readlines()
+    fileNameList.sort()
+    # with open('image_fileName_list.txt', 'r')as f:
+    #     fileNameList = f.readlines()
 
-#     # testingFilePath = [join(folderPath, x) for x in fileNameList]
-#     # result = {}
-#     # groundTruth = {}
-#     # a = ExperimentExecutor()
-#     # a.execute(result, groundTruth, testingFilePath)
+    # testingFilePath = [join(folderPath, x) for x in fileNameList]
+    # result = {}
+    # groundTruth = {}
+    # a = ExperimentExecutor()
+    # a.execute(result, groundTruth, testingFilePath)
 
 
 
-#     for index, fileName in enumerate(fileNameList):
-#         print index, fileName
-#             # f.write(fileName + '\n')
-#     fileNameList = [x.rstrip() for x in fileNameList]
-#     # fileNameList = [folderPath + x for x in fileNameList]
+    for index, fileName in enumerate(fileNameList):
+        print index, fileName
+            # f.write(fileName + '\n')
+    fileNameList = [x.rstrip() for x in fileNameList]
+    # fileNameList = [folderPath + x for x in fileNameList]
 
-#     for index in range(20, len(fileNameList)):
-#         print index, fileNameList[index]
-#         filePath = folderPath + fileNameList[index]
-#         fileName = fileNameList[index]
-#         fileName = 'PMC2674049_1471-2148-9-74-4.jpg'
-#         fileName = 'PMC2374995_gb-2007-8-8-r164-1.jpg'
-#         filePath = folderPath + fileName
-#         if isfile(filePath) :
-#             image = cv.imread(filePath,0)
-#         PhyloParser.displayImage(image)
+    for index in range(32, len(fileNameList)):
+        print index, fileNameList[index]
+        filePath = folderPath + fileNameList[index]
+        fileName = fileNameList[index]
+        # fileName = 'PMC2674049_1471-2148-9-74-4.jpg'
+        fileName = 'PMC1326215_1471-2148-5-71-6.jpg'
+        filePath = folderPath + fileName
+        if isfile(filePath) :
+            image = cv.imread(filePath,0)
+        PhyloParser.displayImage(image)
 
-#         # imageData = ImageData(image)
-#         # imageData = PhyloParser.preprocces(imageData, debug = False)
-#         # # imageData = PhyloParser.detectLines__v2(imageData, debug=True)
-#         # imageData = PhyloParser.testing(imageData)
+        # imageData = ImageData(image)
+        # imageData = PhyloParser.preprocces(imageData, debug = False)
+        # # imageData = PhyloParser.detectLines__v2(imageData, debug=True)
+        # imageData = PhyloParser.testing(imageData)
 
-#         image_data = ImageData(image)
-#         image_data = phyloParser.preprocces(image_data, debug= False)
-#         # PhyloParser.displayImage(image)
+        image_data = ImageData(image)
+        image_data = phyloParser.preprocces(image_data, debug= False)
+        # PhyloParser.displayImage(image)
 
-#         image_data = phyloParser.detectLines(image_data, debug = False)
+
+
+        image_data = phyloParser.detectLines(image_data, debug = False)
+
+
         
-#         # image_data = phyloPaser.traceTree(image_data, debug = True)
-#         image_data = phyloParser.getCorners(image_data, debug = False)        
-#         image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
-#         image_data = phyloParser.includeLinesFromCorners(image_data)
-#         # image_data = phyloParser.detectCorners(image_data)
-#         # image_data = phyloParser.refineLinesByCorners(image_data)
-#         # image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
-#         # image_data = phyloPaser.getSpecies(image_data, debug = True)
-#         image_data = phyloParser.matchLines(image_data, debug = False)
-#         # image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
-#         # print image_data.orphanBox2Text
-#         # image_data = phyloParser.getSpecies(image_data, debug = True)
-#         treeString = phyloParser.makeTree(image_data, debug = True, tracing = False, showResult = False)
-# #         # image_data = phyloPaser.getSpecies(image_data)
+        # image_data = phyloPaser.traceTree(image_data, debug = True)
+        image_data = phyloParser.getCorners(image_data, debug = False)        
+        image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
+        image_data = phyloParser.includeLinesFromCorners(image_data)
+
+
+
+
+
+        # image_data = phyloParser.detectCorners(image_data)
+        # image_data = phyloParser.refineLinesByCorners(image_data)
+        # image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
+        # image_data = phyloPaser.getSpecies(image_data, debug = True)
+        image_data = phyloParser.matchLines(image_data, debug = False)
+        # image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
+        # print image_data.orphanBox2Text
+        # image_data = phyloParser.getSpecies(image_data, debug = True)
+        treeString = phyloParser.makeTree(image_data, debug = True, tracing = False, showResult = False)
+#         # image_data = phyloPaser.getSpecies(image_data)
  
 
-# #         a = ExperimentExecutor()
+#         a = ExperimentExecutor()
 
-# #         resultTree = ExperimentExecutor.getTreeObject(image_data.treeStructure)
+#         resultTree = ExperimentExecutor.getTreeObject(image_data.treeStructure)
 
-# #         groundTruthDict = ExperimentExecutor.getGroundTruthDict('groundTruth.csv')
+#         groundTruthDict = ExperimentExecutor.getGroundTruthDict('groundTruth.csv')
 
-# #         groundTruthTree = ExperimentExecutor.getTreeObject(groundTruthDict[fileName])
+#         groundTruthTree = ExperimentExecutor.getTreeObject(groundTruthDict[fileName])
 
-# #         score = ExperimentExecutor.getEditDistance(resultTree, groundTruthTree)        
+#         score = ExperimentExecutor.getEditDistance(resultTree, groundTruthTree)        
         
-# # # #         print treeString
+# # #         print treeString
         
-# #         
+#         
