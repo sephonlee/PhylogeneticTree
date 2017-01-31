@@ -225,9 +225,7 @@ class PhyloParser():
 
         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(255 - PhyloParser.negateImage(image)) 
 
-#         PhyloParser.displayImage(image_data.treeMask)
-#         PhyloParser.displayImage(image_data.nonTreeMask)
-
+        # Old method using sliding window
         # image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(edgeMask)
 
 
@@ -457,7 +455,6 @@ class PhyloParser():
     def sortByCntsLength(item):
         return -len(item)
 
-    
     @staticmethod
     # return a mask of the tree, a mask of text and contours
     def findContours(var_mask1, var_mask2 = None):
@@ -4926,7 +4923,7 @@ class PhyloParser():
             if not image_data.treeReady:
                 ## Fix false-positive sub-trees and mandatorily connect sub-trees
                 image_data = self.fixTrees(image_data)
-                image_data = self.checkAnchorLines(image_data)
+#                 image_data = self.checkAnchorLines(image_data)
                 image_data = self.recoverLineFromText(image_data)
                 image_data = self.checkDone(image_data)
                 
