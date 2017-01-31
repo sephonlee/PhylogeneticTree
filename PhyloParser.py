@@ -201,8 +201,11 @@ class PhyloParser():
         #save original image
         image_data.originalImage = image.copy() 
 
-#         #purify background
+        #purify background
 #         image, image_data.varianceMask, image_data.varMap, image_data.hasColorBackground = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
+#         print "varianceMask"
+#         PhyloParser.displayImage(image_data.varianceMask)
+        
 #         if debug:
 #             print "Display image with removed background"
 #             PhyloParser.displayImage(image)
@@ -221,16 +224,16 @@ class PhyloParser():
 #             print "display non-tree mask"
 #             PhyloParser.displayImage(image_data.nonTreeMask)
 
-        image, edgeMask= PhyloParser.removeBackground(image)
-
+        PhyloParser.displayImage(image)
+        image, edgeMask, hasBackground= PhyloParser.removeBackground(image)
         
-
 
         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(255 - PhyloParser.negateImage(image)) 
 
-        PhyloParser.displayImage(image_data.treeMask)
-        PhyloParser.displayImage(image_data.nonTreeMask)
 
+        
+#         PhyloParser.displayImage(image_data.treeMask)
+        # Old method using sliding window
         # image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(edgeMask)
 
 
@@ -240,7 +243,8 @@ class PhyloParser():
             PhyloParser.displayImage(image)
                         
         image_data.image_preproc = image
-
+        image_data.hasBackground = hasBackground
+        
         image_data.preprocessed = True
 
         return image_data
@@ -338,7 +342,7 @@ class PhyloParser():
         #     image = newImage
             
 
-        return image, edges
+        return image, edges, hasBackground
 
 
     @staticmethod
@@ -466,75 +470,85 @@ class PhyloParser():
 
         var_mask1 = 255 - var_mask1
 
-
         height, width = var_mask1.shape
         var_mask1 = cv.copyMakeBorder(var_mask1, 1, 1, 1, 1, cv.BORDER_CONSTANT, value = 0)
         _, contours, hierarchy= cv.findContours(var_mask1.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
-
-        # mask = np.zeros((height,width), dtype=np.uint8)
-        # cv.drawContours(mask, contours, 0, (255), thickness = -1, hierarchy = hierarchy, maxLevel = 1)
-        
-
-        # print 'mask'
-        # PhyloParser.displayImage(mask) 
-
         
         lenghtList = []
         for cnts in contours:
             lenghtList.append(len(cnts))
             for index, points in enumerate(cnts):
                 cnts[index] = points - 1 #shift back (because of padding)
-
-        maxValue = 0
-        maxIndex = 0
-        for index, cnts in enumerate(contours):
-            if len(cnts)> maxValue:
-                maxIndex = index
-                maxValue = len(cnts)
-
-                   
-        # hierarchy = hierarchy.tolist()
-        # temp =  zip(contours, hierarchy)
-        # temp = sorted(temp, key = lambda x: -len(x[0]))
-        # contours = [x for x, y in temp]
-        # hierarchy = [y for x, y in temp]
-        # hierarchy = np.asarray(hierarchy)
-
+           
+        
+        hierarchy = hierarchy[0].tolist()
+        temp =  zip(contours, hierarchy)
+        temp = sorted(temp, key = lambda x: -len(x[0]))
+        contours = [x for x, y in temp]
+        hierarchy = [y for x, y in temp]
+        
         
         mask = np.zeros((height,width), dtype=np.uint8)
-        cv.drawContours(mask, contours, maxIndex, (255), thickness = -1, hierarchy = hierarchy, maxLevel = 1)
-
-        kernel = np.ones((5,5),np.uint8)
-        tmpMask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
-
-        compensateMask = np.zeros((height, width), dtype = np.uint8)
-        cv.drawContours(compensateMask, contours, maxIndex, (255), thickness = -1)
+        cv.drawContours(mask, contours, 0, (255), thickness = -1)
+        
 #         PhyloParser.displayImage(var_mask1)
 #         PhyloParser.displayImage(255-var_mask2)
 #         PhyloParser.displayImage(mask)
         
         nonTreeMask = np.zeros((height, width), dtype = np.uint8)
-        cv.drawContours(nonTreeMask, contours, -1, (255), thickness = -1)
-        nonTreeMask[np.where(compensateMask == 255)] = 0
-        cv.drawContours(nonTreeMask, contours, -1, (255), thickness = -1, hierarchy = hierarchy, maxLevel = 5)
-        nonTreeMask[np.where(tmpMask == 255)] = 0
+
+        textContours = []
+        for index in range(1, len(contours)):
+#             print contours
+#             nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+            # draw only contour in level 0
+            if hierarchy[index][3] == -1:
+                cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
+                textContours.append(contours[index])
+#             print hierarchy[index][3] == -1
+#             PhyloParser.displayImage(nonTreeMask)
+
+#         PhyloParser.displayImage(nonTreeMask)
+        return mask, nonTreeMask, textContours, hierarchy
 
 
-#         for index in range(0, len(contours)):
-# #             print contours
-# #             nonTreeMask = np.zeros((height, width), dtype = np.uint8)
-#             # draw only contour in level 0
-#             if index!=maxIndex:
-#                 if hierarchy[0][index][3] == -1:
-#                     cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
-#                     textContours.append(contours[index])
-#     #             print hierarchy[index][3] == -1
-#     #             PhyloParser.displayImage(nonTreeMask)
-#             else:
-#                 cv.drawContours(nonTreeMask, contours, index, (255), thickness)
+    @staticmethod
+    # return a mask of the tree, a mask of text and contours
+    def findTextContours_(nonTreeMask, var_mask2 = None):
+        
 
+        height, width = nonTreeMask.shape
+        nonTreeMask = cv.copyMakeBorder(nonTreeMask, 1, 1, 1, 1, cv.BORDER_CONSTANT, value = 0)
+        _, contours, hierarchy= cv.findContours(nonTreeMask.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+        
+        lenghtList = []
+        for cnts in contours:
+            lenghtList.append(len(cnts))
+            for index, points in enumerate(cnts):
+                cnts[index] = points - 1 #shift back (because of padding)
+           
+        
+        hierarchy = hierarchy[0].tolist()
+        temp =  zip(contours, hierarchy)
+        temp = sorted(temp, key = lambda x: -len(x[0]))
+        contours = [x for x, y in temp]
+        hierarchy = [y for x, y in temp]
+          
+        mask = np.zeros((height, width), dtype = np.uint8)
 
-        return mask, nonTreeMask, contours, hierarchy
+        textContours = []
+        for index in range(0, len(contours)):
+#             print contours
+#             nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+            # draw only contour in level 0
+            if hierarchy[index][3] == -1:
+                cv.drawContours(mask, contours, index, (255), thickness = -1)
+                textContours.append(contours[index])
+#             print hierarchy[index][3] == -1
+#             PhyloParser.displayImage(nonTreeMask)
+
+        return mask, textContours, hierarchy
+
 
     @staticmethod
     def removeLabels(image, mask):
@@ -585,7 +599,7 @@ class PhyloParser():
         hasColorBackGround = False;
         if sum(hist[-threshold_hist:]) / float(dim[0]*dim[1]) <= (255-4*threshold_hist)/float(255):
             hasColorBackGround = True
-        print 'This image has background:', hasColorBackGround
+#         print 'This image has background:', hasColorBackGround
         
         for i in range(0, dim[0] - kernel_size[0] + 1):
             for j in range(0, dim[1] - kernel_size[1] + 1):
@@ -1420,9 +1434,9 @@ class PhyloParser():
         # use preprocessed image
         print image_data.preprocessed
         if image_data.preprocessed:    
-            image = image_data.image_preproc.copy()
+            image = image_data.image_preproc
         else:
-            image = image_data.image.copy()
+            image = image_data.image
 
         # PhyloParser.displayImage(image)
         # # sub-preprocessing 
@@ -1438,14 +1452,10 @@ class PhyloParser():
         # save the preprocessed image into image_data
         image_data.image_preproc_for_line_detection = image
 
-
-
         # remove text information
         if image_data.treeMask is not None:
             print "Found available tree mask! Applied the tree mask"
             image = PhyloParser.removeLabels(image, image_data.treeMask)
-
- 
 
         image = PhyloParser.negateImage(image)
 
@@ -1464,8 +1474,6 @@ class PhyloParser():
         # plt.imshow(image, cmap='Greys_r')
         # plt.show()
         image_data.verLines = PhyloParser.getLines(image, mode, minLength = minVerLine)
-
-
 
         # find horizontal lines
         image = PhyloParser.rotateImage(image)
@@ -2439,7 +2447,28 @@ class PhyloParser():
     ## end static method for includeLinesFromCorners ##
     
     
-    
+
+    def matchLines_v2(self, image_data, debug = False):
+
+        if image_data.lineDetected:
+            image_data = self.matchParent(image_data)
+            image_data = self.matchChildren(image_data)
+            # image_data = self.removeText(image_data)
+            
+            if debug:
+                image_data.displayTargetLines('parent')
+                image_data.displayTargetLines('children')
+                image_data.displayTargetLines('interLines')
+                image_data.displayTargetLines('anchorLines')
+            
+            image_data.lineMatched = True
+            
+        else:
+            print "Error! Please do detectLines before this method"
+        
+        
+        return image_data
+      
     
     def matchLines(self, image_data, debug = False):
 
@@ -2687,10 +2716,12 @@ class PhyloParser():
     # margin: height of scan zone after line with no assigned box
     def getSpecies_v2(image_data, padding = 2, margin = 5, debug = False):
         
+        print "getSpecies_v2"
         
         image = image_data.image.copy()
         anchorLines = image_data.anchorLines       
         varianceMask = image_data.varianceMask
+        
         
         # cut out anchor line
         dim = varianceMask.shape
@@ -2700,10 +2731,10 @@ class PhyloParser():
         # cut out anchorlines from text
         for line in anchorLines:        
             varianceMask[max(0, line[1] - cut_height) : min(dim[0], line[1] + cut_height), max((line[2] - cut_width), 0) : min((line[2] + cut_width), dim[1])] = 255
-            
+        
         # get contours
         treeMask, nonTreeMask, contours, hierarchy = PhyloParser.findContours(varianceMask)
-
+        
         # transform contours to bonding boxes
         contourBoxes = []
         for cnt in contours:
@@ -2767,7 +2798,126 @@ class PhyloParser():
 
         return image_data
     
+    @staticmethod
+    # padding: enlarge box area
+    # margin: height of scan zone after line with no assigned box
+    def getSpecies_v3(image_data, padding = 2, margin = 5, debug = False):
+        
+        print "getSpecies_v3"
+        
+
+        image = image_data.image.copy()
+        anchorLines = image_data.anchorLines       
+        
+        # get non-tree contours
+        contours, varianceMask = PhyloParser.findTextContours(image_data)
+        
+        # transform contours to bonding boxes
+        contourBoxes = []
+        for cnt in contours:
+            contourBoxes.append(PhyloParser.getContourInfo(cnt))
+                        
+        # sort boxes and anchorlines from top to bot for further matching       
+        contourBoxes = sorted(contourBoxes, key = lambda x: (x[0], x[2])) #top, left
+        anchorLines = sorted(anchorLines, key = lambda x: (x[3], x[2])) #top, right        
+        
+        # DEBUG
+        if debug:
+            print "show variance mask with anchor lines"
+            img = varianceMask.copy()
+            for b in contourBoxes:
+                cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+            PhyloParser.displayLines(img, anchorLines)
+        
+        ## filter tall thin boxes
+        contourBoxes = PhyloParser.refineContourBox(contourBoxes, threshold_aspect = 10, threshold_height = 20)
+        
+        ## match line and boxes
+        lineIndex2ClusterBoxes, lineIndex2BoxIndex, lineIndex2SubBoxes, lineInTextIndex, noTextLineIndex, orphanBoxFromShareBox, activateBoxIndices, shareBoxIndices, orphanBoxIndices = PhyloParser.matchAnchorLineAndContourBox(image, anchorLines, contourBoxes)
+        
+        ## collect orphan boxes
+        orphanBoxes = PhyloParser.clusterOrphanBox(image, anchorLines, contourBoxes, orphanBoxFromShareBox, orphanBoxIndices)
+        
+        if debug:
+            print "line2box"
+            lines = []
+            img = image.copy()
+            for line_index in lineIndex2ClusterBoxes:
+                lines.append(anchorLines[line_index])
+                boxes = lineIndex2ClusterBoxes[line_index]
+                for b in boxes:
+                    cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+            PhyloParser.displayLines(img, lines)
+            
+            print "orphane boxes"
+            img = image.copy()
+            for b in orphanBoxes:
+                cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+            PhyloParser.displayLines(img, lines)
+            
+
+        ## get text for anchor lines
+        line2Text = PhyloParser.line2Text_v2(image, anchorLines, lineIndex2ClusterBoxes, lineInTextIndex, noTextLineIndex, padding = padding)
+        
+        ## get text from orphan
+        orphanBox2Text = PhyloParser.box2Text(image, orphanBoxes)
+        
+        if debug:
+            for line in line2Text:
+                print "line", line, "text", line2Text[line]
+            for box in orphanBox2Text:
+                print "box", box, "text", orphanBox2Text[box]
+
+        image_data.line2Text = line2Text
+        image_data.orphanBox2Text = orphanBox2Text
+        image_data.anchorLines = anchorLines
+        image_data.speciesNameReady = True 
+
+        return image_data
+ 
+ 
+    @staticmethod  
+    def findTextContours(image_data, threshold_hist = 10, cut_height = 5, cut_width = 2):
+        
+        # use original image
+        image = image_data.originalImage.copy()
+        anchorLines = image_data.anchorLines
+        dim = image.shape
     
+#         # remove background if necessary
+#         if image_data.hasBackground:
+#             print "has color background, remove back ground using sliding windows"
+#             image, varianceMask, varMap, hasBackground = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
+#         else:
+#             print "no color background, use treemask and non tree mask"
+
+        print "sean treemask"
+        PhyloParser.displayImage(image_data.treeMask)
+        
+        print "sean non-tree mask"
+        PhyloParser.displayImage(image_data.nonTreeMask)
+        
+        
+        varianceMask = 255 - (image_data.treeMask + image_data.nonTreeMask)
+        print "varience mask"
+        PhyloParser.displayLines(varianceMask, anchorLines)
+        
+        # cut out anchorlines from text
+        for line in anchorLines:        
+            varianceMask[max(0, line[1] - cut_height) : min(dim[0], line[1] + cut_height), max((line[2] - cut_width), 0) : min((line[2] + cut_width), dim[1])] = 255
+        
+        print "varience mask"
+        PhyloParser.displayImage(varianceMask)
+        # get contours
+        treeMask, nonTreeMask, contours, hierarchy = PhyloParser.findContours(varianceMask)
+        
+        print "treemask"
+        PhyloParser.displayImage(treeMask)
+        
+        print "non-tree mask"
+        PhyloParser.displayImage(nonTreeMask)
+        
+        return contours, varianceMask
 
     @staticmethod
     # padding: enlarge box area
@@ -4769,7 +4919,7 @@ class PhyloParser():
             if not image_data.treeReady:
                 ## Fix false-positive sub-trees and mandatorily connect sub-trees
                 image_data = self.fixTrees(image_data)
-                image_data = self.checkAnchorLines(image_data)
+#                 image_data = self.checkAnchorLines(image_data)
                 image_data = self.recoverLineFromText(image_data)
                 image_data = self.checkDone(image_data)
                 
@@ -4835,8 +4985,7 @@ class PhyloParser():
     def sortNodeByLeftEnd(item):
         return item.branch[0]
 
-    @staticmethod
-    def getNodeBranchOnTheRight(breakNode, nodeList, mode):
+    def getNodeBranchOnTheRight(self, breakNode, nodeList, mode):
         margin = 2
         if mode == 'upper':
             x = breakNode.branch[0]
@@ -4853,11 +5002,11 @@ class PhyloParser():
                 potentialNodes.append(node)
             if mode == 'lower':
                 if breakNode.lowerLeave and node.root:
-                    if PhyloParser.isSameLine(breakNode.lowerLeave, node.root):
+                    if isSameLine(breakNode.lowerLeave, node.root):
                         potentialNodes.append(node)
             elif mode == 'upper':
                 if breakNode.upperLeave and node.root:
-                    if PhyloParser.isSameLine(breakNode.upperLeave, node.root):
+                    if isSameLine(breakNode.upperLeave, node.root):
                         potentialNode.append(node)
 
 
@@ -4877,7 +5026,7 @@ class PhyloParser():
             
             return False
         else:
-            potentialNodes = sorted(potentialNodes, key =PhyloParser.sortNodeByLeftEnd)
+            potentialNodes = sorted(potentialNodes, key = self.sortNodeByLeftEnd)
             return potentialNodes[0]
 
     @staticmethod
@@ -4902,7 +5051,6 @@ class PhyloParser():
         branchArray = image_data.branchArray
         image = image_data.image
         rootList = image_data.rootList
-        rootList = sorted(rootList, key = lambda x: x.branch[0])
         root = rootList[0]
         newAnchors = []
         wrongAnchors = []
@@ -4916,47 +5064,41 @@ class PhyloParser():
 
         if len(wrongAnchors) > 0:
             stack = []
-            seen = []
+            stack.append(root)
 
-            for rootNode in rootList:
-                stack.append(rootNode)
-                while stack:
+            while stack:
+                node = stack.pop()
 
-                    node = stack.pop()
-                    seen.append(node)
-                    for line in wrongAnchors:
-                        if node.upperLeave and PhyloParser.isSameLine(node.upperLeave, line):
-                            node.isUpperAnchor = False
-                            connectNode = PhyloParser.getNodeBranchOnTheRight(node, rootList, mode = 'upper')
-                            if connectNode:
-                                rootNode.numNodes += connectNode.numNodes
-                                tmpTo = list(node.to)
-                                tmpTo[0] = connectNode
-                                node.to = tuple(tmpTo)
-                        elif node.to[0] and node.to[0] not in seen:
-                            stack.append(node.to[0])
+                for line in wrongAnchors:
+                    if PhyloParser.isSameLine(node.upperLeave, line):
+                        node.isUpperAnchor = False
+                        connectNode = PhyloParser.getNodeBranchOnTheRight(node, rootList, mode = 'upper')
+                        if connectNode:
+                            tmpTo = list(node.to)
+                            tmpTo[0] = connectNode
+                            node.to = tumple(tmpTo)
+                    elif node.to[0]:
+                        stack.append(node.to[0])
 
-                        if node.lowerLeave and PhyloParser.isSameLine(node.lowerLeave, line):
-                            node.isLowerAnchor = False
-                            connectNode = PhyloParser.getNodeBranchOnTheRight(node, rootList, mode = 'lower')
-                            if connectNode:
-                                rootNode.numNodes += connectNode.numNodes
-                                tmpTo = list(node.to)
-                                tmpTo[1] = connectNode
-                                node.to = tuple(tmpTo)
-                        elif node.to[1] and node.to[1] not in seen:
-                            stack.append(node.to[1])
+                    if PhyloParser.isSameLine(node.lowerLeave, line):
+                        node.isLowerAnchor = False
+                        connectNode = PhyloParser.getNodeBranchOnTheRight(node, rootList, mode = 'lower')
+                        if connectNode:
+                            tmpTo = list(node.to)
+                            tmpTo[1] = connectNode
+                            node.to = tumple(tmpTo)
+                    elif node.to[1]:
+                        stack.append(node.to[1])
 
-                        if not node.isBinary:
-                            for lineIndex, interLine in enumerate(node.interLeave):
-                                if PhyloParser.isSameLine(interLine, line):
-                                    node.isInterAnchor[lineIndex] = False
-                                    connectNode = PhyloParser.getNodeBranchOnTheRight(node, rootList)
-                                    if connectNode:
-                                        rootNode.numNodes += connectNode.numNodes
-                                        node.otherTo[lineIndex] = connectNode
-                                elif node.otherTo[lineIndex] and node.otherTo[lineIndex] not in seen:
-                                    stack.append(node.otherTo[lineIndex])
+                    if not node.isBinary:
+                        for lineIndex, interLine in enumerate(node.interLeave):
+                            if PhyloParser.isSameLine(interLine, line):
+                                node.isInterAnchor[lineIndex] = False
+                                connectNode = PhyloParser.getNodeBranchOnTheRight(node, rootList)
+                                if connectNode:
+                                    node.otherTo[lineIndex] = connectNode
+                            elif node.otherTo[lineIndex]:
+                                stack.append(node.to[lineIndex])
 
         image_data.anchorLines = newAnchors
 
@@ -5118,7 +5260,6 @@ class PhyloParser():
     def checkDone(self, image_data):
         rootList = image_data.rootList
         isDone = True
-        rootList = sorted(rootList, key = lambda x: -x.numNodes)
         rootNode = rootList[0]
 
 
@@ -5138,7 +5279,7 @@ class PhyloParser():
                         isDone = False
 
         image_data.treeReady = isDone
-        image_data.rootList = rootList
+        
         return image_data
 
 
@@ -5539,6 +5680,10 @@ class PhyloParser():
             node.origin = rootNode
             if node.to[0] :
 
+                if node.branch[0] == 31 and node.branch[1] == 179:
+                    print node.to[0] not in seen
+                    print node.to[0] not in visit
+                    print node.branch != node.to[0].branch
 
                 if node.to[0] not in seen:
                     seen.append(node.to[0])
