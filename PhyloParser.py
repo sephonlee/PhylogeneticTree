@@ -223,9 +223,6 @@ class PhyloParser():
 
         image, edgeMask, hasBackground= PhyloParser.removeBackground(image)
 
-        
-
-
         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(255 - PhyloParser.negateImage(image)) 
 
 #         PhyloParser.displayImage(image_data.treeMask)
@@ -261,7 +258,7 @@ class PhyloParser():
 
 
 
-        treeMask, nonTreeMask, controus, hierarchy = PhyloParser.findContours(edges)
+#         treeMask, nonTreeMask, controus, hierarchy = PhyloParser.findContours(edges)
 
 
         # edges = cv.dilate(edges, None)
@@ -460,53 +457,6 @@ class PhyloParser():
     def sortByCntsLength(item):
         return -len(item)
 
-
-    @staticmethod
-    # return a mask of the tree, a mask of text and contours
-    def findContours_original(var_mask1, var_mask2 = None):
-
-        var_mask1 = 255 - var_mask1
-
-        height, width = var_mask1.shape
-        var_mask1 = cv.copyMakeBorder(var_mask1, 1, 1, 1, 1, cv.BORDER_CONSTANT, value = 0)
-        _, contours, hierarchy= cv.findContours(var_mask1.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
-        
-        lenghtList = []
-        for cnts in contours:
-            lenghtList.append(len(cnts))
-            for index, points in enumerate(cnts):
-                cnts[index] = points - 1 #shift back (because of padding)
-           
-        
-        hierarchy = hierarchy[0].tolist()
-        temp =  zip(contours, hierarchy)
-        temp = sorted(temp, key = lambda x: -len(x[0]))
-        contours = [x for x, y in temp]
-        hierarchy = [y for x, y in temp]
-        
-        
-        mask = np.zeros((height,width), dtype=np.uint8)
-        cv.drawContours(mask, contours, 0, (255), thickness = -1)
-        
-#         PhyloParser.displayImage(var_mask1)
-#         PhyloParser.displayImage(255-var_mask2)
-#         PhyloParser.displayImage(mask)
-        
-        nonTreeMask = np.zeros((height, width), dtype = np.uint8)
-
-        textContours = []
-        for index in range(1, len(contours)):
-#             print contours
-#             nonTreeMask = np.zeros((height, width), dtype = np.uint8)
-            # draw only contour in level 0
-            if hierarchy[index][3] == -1:
-                cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
-                textContours.append(contours[index])
-#             print hierarchy[index][3] == -1
-#             PhyloParser.displayImage(nonTreeMask)
-
-#         PhyloParser.displayImage(nonTreeMask)
-        return mask, nonTreeMask, textContours, hierarchy
     
     @staticmethod
     # return a mask of the tree, a mask of text and contours
@@ -514,18 +464,9 @@ class PhyloParser():
 
         var_mask1 = 255 - var_mask1
 
-
         height, width = var_mask1.shape
         var_mask1 = cv.copyMakeBorder(var_mask1, 1, 1, 1, 1, cv.BORDER_CONSTANT, value = 0)
         _, contours, hierarchy= cv.findContours(var_mask1.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
-
-        # mask = np.zeros((height,width), dtype=np.uint8)
-        # cv.drawContours(mask, contours, 0, (255), thickness = -1, hierarchy = hierarchy, maxLevel = 1)
-        
-
-        # print 'mask'
-        # PhyloParser.displayImage(mask) 
-
         
         lenghtList = []
         for cnts in contours:
@@ -533,6 +474,7 @@ class PhyloParser():
             for index, points in enumerate(cnts):
                 cnts[index] = points - 1 #shift back (because of padding)
 
+        # label the largest contour as the tree
         maxValue = 0
         maxIndex = 0
         for index, cnts in enumerate(contours):
@@ -540,48 +482,22 @@ class PhyloParser():
                 maxIndex = index
                 maxValue = len(cnts)
 
-                   
-        # hierarchy = hierarchy.tolist()
-        # temp =  zip(contours, hierarchy)
-        # temp = sorted(temp, key = lambda x: -len(x[0]))
-        # contours = [x for x, y in temp]
-        # hierarchy = [y for x, y in temp]
-        # hierarchy = np.asarray(hierarchy)
-
         
         mask = np.zeros((height,width), dtype=np.uint8)
         cv.drawContours(mask, contours, maxIndex, (255), thickness = -1, hierarchy = hierarchy, maxLevel = 1)
-
+        
         kernel = np.ones((5,5),np.uint8)
         tmpMask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
 
         compensateMask = np.zeros((height, width), dtype = np.uint8)
         cv.drawContours(compensateMask, contours, maxIndex, (255), thickness = -1)
-#         PhyloParser.displayImage(var_mask1)
-#         PhyloParser.displayImage(255-var_mask2)
-#         PhyloParser.displayImage(mask)
-        
+
         nonTreeMask = np.zeros((height, width), dtype = np.uint8)
         cv.drawContours(nonTreeMask, contours, -1, (255), thickness = -1)
         nonTreeMask[np.where(compensateMask == 255)] = 0
         cv.drawContours(nonTreeMask, contours, -1, (255), thickness = -1, hierarchy = hierarchy, maxLevel = 5)
         nonTreeMask[np.where(tmpMask == 255)] = 0
-
-
-#         for index in range(0, len(contours)):
-# #             print contours
-# #             nonTreeMask = np.zeros((height, width), dtype = np.uint8)
-#             # draw only contour in level 0
-#             if index!=maxIndex:
-#                 if hierarchy[0][index][3] == -1:
-#                     cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
-#                     textContours.append(contours[index])
-#     #             print hierarchy[index][3] == -1
-#     #             PhyloParser.displayImage(nonTreeMask)
-#             else:
-#                 cv.drawContours(nonTreeMask, contours, index, (255), thickness)
-
-
+        
         return mask, nonTreeMask, contours, hierarchy
 
     @staticmethod
@@ -2827,10 +2743,15 @@ class PhyloParser():
         image = image_data.image.copy()
         anchorLines = image_data.anchorLines       
         
-        # get non-tree contours
-        contours, varianceMask = PhyloParser.findTextContours(image_data)
+        # get non-tree contours #old method using sliding window
+#         contours, varianceMask = PhyloParser.findTextContours_old(image_data)
         
-        print "varianceMask"
+        
+        nonTreeMask = image_data.nonTreeMask.copy()
+        treeMask = image_data.treeMask.copy()
+        varianceMask = 255 - (nonTreeMask + treeMask)
+        
+        mask, contours, hierarchy = PhyloParser.findTextContours(255-nonTreeMask)
         
         # transform contours to bonding boxes
         contourBoxes = []
@@ -2896,49 +2817,114 @@ class PhyloParser():
         return image_data
  
  
-    @staticmethod  
-    def findTextContours(image_data, threshold_hist = 10, cut_height = 5, cut_width = 2):
+
+
+
+    @staticmethod
+    # return a mask of the tree, a mask of text and contours
+    def findTextContours(var_mask1):
+
+        var_mask1 = 255 - var_mask1
+
+        height, width = var_mask1.shape
+        var_mask1 = cv.copyMakeBorder(var_mask1, 1, 1, 1, 1, cv.BORDER_CONSTANT, value = 0)
+        _, contours, hierarchy= cv.findContours(var_mask1.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+        
+        lenghtList = []
+        for cnts in contours:
+            lenghtList.append(len(cnts))
+            for index, points in enumerate(cnts):
+                cnts[index] = points - 1 #shift back (because of padding)
+           
+        
+        hierarchy = hierarchy[0].tolist()
+        mask = np.zeros((height, width), dtype = np.uint8)
+
+        textContours = []
+        for index in range(0, len(contours)):
+#             print contours
+#             nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+            # draw only contour in level 0
+            if hierarchy[index][3] == -1:
+                cv.drawContours(mask, contours, index, (255), thickness = -1)
+                textContours.append(contours[index])
+#             print hierarchy[index][3] == -1
+#             PhyloParser.displayImage(nonTreeMask)
+
+#         PhyloParser.displayImage(mask)
+        return mask, textContours, hierarchy
+
+
+ 
+    @staticmethod
+    # find text contours using sliding window and cut off pixels after anchor line
+    def findTextContours_v0(image_data, threshold_hist = 10, cut_height = 5, cut_width = 2):
         
         # use original image
         image = image_data.originalImage.copy()
         anchorLines = image_data.anchorLines
         dim = image.shape
     
-#         # remove background if necessary
-#         if image_data.hasBackground:
-#             print "has color background, remove back ground using sliding windows"
-#             image, varianceMask, varMap, hasBackground = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
-#         else:
-#             print "no color background, use treemask and non tree mask"
-
-        print "sean treemask"
-        PhyloParser.displayImage(image_data.treeMask)
-        
-        print "sean non-tree mask"
-        PhyloParser.displayImage(image_data.nonTreeMask)
-        
-        
-        varianceMask = 255 - (image_data.treeMask + image_data.nonTreeMask)
-        print "varience mask"
-        PhyloParser.displayLines(varianceMask, anchorLines)
+        # remove background if necessary
+        if image_data.hasBackground:
+            print "has color background, remove back ground using sliding windows"
+            image, varianceMask, varMap, hasBackground = PhyloParser.purifyBackGround(image, kernel_size = (3,3))
+        else:
+            print "no color background, use treemask and non tree mask"
+            varianceMask = 255 - (image_data.treeMask + image_data.nonTreeMask)
         
         # cut out anchorlines from text
         for line in anchorLines:        
             varianceMask[max(0, line[1] - cut_height) : min(dim[0], line[1] + cut_height), max((line[2] - cut_width), 0) : min((line[2] + cut_width), dim[1])] = 255
         
-        print "varience mask"
-        PhyloParser.displayImage(varianceMask)
+
         # get contours
-        treeMask, nonTreeMask, contours, hierarchy = PhyloParser.findContours_original(varianceMask)
-        
-        print "treemask"
-        PhyloParser.displayImage(treeMask)
-        
-        print "non-tree mask"
-        PhyloParser.displayImage(nonTreeMask)
-        
+        treeMask, nonTreeMask, contours, hierarchy = PhyloParser.findContours_v0(varianceMask)
+ 
         return contours, varianceMask
+
+    @staticmethod
+    # return a mask of the tree, a mask of text and contours
+    # using original image
+    def findContours_v0(var_mask1, var_mask2 = None):
+
+        var_mask1 = 255 - var_mask1
+
+        height, width = var_mask1.shape
+        var_mask1 = cv.copyMakeBorder(var_mask1, 1, 1, 1, 1, cv.BORDER_CONSTANT, value = 0)
+        _, contours, hierarchy= cv.findContours(var_mask1.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
         
+        lenghtList = []
+        for cnts in contours:
+            lenghtList.append(len(cnts))
+            for index, points in enumerate(cnts):
+                cnts[index] = points - 1 #shift back (because of padding)
+           
+        
+        hierarchy = hierarchy[0].tolist()
+        temp =  zip(contours, hierarchy)
+        temp = sorted(temp, key = lambda x: -len(x[0]))
+        contours = [x for x, y in temp]
+        hierarchy = [y for x, y in temp]
+        
+        mask = np.zeros((height,width), dtype=np.uint8)
+        cv.drawContours(mask, contours, 0, (255), thickness = -1)
+        
+        nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+
+        textContours = []
+        for index in range(1, len(contours)):
+#             print contours
+#             nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+            # draw only contour in level 0
+            if hierarchy[index][3] == -1:
+                cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
+                textContours.append(contours[index])
+#             print hierarchy[index][3] == -1
+#             PhyloParser.displayImage(nonTreeMask)
+
+#         PhyloParser.displayImage(nonTreeMask)
+        return mask, nonTreeMask, textContours, hierarchy        
 
     @staticmethod
     # padding: enlarge box area
