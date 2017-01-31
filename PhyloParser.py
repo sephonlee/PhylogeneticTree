@@ -228,8 +228,7 @@ class PhyloParser():
 
         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(255 - PhyloParser.negateImage(image)) 
 
-        PhyloParser.displayImage(image_data.treeMask)
-        PhyloParser.displayImage(image_data.nonTreeMask)
+
 
         # image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(edgeMask)
 
@@ -518,6 +517,7 @@ class PhyloParser():
         nonTreeMask[np.where(compensateMask == 255)] = 0
         cv.drawContours(nonTreeMask, contours, -1, (255), thickness = -1, hierarchy = hierarchy, maxLevel = 5)
         nonTreeMask[np.where(tmpMask == 255)] = 0
+
 
 
 #         for index in range(0, len(contours)):
