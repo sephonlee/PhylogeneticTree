@@ -225,13 +225,12 @@ class PhyloParser():
 
         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(255 - PhyloParser.negateImage(image)) 
 
-<<<<<<< HEAD
+
 
         
         # PhyloParser.displayImage(image_data.treeMask)
         # PhyloParser.displayImage(image_data.nonTreeMask)
-=======
->>>>>>> d00a29a0a8be6ef49f3109a23d385108135dea2b
+
         # Old method using sliding window
         # image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(edgeMask)
 
