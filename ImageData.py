@@ -386,3 +386,4 @@ class ImageData():
                     print 'length = ', mapValue['length']
                     print 'overlap = ', mapValue['overlap']
                     print 'linegroup: ', mapValue['lineGroup']
+                    print 'numNoiseGroup:' , len(mapValue['noise'])
