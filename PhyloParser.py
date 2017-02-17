@@ -723,10 +723,9 @@ class PhyloParser():
         verLines = image_data.verLines
         verLines = sorted(verLines,  key = lambda x: int(x[0]))
         
-        isFound, branch = PhyloParser.checkBranchIsBlack(branch, image)
+        isFound, branch = PhyloParser.checkBranchIsBlack(verLines[1], image)
 
         #use the very left vertical line to get startpoint
-
         if isFound:
             startPoint = PhyloParser.getStartPoint(image, branch)
         else:
@@ -744,9 +743,10 @@ class PhyloParser():
         while len(queue_trunk) != 0:
             current_trunk = queue_trunk.pop(0)
             current_trunk = PhyloParser.traceTrunk(image, history_map, current_trunk)
-            
+            print "current_trunk", current_trunk
+            print "current_trunk's bud", current_trunk.buds
 #             print "point2Trunk", point2Trunk
-#             PhyloParser.displayTrunk(image, current_trunk)
+            PhyloParser.displayTrunk(image, current_trunk)
             
             point2Trunk[current_trunk.startPoint] = current_trunk
             
@@ -755,10 +755,9 @@ class PhyloParser():
 #                 print "new_trunk_bud", new_trunk.buds
                 queue_trunk.append(new_trunk)
 
-        print point2Trunk
-
+        print "displayTreeFromTrunk"
         PhyloParser.displayTreeFromTrunk(image, point2Trunk)
-#         print "point2Trunk"
+        print "point2Trunk"
         for point in point2Trunk:
             PhyloParser.displayTrunk(image, point2Trunk[point])
             
@@ -863,7 +862,8 @@ class PhyloParser():
         currentPointValue = int(image[currentPoint])
         history_map[currentPoint] = 1
 
-        while True:
+        isOnBoundary = False
+        while not isOnBoundary:
             nextPoint = (currentPoint[0]-1, currentPoint[1])
             if currentPoint[0]-1 >-1:
                 nextPointValue = int(image[nextPoint])
@@ -871,18 +871,20 @@ class PhyloParser():
                 nextBud = (currentPoint[0], currentPoint[1]+1)
                 nextBudValue = int(image[nextBud])
                 
-    #             print "current point", currentPoint, "value", currentPointValue
+#                 print "current point", currentPoint, "value", currentPointValue
                 # top pixel is in the line            
                 if abs(nextPointValue - currentPointValue) <= threshold:
-    #                 print "move on top"
+#                     print "move on top"
                     currentPoint = nextPoint
                     currentPointValue = nextPointValue
                     history_map[currentPoint] = 1 # update value in map at next point
                 else:
                     trunk.top = currentPoint
-                    # print "end of the line", trunk.top, image[trunk.top[0], trunk.top[1]], image[trunk.top[0]-1, trunk.top[1]]
+#                     print "end of the line", trunk.top, image[trunk.top[0], trunk.top[1]], image[trunk.top[0]-1, trunk.top[1]]
+#                     print image[trunk.top[0]-2:trunk.top[0]+3, trunk.top[1]-2:trunk.top[1]+3]
     #                 print "end of the line"
-                    break
+#                     break
+                    isOnBoundary = True
                 
                 if abs(nextBudValue - currentPointValue) <= threshold:
     #                 print "find bud"
@@ -898,7 +900,9 @@ class PhyloParser():
         # searching down
         currentPoint = trunk.startPoint
         currentPointValue = int(image[currentPoint])
-        while True:
+        
+        isOnBoundary = False
+        while not isOnBoundary:
             nextPoint = (currentPoint[0]+1, currentPoint[1])
             if currentPoint[0] +1 < image.shape[0]:
                 nextPointValue = int(image[nextPoint])
@@ -917,7 +921,8 @@ class PhyloParser():
                 else:
                     trunk.bot = currentPoint
     #                 print "end of the line"
-                    break
+#                     break
+                    isOnBoundary = True
                  
                 if abs(nextBudValue - currentPointValue) <= threshold:
     #                 print "find bud"
@@ -929,11 +934,15 @@ class PhyloParser():
                 break
 
 #         print "trunk buds", trunk.buds
-#         print "map", history_map[trunk["top"][0]-1:trunk["bot"][0]+2, trunk["top"][1]-1:trunk["top"][1]+2] 
+#         print trunk.top
+#         print "map", history_map[trunk.top[0]-1:trunk.bot[0]+2, trunk.top[1]-1:trunk.top[1]+2]
+#         print "image", image[trunk.top[0]-2:trunk.bot[0]+2, trunk.top[1]-2:trunk.top[1]+4] 
 #         PhyloParser.displayTrunk(image, trunk)
 
         trunk.trunkLine = (trunk.top[1], trunk.top[0], trunk.bot[1], trunk.bot[0], abs(trunk.bot[0] - trunk.bot[1]))
         trunk.leaves, trunk.interLines, trunk.nextStartPoint = PhyloParser.traceBuds(image, history_map, trunk.buds)
+#         print "trunk.leaves"
+#         print trunk.leaves
         yt, xt = trunk.top
         yb, xb = trunk.bot
 
@@ -976,18 +985,24 @@ class PhyloParser():
         if len(buds) > 0:
             bud_group = []
             tmp = [buds[0]]
-            for i in range(1, len(buds)):
-                previous_bud = buds[i-1]
-                bud = buds[i]
-                if bud[0]-1 == previous_bud[0] and bud[1] == previous_bud[1]:
-                    tmp.append(bud)
-                else:
-                    bud_group.append(tmp)
-                    tmp = [bud]
+            if len(buds) >= 2:
+                for i in range(1, len(buds)):
+                    previous_bud = buds[i-1]
+                    bud = buds[i]
                     
-                if i == len(buds) - 1:
-                    bud_group.append(tmp)
-                    
+                    # in the same group
+                    if bud[0]-1 == previous_bud[0] and bud[1] == previous_bud[1]:
+                        tmp.append(bud)
+                    # in a new group
+                    else:
+                        bud_group.append(tmp)
+                        tmp = [bud]
+                        
+                    if i == len(buds) - 1:
+                        bud_group.append(tmp)
+            else:
+                bud_group.append(tmp)
+            
             
             for g in bud_group:
                 new_bud = g[len(g)/2]
@@ -2318,9 +2333,6 @@ class PhyloParser():
                 patch = image[corner[0]-1:corner[0]+2, corner[1]-1:corner[1]+2].copy().astype("float")/255      
                 patch_variance =  np.var(patch)
             
-#                 print corner
-#                 print "patch"
-#                 print patch
 #                 print filteredImage[corner[0]-1:corner[0]+2, corner[1]-1:corner[1]+2].copy().astype("float")
                 
                 patch_sum = max(np.amax(np.sum(patch, 0)), np.amax(np.sum(patch, 1)))
@@ -3462,8 +3474,12 @@ class PhyloParser():
         
         # transform contours to bonding boxes
         contourBoxes = []
+        img = image.copy()
         for cnt in contours:
             contourBoxes.append(PhyloParser.getContourInfo(cnt))
+            b = PhyloParser.getContourInfo(cnt)
+            cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+        PhyloParser.displayImage(img)
                         
         # sort boxes and anchorlines from top to bot for further matching       
         contourBoxes = sorted(contourBoxes, key = lambda x: (x[0], x[2])) #top, left
@@ -5613,6 +5629,7 @@ class PhyloParser():
 
 
             # Create node from matched lines
+            # first tracing
             image_data = self.createNodes(image_data, tracing)
             if debug:
                 # for node in image_data.nodeList:
@@ -5621,7 +5638,10 @@ class PhyloParser():
             pass
 
             # Gather trees from nodes
-            image_data = self.createRootList(image_data, tracing = False)
+
+            # second tracing
+            image_data = self.createRootList(image_data, tracing)
+
 
             if debug:
                 image_data.displayTrees('regular')
@@ -5634,7 +5654,9 @@ class PhyloParser():
                 ## Fix false-positive sub-trees and mandatorily connect sub-trees
                 image_data = self.fixTrees(image_data)
 
+
                 # image_data = self.checkAnchorLines(image_data)
+
 
                 image_data = self.recoverLineFromText(image_data)
                 image_data = self.checkDone(image_data)
@@ -5727,11 +5749,12 @@ class PhyloParser():
             elif mode == 'upper':
                 if breakNode.upperLeave and node.root:
                     if PhyloParser.isSameLine(breakNode.upperLeave, node.root):
-                        potentialNode.append(node)
+                        potentialNodes.append(node)
             else:
                 if node.root:
                     if PhyloParser.isSameLine(mode, node.root):
-                        potentialNode.append(node)
+                        potentialNodes.append(node)
+
 
         if len(potentialNodes) == 0:
             # for node in nodeList:
@@ -5924,6 +5947,7 @@ class PhyloParser():
 
     @staticmethod
     def recoverLineFromText(image_data):
+        print "recoverLineFromText"
         image_height = image_data.image_height
         image_width = image_data.image_width
         rootNode = image_data.rootList[0]
@@ -5964,7 +5988,7 @@ class PhyloParser():
                             if node.isBinary:
                                 node.isBinary = False
 
-                        image_data.displayNode(node)
+#                         image_data.displayNode(node)
                         tmpDict = {}
                         tmpDict['status'] = 'from_box'
                         tmpDict['text'] = textInfo['text']
@@ -5981,7 +6005,7 @@ class PhyloParser():
         image_data.orphanBox2Text = image_data.orphanBox2Text
         image_data.anchorLines = anchorLines
 
-
+        print "recoverLineFromText end"
         return image_data
 
 
