@@ -743,23 +743,24 @@ class PhyloParser():
         while len(queue_trunk) != 0:
             current_trunk = queue_trunk.pop(0)
             current_trunk = PhyloParser.traceTrunk(image, history_map, current_trunk)
-            print "current_trunk", current_trunk
-            print "current_trunk's bud", current_trunk.buds
-#             print "point2Trunk", point2Trunk
-            PhyloParser.displayTrunk(image, current_trunk)
+
+            if debug:
+#                 print "current_trunk", current_trunk
+#                 print "current_trunk's bud", current_trunk.buds
+                PhyloParser.displayTrunk(image, current_trunk)
             
             point2Trunk[current_trunk.startPoint] = current_trunk
             
             for startPoint in current_trunk.nextStartPoint:
                 new_trunk = TrunkNode(startPoint)
-#                 print "new_trunk_bud", new_trunk.buds
                 queue_trunk.append(new_trunk)
 
-        print "displayTreeFromTrunk"
-        PhyloParser.displayTreeFromTrunk(image, point2Trunk)
-        print "point2Trunk"
-        for point in point2Trunk:
-            PhyloParser.displayTrunk(image, point2Trunk[point])
+        if debug:
+            print "displayTreeFromTrunk"
+            PhyloParser.displayTreeFromTrunk(image, point2Trunk)
+#             print "point2Trunk"
+#             for point in point2Trunk:
+#                 PhyloParser.displayTrunk(image, point2Trunk[point])
             
         return
 

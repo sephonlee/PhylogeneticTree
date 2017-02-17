@@ -111,6 +111,16 @@ if __name__ == '__main__':
     
 #     filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/14087683_10153822638021658_1412380893_o.jpg"
 
+    filename = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/phylogenetic_tree_for_parsing/PMC2614190_ebo-04-181-g01.jpg"
+
+#     print "here"
+#     image = np.zeros([12, 20]) + 255
+#     image[5:7, 0:16] = 0
+#     image[:, 16:19] = 0
+#     PhyloParser.displayImage(image)
+#     
+#     PhyloParser.detectCorners(image, 2)
+
     path = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/high_quality_tree"
     
     fileList = []
@@ -136,6 +146,7 @@ if __name__ == '__main__':
     
         
         print "original image"
+        print image[180:193, 37:50]
         PhyloParser.displayImage(image)
 #         print PhyloParser.image2text(image[33:, 366:453])
     
