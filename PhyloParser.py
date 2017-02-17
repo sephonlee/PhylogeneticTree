@@ -1194,6 +1194,24 @@ class PhyloParser():
         image_data.horLines, image_data.horLineMask, image_data.horLineMappingDict = PhyloParser.getUniqueLinesList(horLines, horLineMask, horLineMappingDict, mode = 'hor')
         image_data.verLines, image_data.verLineMask, image_data.verLineMappingDict = PhyloParser.getUniqueLinesList(verLines, verLineMask, verLineMappingDict, mode = 'ver')
 
+        # for key, value in horLineMappingDict.items():
+        #     if key == 'overlapMapping':
+        #         print value
+        #     elif key == 'lineMapping':
+        #         for indexKey, mapValue in value.items():
+        #             print '----------------------------'
+        #             print 'Index = ',indexKey
+        #             print 'length = ', mapValue['length']
+        #             print 'overlap = ', mapValue['overlap']
+        #             print 'linegroup: ', mapValue['lineGroup']
+        #             print 'numNoiseGroup:' , len(mapValue['noise'])
+        #             print 'noiseIndexes:', 
+        #             for key, whatever in mapValue['noise'].items():
+        #                 print key,
+        #             print
+        # PhyloParser.displayImage(horLineMask[:,:,0])
+        # PhyloParser.displayImage(horLineMask[:,:,1])
+
         # PhyloParser.displayImage(image_data.horLineMask[:,:,0])
         # PhyloParser.displayImage(image_data.verLineMask[:,:,0])
 
@@ -1265,10 +1283,17 @@ class PhyloParser():
                     mappingDict['lineMapping'][mapIndex]['overlap'] = [overlapNumber]
                     mappingDict['overlapMapping'][overlapNumber].append(mapIndex)
                     overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex, mode, overlapIndex = overlapNumber)
-
+                    mapIndex +=1
         lineList = []
+        noiseIndexes = []
+        noiseOverlapIndexes = []
+
+        if mode == 'hor':
+            print mappingDict
 
         for lineIndex, lineDict in mappingDict['lineMapping'].items():
+
+            lineDict['noise'] = {}
             lineDict['parent'] = []
             lineDict['type'] = None
             targetIndex = len(lineDict['lineGroup'])/2
@@ -1276,7 +1301,82 @@ class PhyloParser():
             x1, y1, x2, y2, length = targetLine
             lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
             lineDict['rline'] = targetLine
-            lineList.append(targetLine)
+
+
+
+
+        for lineIndex, lineDict in mappingDict['lineMapping'].items():
+            isNoise = False
+            if lineIndex not in noiseIndexes:
+                noisePool = []
+                for overlapMappingIndex in mappingDict['lineMapping'][lineIndex]['overlap']:
+                    
+                    for overlapIndex in mappingDict['overlapMapping'][overlapMappingIndex]:
+                        if lineIndex != overlapIndex:
+                            ox1, oy1, ox2, oy2, olength = mappingDict['lineMapping'][overlapIndex]['rline']
+                            tx1, ty1, tx2, ty2, tlength = mappingDict['lineMapping'][lineIndex]['rline']
+                            
+                            if mode == 'hor':
+                                if ox1 > tx1 - tlength/10 and ox2 < tx2 + tlength/10:
+                                    isNoise = True
+                                    if overlapIndex not in noisePool:
+                                        noisePool.append(overlapIndex)
+                            elif mode == 'ver':
+
+                                if oy1 > ty1 - tlength/10 and oy2 < ty2 + tlength/10:
+                                    
+                                    isNoise = True
+                                    if overlapIndex not in noisePool:
+                                        noisePool.append(overlapIndex)
+
+                if isNoise:
+                    if mode == 'hor':
+                        print lineIndex, noisePool
+                    overlapIndexCheckList = []
+                    for noiseIndex in noisePool:
+                        noiseIndexes.append(noiseIndex)
+                        lineDict['noise'][noiseIndex] = mappingDict['lineMapping'][noiseIndex].copy()
+                        for subNoiseIndex, subnoises in mappingDict['lineMapping'][noiseIndex]['noise'].items():
+                            lineDict['noise'][subNoiseIndex] = subnoises.copy()
+                        mask[PhyloParser.mapping2Dto3D(np.where(mask[:,:,0] == noiseIndex), 0)] = lineIndex
+                        for overlapIndex in mappingDict['lineMapping'][noiseIndex]['overlap']:
+                            if noiseIndex == 9:
+                                print overlapIndex
+                            if noiseIndex in mappingDict['overlapMapping'][overlapIndex]:
+                                mappingDict['overlapMapping'][overlapIndex].remove(noiseIndex)
+                            overlapIndexCheckList.append(overlapIndex)
+
+                    if len(overlapIndexCheckList) >0:
+                        for overlapMappingIndex in overlapIndexCheckList:
+                            
+                            if len(mappingDict['overlapMapping'][overlapMappingIndex])<2:
+                                if mode == 'hor':
+                                    print overlapMappingIndex, 'has been removed'
+                                mask[PhyloParser.mapping2Dto3D(np.where(mask[:,:,1] == overlapMappingIndex), 1)] = 0
+                                for overlapIndex in mappingDict['overlapMapping'][overlapMappingIndex]:
+                                    if overlapMappingIndex in mappingDict['lineMapping'][overlapIndex]['overlap']:
+                                        mappingDict['lineMapping'][overlapIndex]['overlap'].remove(overlapMappingIndex)
+                                if overlapMappingIndex not in noiseOverlapIndexes:
+                                    noiseOverlapIndexes.append(overlapMappingIndex)
+                                
+                                # print mappingDict
+        if mode == 'hor':
+            print '----------------------------Before deleting-------------------------'
+            print mappingDict
+
+            for noiseIndex in noiseIndexes:
+                del mappingDict['lineMapping'][noiseIndex]
+
+            for noiseIndex in noiseOverlapIndexes:
+                del mappingDict['overlapMapping'][noiseIndex]
+            print '----------------------------After deleting-------------------------'
+            print mappingDict
+
+        for lineIndex, lineDict in mappingDict['lineMapping'].items():
+            lineList.append(lineDict['rline'])
+
+        if mode == 'hor':
+            print mappingDict
 
         return lineList, mask, mappingDict
 
@@ -1290,6 +1390,10 @@ class PhyloParser():
         mappingDict['lineMapping'][mapIndex]['length'] = (sumLength + length) / countLength
 
         return mappingDict
+    # @staticmethod
+    # def isSameLineGroup_advanced(line, voteNumber, mappingDict, mappingMask):
+        
+
 
     @staticmethod
     def isSameLineGroup(length1, length2):
@@ -1325,7 +1429,21 @@ class PhyloParser():
         #     PhyloParser.displayImage(mask[:,:,0])
         #     PhyloParser.displayImage(mask[:,:,1])
 
+        if mode == 'hor' and newOverlapIndex == 5:
+            print mappingDict
+            print mapIndex, overlapIndex, newOverlapIndex
+        if mode == 'hor' and overlapIndex == 5:
+            print mappingDict
+            print mapIndex, overlapIndex, newOverlapIndex
+            print mappingDict['overlapMapping'][overlapIndex]
 
+        if mode == 'hor' and newOverlapIndex == 6:
+            print mappingDict
+            print mapIndex, overlapIndex, newOverlapIndex
+        if mode == 'hor' and overlapIndex == 6:
+            print mappingDict
+            print mapIndex, overlapIndex, newOverlapIndex
+            print mappingDict['overlapMapping'][overlapIndex]
 
 
         overlapCoverRange = np.where(drawMask == 155)
@@ -1349,8 +1467,8 @@ class PhyloParser():
 
                         if not isArchived:
                             mappingDict['overlapMapping'][newOverlapIndex] = [mapIndex, coverIndex]
-                            mappingDict['lineMapping'][mapIndex]['overlap'] = [newOverlapIndex]
-                            mappingDict['lineMapping'][coverIndex]['overlap'] = [newOverlapIndex]                
+                            mappingDict['lineMapping'][mapIndex]['overlap'].append(newOverlapIndex)
+                            mappingDict['lineMapping'][coverIndex]['overlap'].append(newOverlapIndex)             
                             drawRange = PhyloParser.mapping2Dto3D(np.where((drawMask == 205) & (mask[:,:,0] == coverIndex)), 1)
                             mask[drawRange] = newOverlapIndex
                             newOverlapIndex+=1
@@ -1386,7 +1504,10 @@ class PhyloParser():
             for nonzeroIndex in nonzeroIndexes:                
                 if mapIndex not in mappingDict['overlapMapping'][nonzeroIndex]:
                     mappingDict['overlapMapping'][newOverlapIndex] = [mapIndex]
+                    mappingDict['lineMapping'][mapIndex]['overlap'].append(newOverlapIndex)
                     mappingDict['overlapMapping'][newOverlapIndex] += mappingDict['overlapMapping'][nonzeroIndex]
+                    for walalalaIndex in mappingDict['overlapMapping'][nonzeroIndex]:
+                        mappingDict['lineMapping'][walalalaIndex]['overlap'].append(newOverlapIndex)
                     drawRange = PhyloParser.mapping2Dto3D(np.where((drawMask == 155) & (mask[:,:,1] == nonzeroIndex)), 1)
                     mask[drawRange] = newOverlapIndex
                     newOverlapIndex+=1
@@ -2812,12 +2933,21 @@ class PhyloParser():
     def matchLines(self, image_data, debug = False):
 
         if image_data.lineDetected:
-            image_data = self.matchParent(image_data)
-            image_data = self.matchChildren(image_data)
+            # image_data = self.matchParent(image_data)
+            # image_data = self.matchChildren(image_data)
             # image_data = self.removeText(image_data)
-            # image_data = self.matchParent_new(image_data)
-            # image_data.displayTargetLines('parent')
+            image_data = self.matchParent_new(image_data)
 
+            image_data = self.matchChildren_new(image_data)
+            # print image_data.horLineMappingDict
+
+            # image_data.displayTargetLines('children')
+            # image_data.displayTargetLines('parent')
+            # for key, value in image_data.horLineMappingDict['lineMapping'].items():
+
+            #     print key, value
+            # print image_data.horLineMappingDict
+            # print image_data.verLineMappingDict
             if debug:
                 image_data.displayTargetLines('parent')
                 image_data.displayTargetLines('children')
@@ -2830,13 +2960,79 @@ class PhyloParser():
     #         print "Error! Please do detectLines before this method"
         
         
-    #     return image_data
+        return image_data
 
     
     # @staticmethod
     # # your display() method
     # def displayTree(root):
     #     return
+
+    def matchChildren_new(self, image_data):
+        horLines = image_data.horLines
+        verLines = image_data.verLines
+        horLineMask = image_data.horLineMask
+        verLineMask = image_data.verLineMask
+        horLineMappingDict = image_data.horLineMappingDict
+        verLineMappingDict = image_data.verLineMappingDict
+
+        height, width, dim = horLineMask.shape
+
+        children = []
+        anchorLines = []
+
+        for verLineIndex, verLineGroup in verLineMappingDict['lineMapping'].items():
+            overlapArea = np.where((verLineMask[:,:,0] == verLineIndex) & (horLineMask[:,:,1] != 0))
+            overlapIndexes = horLineMask[PhyloParser.mapping2Dto3D(overlapArea, 1)]
+            intersectionArea = np.where((verLineMask[:,:,0] == verLineIndex) & (horLineMask[:,:,0] != 0))
+            intersectionIndexes = list(horLineMask[PhyloParser.mapping2Dto3D(intersectionArea, 0)])
+            print 'step1', intersectionIndexes
+            print overlapIndexes
+            for overlapIndex in overlapIndexes:
+                intersectionIndexes += list(horLineMappingDict['overlapMapping'][overlapIndex])
+            print 'step2', intersectionIndexes
+            potentialChildren = list(set(intersectionIndexes))
+            midPoint = verLineGroup['midPoint']
+            leaves = []
+            leavesIndex = []
+            for potChildIndex in potentialChildren:
+                horMidPoint = horLineMappingDict['lineMapping'][potChildIndex]['midPoint']
+                if PhyloParser.isPointOnTheRight(midPoint, horMidPoint):
+                    leaves.append(horLineMappingDict['lineMapping'][potChildIndex]['rline'])
+                    leavesIndex.append(potChildIndex)
+                    if horLineMappingDict['lineMapping'][potChildIndex]['type'] != 'interLine':
+                        horLineMappingDict['lineMapping'][potChildIndex]['type'] = 'anchorLine'
+                        anchorLines.append(horLineMappingDict['lineMapping'][potChildIndex]['rline'])
+            
+            leaves = sorted(leaves, key = lambda x: x[1])
+            if len(leaves)>=2:
+                children.append(((verLineGroup['rline'], tuple(leaves)), 0))
+            elif len(leaves) ==1:
+                x1, y1, x2, y2, length = leaves[0]
+                vx1, vy1, vx2, vy2, vlength = verLineGroup['rline']
+                if abs(y1 - vy1) > abs(y1 - vy2):
+                    leaves.insert(0, None)
+                else:
+                    leaves.append(None)
+
+                children.append(((verLineGroup['rline'], tuple(leaves)), 0))
+
+
+        image_data.children = children
+        image_data.anchorLines = anchorLines
+
+        return image_data
+
+    @staticmethod
+    def isPointOnTheRight(refPoint, targetPoint):
+        y1, x1 = refPoint
+        y2, x2 = targetPoint
+
+        if x2 > x1:
+            return True
+        else:
+            return False            
+
 
     def matchParent_new(self, image_data):
 
@@ -2853,41 +3049,75 @@ class PhyloParser():
 
         for horLineIndex, horLineGroup in horLineMappingDict['lineMapping'].items():
             horLineGroup['type'] = None
-            intersectionMask = np.zeros((height, width), dtype = np.uint8)
+            overlapArea = np.where((horLineMask[:,:,0] == horLineIndex) & (verLineMask[:,:,1] !=0))
+            overlapIndexes = verLineMask[PhyloParser.mapping2Dto3D(overlapArea, 1)]
+            intersectArea = np.where((horLineMask[:,:,0] == horLineIndex) & (verLineMask[:,:,0] != 0))
+            intersectIndexes = list(verLineMask[PhyloParser.mapping2Dto3D(intersectArea, 0)])
 
-            overlapIndexes = np.where((horLineMask[:,:,0] == horLineIndex) & (verLineMask[:,:,1] !=0))
+            for overlapIndex in overlapIndexes:
+                intersectIndexes += list(verLineMappingDict['overlapMapping'][overlapIndex])
+
+            potentialParents = list(set(intersectIndexes))
+            midPoint = horLineGroup['midPoint']
+            realParent = []
+            realParentIndex = []
             isFound = False
-            if len(overlapIndexes[0]) == 0:
-                intersectionIndexes = np.where((horLineMask[:,:,0] == horLineIndex) & (verLineMask[:,:,0] != 0))
-                
-                midPoint = horLineGroup['midPoint']
-                rightEndIndexes = PhyloParser.getThePointsOnTheRightEnd(intersectionIndexes, midPoint)
-                
-                if len(rightEndIndexes[0])!=0:
-                    indexNumberList = verLineMask[PhyloParser.mapping2Dto3D(rightEndIndexes, 0)]
-                    uniqueIndexes = list(set(indexNumberList))
-                    for index in uniqueIndexes:
-                        parent = ((horLineGroup['rline'], verLineMappingDict['lineMapping'][index]['rline']), 0 )
-                        parents.append(parent)
-                        horLineGroup['parent'].append(index)
-                        verLineMappingDict['lineMapping'][index]['parent'].append(horLineIndex)
-                        isFound = True
-            else:
-                rightEndIndexes = PhyloParser.getThePointsOnTheRightEnd(overlapIndexes, midPoint)
-                if len(rightEndIndexes[0])!=0:
-                    indexNumberList = verLineMask[PhyloParser.mapping2Dto3D(rightEndIndexes, 1)]
-                    uniqueIndexes = list(set(indexNumberList))
-                    for overlapIndex in uniqueIndexes:
-                        parentCandidates = verLineMappingDict['overlapMapping'][overlapIndex]
-                        for index in parentCandidates:
-                            parent = ((horLineGroup['rline'], verLineMappingDict['lineMapping'][index]['rline']), 0 )
-                            parents.append(parent)
-                            horLineGroup['parent'].append(index)
-                            verLineMappingDict['lineMapping'][index]['parent'].append(horLineIndex)
-                            isFound = True
+            for potParentIndex in potentialParents:
+                verMidPoint = verLineMappingDict['lineMapping'][potParentIndex]['midPoint']
+                if PhyloParser.isPointOnTheRight(midPoint, verMidPoint):
+                    realParent.append(verLineMappingDict['lineMapping'][potParentIndex]['rline'])
+                    realParentIndex.append(potParentIndex)
+                    parent = ((horLineGroup['rline'], verLineMappingDict['lineMapping'][potParentIndex]['rline']), 0)
+                    parents.append(parent)
+                    isFound = True
             if isFound:
-                interLines.append(horLineGroup['rline'])
                 horLineGroup['type'] = 'interLine'
+                interLines.append(horLineGroup['rline'])
+                horLineGroup['parent'] = realParentIndex
+
+
+            # overlapIndexes = np.where((horLineMask[:,:,0] == horLineIndex) & (verLineMask[:,:,1] !=0))
+            # if horLineGroup['rline'] ==  (174, 482, 355, 482, 181):
+            #     print 'overlap', overlapIndexes
+            # isFound = False
+            # if len(overlapIndexes[0]) == 0:
+            #     intersectionIndexes = np.where((horLineMask[:,:,0] == horLineIndex) & (verLineMask[:,:,0] != 0))
+            #     if horLineGroup['rline'] == (174, 482, 355, 482, 181):
+            #         print 'intersect', intersectionIndexes
+            #     midPoint = horLineGroup['midPoint']
+            #     rightEndIndexes = PhyloParser.getThePointsOnTheRightEnd(intersectionIndexes, midPoint)
+                
+            #     if len(rightEndIndexes[0])!=0:
+            #         indexNumberList = verLineMask[PhyloParser.mapping2Dto3D(rightEndIndexes, 0)]
+            #         uniqueIndexes = list(set(indexNumberList))
+            #         for index in uniqueIndexes:
+            #             parent = ((horLineGroup['rline'], verLineMappingDict['lineMapping'][index]['rline']), 0 )
+            #             parents.append(parent)
+            #             horLineGroup['parent'].append(index)
+            #             verLineMappingDict['lineMapping'][index]['parent'].append(horLineIndex)
+            #             isFound = True
+            # else:
+            #     midPoint = horLineGroup['midPoint']
+            #     rightEndIndexes = PhyloParser.getThePointsOnTheRightEnd(overlapIndexes, midPoint)
+            #     if horLineGroup['rline'] == (174, 482, 355, 482, 181):
+            #         print 'rightEnd', rightEndIndexes
+            #         print np.where(verLineMask[:,:,0] == 12)
+            #     if len(rightEndIndexes[0])!=0:
+            #         indexNumberList = verLineMask[PhyloParser.mapping2Dto3D(rightEndIndexes, 1)]
+            #         if horLineGroup['rline'] == (174, 482, 355, 482, 181):
+            #             print 'indexNumber', indexNumberList
+            #         uniqueIndexes = list(set(indexNumberList))
+            #         for overlapIndex in uniqueIndexes:
+            #             parentCandidates = verLineMappingDict['overlapMapping'][overlapIndex]
+            #             for index in parentCandidates:
+            #                 parent = ((horLineGroup['rline'], verLineMappingDict['lineMapping'][index]['rline']), 0 )
+            #                 parents.append(parent)
+            #                 horLineGroup['parent'].append(index)
+            #                 verLineMappingDict['lineMapping'][index]['parent'].append(horLineIndex)
+            #                 isFound = True
+            # if isFound:
+            #     interLines.append(horLineGroup['rline'])
+            #     horLineGroup['type'] = 'interLine'
 
         image_data.parent = parents
         image_data.interLines = interLines
@@ -2912,9 +3142,10 @@ class PhyloParser():
         rightEndY = []
         rightEndX = []
         my, mx = midPoint
+
         for index, x in enumerate(intersecRange[1]):
-            print x, mx
-            if x > mx:
+            
+            if x >= mx:
                 rightEndX.append(x)
                 rightEndY.append(intersecRange[0][index])
         rightEnd = (np.asarray(rightEndY), np.asarray(rightEndX))
@@ -5408,8 +5639,10 @@ class PhyloParser():
             pass
 
             # Gather trees from nodes
+
             # second tracing
             image_data = self.createRootList(image_data, tracing)
+
 
             if debug:
                 image_data.displayTrees('regular')
@@ -5422,7 +5655,10 @@ class PhyloParser():
                 ## Fix false-positive sub-trees and mandatorily connect sub-trees
                 image_data = self.fixTrees(image_data)
 
-                image_data = self.checkAnchorLines(image_data)
+
+                # image_data = self.checkAnchorLines(image_data)
+
+
                 image_data = self.recoverLineFromText(image_data)
                 image_data = self.checkDone(image_data)
                 
@@ -6419,11 +6655,11 @@ class PhyloParser():
 
         if tracing:
             print 'Before first Tracing'
-            # PhyloParser.displayImage(lineCoveredMask)
+            PhyloParser.displayImage(lineCoveredMask)
 
             lineCoveredMask, brokenNodes, nodeList = PhyloParser.findMissingLines(brokenNodes, nodeList, image_data, mask = lineCoveredMask)
             print 'After first Tracing'
-            # PhyloParser.displayImage(lineCoveredMask)
+            PhyloParser.displayImage(lineCoveredMask)
 
         # image_data = PhyloParser.purifyNodes(image_data)
 
@@ -6699,6 +6935,7 @@ class PhyloParser():
                     if not (len(trunk.leaves) == 0 and len(trunk.interLines) == 0):
                         node, mask, refinedLines = PhyloParser.matchNodeAndTrunk(node, trunk, mask, refinedLines)
 
+
                 else:
                     trunk = trunkList[0]
                     if not (len(trunk.leaves) == 0 and len(trunk.interLines) == 0):
@@ -6907,8 +7144,8 @@ class PhyloParser():
 
             current_trunk = PhyloParser.traceTrunk(image, history_map, current_trunk)
             
-#             print "point2Trunk", point2Trunk
-#             PhyloParser.displayTrunk(image, current_trunk)
+            # print "point2Trunk", point2Trunk
+            PhyloParser.displayTrunk(image, current_trunk)
             
             trunkList.append(current_trunk)
             
