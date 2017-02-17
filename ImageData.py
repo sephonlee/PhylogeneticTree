@@ -25,8 +25,8 @@ class ImageData():
     image_height = None
     image_width = None
     linesList = []
-    horLines = []
-    verLines = []
+    horLines = [] # modified by removedRepeatedLines
+    verLines = [] # modified by removedRepeatedLines
     lineDetected = False
     
     # filled by detectCorner
@@ -45,6 +45,13 @@ class ImageData():
     horLineGroup = []
     verLineGroup = []
     lineRefined = False
+
+    # filled by removedRepeatedLines
+    horLineMask = None
+    horLineMappingDict = None
+    verLineMask = None
+    verLineMappingDict = None
+
     
     # filled by matchLine
     cleanImage = None
@@ -67,6 +74,8 @@ class ImageData():
     nodeList = []
     rootList = []
     lineCoveredMask = None # It is a mask that indicates lines covered by nodes
+    searchNodesMask = None  
+    nodesMappingDict = None 
     treeHead = None # Head of the tree
     treeReady = False
     treeStructure = None
@@ -366,4 +375,14 @@ class ImageData():
             print "something bad happens" 
             treeString = self.treeHead.getTreeString()## For now, it still defines the tree head. However, we need something else returned to notice it's not perfect
             return treeString ## For now, it still defines the tree head. However, we need something else returned to notice it's not perfect
-                
+    def printMappingDict(self):
+        for key, value in self.mappingDict.items():
+            if key == 'overlapMapping':
+                print value
+            elif key == 'lineMapping':
+                for indexKey, mapValue in value.items():
+                    print '----------------------------'
+                    print 'Index = ',indexKey
+                    print 'length = ', mapValue['length']
+                    print 'overlap = ', mapValue['overlap']
+                    print 'linegroup: ', mapValue['lineGroup']

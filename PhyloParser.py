@@ -225,6 +225,12 @@ class PhyloParser():
 
         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(255 - PhyloParser.negateImage(image)) 
 
+
+
+        
+        # PhyloParser.displayImage(image_data.treeMask)
+        # PhyloParser.displayImage(image_data.nonTreeMask)
+
         # Old method using sliding window
         # image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(edgeMask)
 
@@ -245,8 +251,6 @@ class PhyloParser():
     @staticmethod
     def removeBackground(image):
         hist1, bins = np.histogram(image.ravel(),256,[0,256])
-        # print hist1
-
 
         CANNY_THRESH_1 = 100
         CANNY_THRESH_2 = 200
@@ -454,6 +458,101 @@ class PhyloParser():
     @staticmethod
     def sortByCntsLength(item):
         return -len(item)
+
+
+
+    @staticmethod
+    # return a mask of the tree, a mask of text and contours
+    def findContours_original(var_mask1, var_mask2 = None):
+
+        var_mask1 = 255 - var_mask1
+
+        height, width = var_mask1.shape
+        var_mask1 = cv.copyMakeBorder(var_mask1, 1, 1, 1, 1, cv.BORDER_CONSTANT, value = 0)
+        _, contours, hierarchy= cv.findContours(var_mask1.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+        
+        lenghtList = []
+        for cnts in contours:
+            lenghtList.append(len(cnts))
+            for index, points in enumerate(cnts):
+                cnts[index] = points - 1 #shift back (because of padding)
+           
+        maxValue = 0
+        maxIndex = 0
+
+        for index, cnts in enumerate(contours):
+            if len(cnts) > maxValue:
+                index = maxIndex
+                maxValue = len(cnts)
+
+
+        
+        # hierarchy = hierarchy[0].tolist()
+        # temp =  zip(contours, hierarchy)
+        # temp = sorted(temp, key = lambda x: -len(x[0]))
+        # contours = [x for x, y in temp]
+        # hierarchy = [y for x, y in temp]
+        
+
+        mask = np.zeros((height,width), dtype=np.uint8)
+
+        cv.drawContours(mask, contours, maxIndex, (255), thickness = -1)
+        print 'mask'
+
+
+        kernel = np.ones((5,5), np.uint8)
+        tmpMask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
+        
+
+        compensateMask = np.zeros((height, width), dtype = np.uint8)
+        cv.drawContours(compensateMask, contours, maxIndex, (255), thickness = -1)
+
+
+#         PhyloParser.displayImage(var_mask1)
+#         PhyloParser.displayImage(255-var_mask2)
+#         PhyloParser.displayImage(mask)
+        
+        nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+
+        cv.drawContours(nonTreeMask, contours, -1, (255), thickness = -1)
+        nonTreeMask[np.where(compensateMask == 255)] = 0
+        cv.drawContours(nonTreeMask, contours, -1, (255), thickness = -1, hierarchy = hierarchy, maxLevel = 5)
+        nonTreeMask[np.where(tmpMask == 255)] = 0
+
+
+
+
+#         for index in range(0, len(contours)):
+# #             print contours
+# #             nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+#             # draw only contour in level 0
+#             if index!=maxIndex:
+#                 if hierarchy[0][index][3] == -1:
+#                     cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
+#                     textContours.append(contours[index])
+#     #             print hierarchy[index][3] == -1
+#     #             PhyloParser.displayImage(nonTreeMask)
+#             else:
+#                 cv.drawContours(nonTreeMask, contours, index, (255), thickness)
+
+
+#         textContours = []
+#         for index in range(1, len(contours)):
+# #             print contours
+# #             nonTreeMask = np.zeros((height, width), dtype = np.uint8)
+#             # draw only contour in level 0
+#             if hierarchy[index][3] == -1:
+#                 cv.drawContours(nonTreeMask, contours, index, (255), thickness = -1)
+#                 textContours.append(contours[index])
+# #             print hierarchy[index][3] == -1
+# #             PhyloParser.displayImage(nonTreeMask)
+
+# #         PhyloParser.displayImage(nonTreeMask)
+        return mask, nonTreeMask, contours, hierarchy
+
+
+
+
 
     @staticmethod
     # return a mask of the tree, a mask of text and contours
@@ -1071,6 +1170,301 @@ class PhyloParser():
         plt.show()
 
 
+    @staticmethod
+    def removeRepeatedLines(image_data):
+        horLines = image_data.horLines[:]
+        verLines = image_data.verLines[:]
+        if image_data.preprocessed:    
+            image = image_data.image_preproc.copy()
+        else:
+            image = image_data.image.copy()
+        height, width = image.shape
+
+        horLineMask = np.zeros((height, width, 2), dtype = np.uint8)
+        verLineMask = np.zeros((height, width, 2), dtype = np.uint8)
+
+        horLineMappingDict = {}
+        horLineMappingDict['lineMapping'] = {}
+        horLineMappingDict['overlapMapping'] = {}
+        verLineMappingDict = {}
+        verLineMappingDict['lineMapping'] = {}
+        verLineMappingDict['overlapMapping'] = {} 
+
+        image_data.horLines, image_data.horLineMask, image_data.horLineMappingDict = PhyloParser.getUniqueLinesList(horLines, horLineMask, horLineMappingDict, mode = 'hor')
+        image_data.verLines, image_data.verLineMask, image_data.verLineMappingDict = PhyloParser.getUniqueLinesList(verLines, verLineMask, verLineMappingDict, mode = 'ver')
+
+        # PhyloParser.displayImage(image_data.horLineMask[:,:,0])
+        # PhyloParser.displayImage(image_data.verLineMask[:,:,0])
+
+        return image_data
+
+
+    @staticmethod
+    def getUniqueLinesList(lineList, mask, mappingDict, mode):
+        if mode == 'hor':
+            lineList = sorted(lineList, key = lambda x: x[1])
+        elif mode == 'ver':
+            lineList = sorted(lineList, key = lambda x: x[0])
+
+        mapIndex = 1
+        overlapIndex = 1
+
+        for line in lineList:
+
+            x1, y1, x2, y2, length = line
+            if mode == 'hor':
+                overlapNumber = PhyloParser.getVoteNumber(mask[y1:y2+1, x1:x2, 1], mode = 'overlap')
+            elif mode == 'ver':
+                overlapNumber = PhyloParser.getVoteNumber(mask[y1:y2, x1:x2+1, 1], mode = 'overlap')
+            if overlapNumber == 0:
+                if mode == 'hor':
+                    voteNumber=PhyloParser.getVoteNumber(mask[y1:y2+1, x1:x2, 0])
+                elif mode == 'ver':
+                    voteNumber = PhyloParser.getVoteNumber(mask[y1:y2, x1:x2+1, 0])
+                if voteNumber == 0:
+                    mappingDict['lineMapping'][mapIndex] = {}
+                    mappingDict['lineMapping'][mapIndex]['length'] = length
+                    mappingDict['lineMapping'][mapIndex]['lineGroup'] = [line]
+                    mappingDict['lineMapping'][mapIndex]['overlap'] = []
+                    overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex, mode = mode)
+                    mapIndex +=1
+                else:
+                    if PhyloParser.isSameLineGroup(length, mappingDict['lineMapping'][voteNumber]['length']):
+                        mappingDict['lineMapping'][voteNumber]['lineGroup'].append(line)
+                        PhyloParser.updateAverageLength(mappingDict, voteNumber, line)
+
+                        overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, voteNumber, overlapIndex, mode = mode)
+                    else:
+                        
+                        mappingDict['lineMapping'][mapIndex] = {}
+                        mappingDict['lineMapping'][mapIndex]['length'] = length
+                        mappingDict['lineMapping'][mapIndex]['lineGroup'] = [line]
+                        mappingDict['lineMapping'][mapIndex]['overlap'] = [overlapIndex]
+                        if overlapIndex not in mappingDict['lineMapping'][voteNumber]['overlap']:
+                            mappingDict['lineMapping'][voteNumber]['overlap'].append(overlapIndex)
+                        mappingDict['overlapMapping'][overlapIndex] = [mapIndex, voteNumber]
+
+                        overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex+1, mode = mode, overlapIndex = overlapIndex)
+                        mapIndex+=1
+            else:
+                isFound = False
+
+                for lineIndex in mappingDict['overlapMapping'][overlapNumber]:                 
+                    if PhyloParser.isSameLineGroup(length, mappingDict['lineMapping'][lineIndex]['length']):
+                        mappingDict['lineMapping'][lineIndex]['lineGroup'].append(line)
+                        PhyloParser.updateAverageLength(mappingDict, lineIndex, line)
+                        isFound = True
+
+                        overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, lineIndex, overlapIndex, mode, overlapIndex = overlapNumber)
+
+                if not isFound:
+                    mappingDict['lineMapping'][mapIndex] = {}
+                    mappingDict['lineMapping'][mapIndex]['length'] = length
+                    mappingDict['lineMapping'][mapIndex]['lineGroup'] = [line]
+                    mappingDict['lineMapping'][mapIndex]['overlap'] = [overlapNumber]
+                    mappingDict['overlapMapping'][overlapNumber].append(mapIndex)
+                    overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex, mode, overlapIndex = overlapNumber)
+
+        lineList = []
+
+        for lineIndex, lineDict in mappingDict['lineMapping'].items():
+            lineDict['parent'] = []
+            lineDict['type'] = None
+            targetIndex = len(lineDict['lineGroup'])/2
+            targetLine = lineDict['lineGroup'][targetIndex]
+            x1, y1, x2, y2, length = targetLine
+            lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
+            lineDict['rline'] = targetLine
+            lineList.append(targetLine)
+
+        return lineList, mask, mappingDict
+
+
+
+    @staticmethod
+    def updateAverageLength(mappingDict, mapIndex, line):
+        x1, y1, x2, y2, length = line
+        countLength = len(mappingDict['lineMapping'][mapIndex]['lineGroup']) 
+        sumLength = mappingDict['lineMapping'][mapIndex]['length'] * (countLength - 1)
+        mappingDict['lineMapping'][mapIndex]['length'] = (sumLength + length) / countLength
+
+        return mappingDict
+
+    @staticmethod
+    def isSameLineGroup(length1, length2):
+        if length2 > length1:
+            margin = float(length2) / 10 +2
+
+            if length2 < length1 + margin:
+                return True
+            else:
+                return False
+        else:
+            margin = float(length1) / 10 +2
+            if length1 < length2 + margin:
+                return True
+            else:
+                return False
+
+
+    @staticmethod
+    def drawLine_lineVersion(line, mappingDict, mask, mapIndex, newOverlapIndex, mode, overlapIndex = None):
+
+        x1, y1, x2, y2, length = line
+
+
+        drawMask = PhyloParser.getLineCoverRange_lineVersion(line, mask, mode, margin = 3)
+
+        # if mapIndex == 9:
+        #     hist1, bins = np.histogram(drawMask.ravel(),256,[0,256])
+        #     print hist1
+        #     print np.where((drawMask != 0) & (mask[:,:,1] != 0))
+
+        #     PhyloParser.displayImage(drawMask)
+        #     PhyloParser.displayImage(mask[:,:,0])
+        #     PhyloParser.displayImage(mask[:,:,1])
+
+
+
+
+        overlapCoverRange = np.where(drawMask == 155)
+        isCovered = np.where(drawMask == 205)
+        basicDrawRange = PhyloParser.mapping2Dto3D(np.where(drawMask == 255), 0)
+        mask[basicDrawRange] = mapIndex
+
+            
+        if len(isCovered[0]) != 0:
+            if overlapIndex == None:
+                drawRange = PhyloParser.mapping2Dto3D(isCovered, 0)
+                countCoveredIndexes = np.bincount(mask[drawRange])
+                nonzeroIndexes = np.nonzero(countCoveredIndexes)[0]
+                seen = [] 
+                for coverIndex in nonzeroIndexes:
+                    if coverIndex != mapIndex:
+                        isArchived = False
+                        for existedOverlapIndex in mappingDict['lineMapping'][mapIndex]['overlap']:
+                            if coverIndex in mappingDict['overlapMapping'][existedOverlapIndex]:
+                                isArchived = True
+
+                        if not isArchived:
+                            mappingDict['overlapMapping'][newOverlapIndex] = [mapIndex, coverIndex]
+                            mappingDict['lineMapping'][mapIndex]['overlap'] = [newOverlapIndex]
+                            mappingDict['lineMapping'][coverIndex]['overlap'] = [newOverlapIndex]                
+                            drawRange = PhyloParser.mapping2Dto3D(np.where((drawMask == 205) & (mask[:,:,0] == coverIndex)), 1)
+                            mask[drawRange] = newOverlapIndex
+                            newOverlapIndex+=1
+
+
+            else:
+                drawRange = PhyloParser.mapping2Dto3D(isCovered, 0)
+                countCoveredIndexes = np.bincount(mask[drawRange])
+                nonzeroIndexes = np.nonzero(countCoveredIndexes)[0]
+
+                for coverIndex in nonzeroIndexes:
+                    if coverIndex != mapIndex:
+                        if coverIndex in mappingDict['overlapMapping'][overlapIndex]:
+                            drawRange = PhyloParser.mapping2Dto3D(np.where((drawMask == 205) & (mask[:,:,0] == coverIndex)), 1)                        
+                            mask[drawRange] = overlapIndex
+                        else:
+
+                            mappingDict['overlapMapping'][newOverlapIndex] = [coverIndex, mapIndex]
+                            drawRange = PhyloParser.mapping2Dto3D(np.where((drawMask == 205) & (mask[:,:,0] == coverIndex)), 1)
+                            mask[drawRange] = newOverlapIndex
+                            newOverlapIndex +=1                       
+
+
+
+
+        if len(overlapCoverRange[0]) != 0:
+
+            drawRange = PhyloParser.mapping2Dto3D(overlapCoverRange, 1)
+            countCoveredIndexes = np.bincount(mask[drawRange])
+            nonzeroIndexes = np.nonzero(countCoveredIndexes)[0]                
+
+
+            for nonzeroIndex in nonzeroIndexes:                
+                if mapIndex not in mappingDict['overlapMapping'][nonzeroIndex]:
+                    mappingDict['overlapMapping'][newOverlapIndex] = [mapIndex]
+                    mappingDict['overlapMapping'][newOverlapIndex] += mappingDict['overlapMapping'][nonzeroIndex]
+                    drawRange = PhyloParser.mapping2Dto3D(np.where((drawMask == 155) & (mask[:,:,1] == nonzeroIndex)), 1)
+                    mask[drawRange] = newOverlapIndex
+                    newOverlapIndex+=1
+                else:
+                    drawRange = PhyloParser.mapping2Dto3D(np.where((drawMask == 155) & (mask[:,:,1] == nonzeroIndex)), 1)
+                    mask[drawRange] = nonzeroIndex
+
+          
+            # else:
+            #     print 'wahaha'
+                # drawRange = PhyloParser.mapping2Dto3D(overlapRange, 1)
+                # countCoveredIndexes = np.bincount(drawRange[0])
+                # nonzeroIndexes = np.nonzero(countCoveredIndexes)[0]
+                # for coverIndex in nonzeroIndexes:
+                #     if coverIndex != overlapIndex:
+
+
+        return newOverlapIndex, mappingDict
+    @staticmethod
+    def mapping2Dto3D(oriRange, dim, mode = None):
+        oriRange = list(oriRange)
+        lenRange = len(oriRange[0])
+        if mode == 'modify':
+            oriRange.pop(-1)
+
+        if dim == 0:
+            thirdDim = np.zeros(lenRange, dtype = np.uint8)
+        elif dim == 1:
+            thirdDim = np.ones(lenRange, dtype = np.uint8)
+
+        oriRange.append(thirdDim)
+        oriRange = tuple(oriRange)
+        return oriRange
+
+
+        
+
+    @staticmethod
+    def getLineCoverRange_lineVersion(line, lineMask, mode, margin = 3):
+        shape = lineMask.shape
+        height, width, dimension = shape
+        mask = np.zeros((shape[0], shape[1]), dtype = np.uint8)
+        nonzeroMask_basic = np.zeros((shape[0], shape[1]), dtype = np.uint8)
+        nonzeroMask_overlap = np.zeros((shape[0], shape[1]), dtype = np.uint8)
+        x1, y1, x2, y2, length = line
+        if mode == 'hor':
+            xStart = x1
+            xEnd = x2
+            yStart = y1-margin
+            yEnd = y2+1+margin
+
+            if yStart < 0:
+                yStart = 0
+            if yEnd >=height:
+                yEnd = height -1
+
+        elif mode == 'ver':
+            xStart = x1-margin
+            xEnd = x2+margin+1
+            yStart = y1
+            yEnd = y2
+
+            if xStart<0:
+                xStart = 0
+            if xEnd >= width:
+                xEnd = width-1
+
+
+        mask[yStart:yEnd, xStart:xEnd] = 255
+        
+
+        mask[np.where((mask == 255) & (lineMask[:,:,0] !=0))] -= 50
+
+        
+
+        mask[np.where((mask !=0) & (lineMask[:,:,1] !=0))] -=50
+
+
+        return mask
 
     @staticmethod
     def testing(image_data):
@@ -1454,8 +1848,8 @@ class PhyloParser():
 
 
 
-        image_data.horLines = PhyloParser.purifyLines(image_data.horLines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'hor')
-        image_data.verLines = PhyloParser.purifyLines(image_data.verLines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'ver')
+        horLines = PhyloParser.purifyLines(image_data.horLines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'hor')
+        verLines = PhyloParser.purifyLines(image_data.verLines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'ver')
        
         if debug:
             print "detectLines debugging"
@@ -2420,7 +2814,9 @@ class PhyloParser():
             image_data = self.matchParent(image_data)
             image_data = self.matchChildren(image_data)
             # image_data = self.removeText(image_data)
-            
+            # image_data = self.matchParent_new(image_data)
+            # image_data.displayTargetLines('parent')
+
             if debug:
                 image_data.displayTargetLines('parent')
                 image_data.displayTargetLines('children')
@@ -2429,17 +2825,100 @@ class PhyloParser():
             
             image_data.lineMatched = True
             
-        else:
-            print "Error! Please do detectLines before this method"
+    #     else:
+    #         print "Error! Please do detectLines before this method"
         
         
-        return image_data
+    #     return image_data
 
     
+    # @staticmethod
+    # # your display() method
+    # def displayTree(root):
+    #     return
+
+    def matchParent_new(self, image_data):
+
+        horLines = image_data.horLines
+        verLines = image_data.verLines
+        horLineMask = image_data.horLineMask
+        verLineMask = image_data.verLineMask
+        horLineMappingDict = image_data.horLineMappingDict
+        verLineMappingDict = image_data.verLineMappingDict
+
+        height, width, dim = horLineMask.shape
+        parents = []
+        interLines = []
+
+        for horLineIndex, horLineGroup in horLineMappingDict['lineMapping'].items():
+            horLineGroup['type'] = None
+            intersectionMask = np.zeros((height, width), dtype = np.uint8)
+
+            overlapIndexes = np.where((horLineMask[:,:,0] == horLineIndex) & (verLineMask[:,:,1] !=0))
+            isFound = False
+            if len(overlapIndexes[0]) == 0:
+                intersectionIndexes = np.where((horLineMask[:,:,0] == horLineIndex) & (verLineMask[:,:,0] != 0))
+                
+                midPoint = horLineGroup['midPoint']
+                rightEndIndexes = PhyloParser.getThePointsOnTheRightEnd(intersectionIndexes, midPoint)
+                
+                if len(rightEndIndexes[0])!=0:
+                    indexNumberList = verLineMask[PhyloParser.mapping2Dto3D(rightEndIndexes, 0)]
+                    uniqueIndexes = list(set(indexNumberList))
+                    for index in uniqueIndexes:
+                        parent = ((horLineGroup['rline'], verLineMappingDict['lineMapping'][index]['rline']), 0 )
+                        parents.append(parent)
+                        horLineGroup['parent'].append(index)
+                        verLineMappingDict['lineMapping'][index]['parent'].append(horLineIndex)
+                        isFound = True
+            else:
+                rightEndIndexes = PhyloParser.getThePointsOnTheRightEnd(overlapIndexes, midPoint)
+                if len(rightEndIndexes[0])!=0:
+                    indexNumberList = verLineMask[PhyloParser.mapping2Dto3D(rightEndIndexes, 1)]
+                    uniqueIndexes = list(set(indexNumberList))
+                    for overlapIndex in uniqueIndexes:
+                        parentCandidates = verLineMappingDict['overlapMapping'][overlapIndex]
+                        for index in parentCandidates:
+                            parent = ((horLineGroup['rline'], verLineMappingDict['lineMapping'][index]['rline']), 0 )
+                            parents.append(parent)
+                            horLineGroup['parent'].append(index)
+                            verLineMappingDict['lineMapping'][index]['parent'].append(horLineIndex)
+                            isFound = True
+            if isFound:
+                interLines.append(horLineGroup['rline'])
+                horLineGroup['type'] = 'interLine'
+
+        image_data.parent = parents
+        image_data.interLines = interLines
+
+        return image_data
+
+
+            # print coverRange
+            # print np.where(verLineMask[coverRange] != 0)
+            # print verLineMask[coverRange]
+            # intersectionMask[np.where(verLineMask[coverRange] != 0)] = 255
+
+            
+        #     verLineGroup['rline']
+
+
+        # parent = []
+
+
     @staticmethod
-    # your display() method
-    def displayTree(root):
-        return
+    def getThePointsOnTheRightEnd(intersecRange,midPoint):
+        rightEndY = []
+        rightEndX = []
+        my, mx = midPoint
+        for index, x in enumerate(intersecRange[1]):
+            print x, mx
+            if x > mx:
+                rightEndX.append(x)
+                rightEndY.append(intersecRange[0][index])
+        rightEnd = (np.asarray(rightEndY), np.asarray(rightEndX))
+
+        return rightEnd
     
     
     def matchParent(self, image_data):
@@ -2482,7 +2961,7 @@ class PhyloParser():
                 jointPoints.append((x2-1,y2))
         parent = sorted(parent, key = image_data.sortByDist)
 
-        parent = self.removeRepeatLines(parent)
+        # parent = self.removeRepeatLines(parent)
         interLines = self.removeRepeatLinesBasic(interLines)
 
         image_data.parent = parent
@@ -2606,7 +3085,7 @@ class PhyloParser():
 
                         children.append(((line, tuple(tmpLineList)), totalDist))
         children = sorted(children, key = image_data.sortByDist)
-        children = self.removeRepeatLines(children)
+        # children = self.removeRepeatLines(children)
         anchorLines = self.removeRepeatLinesBasic(anchorLines)
         image_data.children = children
         image_data.anchorLines = anchorLines
@@ -4941,6 +5420,7 @@ class PhyloParser():
             if not image_data.treeReady:
                 ## Fix false-positive sub-trees and mandatorily connect sub-trees
                 image_data = self.fixTrees(image_data)
+
                 image_data = self.checkAnchorLines(image_data)
                 image_data = self.recoverLineFromText(image_data)
                 image_data = self.checkDone(image_data)
@@ -5016,6 +5496,9 @@ class PhyloParser():
         elif mode == 'lower':
             x = breakNode.branch[0]
             y = breakNode.branch[3]
+        else:
+            x = mode[0]
+            y = mode[1]
         potentialNodes = []
 
 
@@ -5030,6 +5513,10 @@ class PhyloParser():
             elif mode == 'upper':
                 if breakNode.upperLeave and node.root:
                     if PhyloParser.isSameLine(breakNode.upperLeave, node.root):
+                        potentialNodes.append(node)
+            else:
+                if node.root:
+                    if PhyloParser.isSameLine(mode, node.root):
                         potentialNodes.append(node)
 
 
@@ -5123,7 +5610,7 @@ class PhyloParser():
                             for lineIndex, interLine in enumerate(node.interLeave):
                                 if PhyloParser.isSameLine(interLine, line):
                                     node.isInterAnchor[lineIndex] = False
-                                    connectNode = PhyloParser.getNodeBranchOnTheRight(node, rootList)
+                                    connectNode = PhyloParser.getNodeBranchOnTheRight(node, rootList, mode = interLine)
                                     if connectNode:
                                         rootNode.numNodes += connectNode.numNodes
                                         node.otherTo[lineIndex] = connectNode
@@ -5925,7 +6412,7 @@ class PhyloParser():
 
                 nodeList.append(a)
 
-        image_data.nodeList = nodeList
+
         # image_data.displayNodes()
 
 
@@ -5939,6 +6426,12 @@ class PhyloParser():
 
         # image_data = PhyloParser.purifyNodes(image_data)
 
+        nodeList, searchNodesMask, nodesMappingDict = PhyloParser.removeRepeatedNodes(nodeList, image)
+        image_data.nodeList = nodeList
+        image_data.searchNodesMask = searchNodesMask
+        image_data.nodesMappingDict = nodesMappingDict
+
+        image_data.displayNodes()
 
         nodeList = sorted(nodeList, key = lambda x: -x.branch[0])
 
@@ -6056,6 +6549,79 @@ class PhyloParser():
 
 
         return image_data
+
+    @staticmethod
+    def removeRepeatedNodes(nodeList, image):
+        height, width = image.shape
+        nodeList = sorted(nodeList, key = lambda x: x.branch[0])
+        searchNodesMask = np.zeros((height, width), dtype = np.uint8)
+        nodeIndex = 0
+        lineMap = {}
+        mapIndex = 1
+        for node in nodeList:
+            lines = node.getAllLines()
+            isCovered, nodeNumber, mapIndex = PhyloParser.drawLines(lines, node, searchNodesMask, mapIndex)
+            if isCovered:
+                lineMap[nodeNumber].append((node, len(lines)))
+            else:
+                lineMap[nodeNumber] = [(node, len(lines))]
+        print lineMap
+        PhyloParser.displayImage(searchNodesMask)
+
+        newNodeList = []
+
+        for key, nodesPool in lineMap.items():
+            nodesPool = sorted(nodesPool, key = lambda x: (-x[1], x[0].branch[0]))
+            newNodeList.append(nodesPool[0][0])
+
+        return newNodeList, searchNodesMask, lineMap
+
+
+    @staticmethod
+    def drawLines(lines, node, searchNodesMask, mapIndex):
+
+        bx1, by1, bx2, by2, blength = node.branch
+        voteNumber = PhyloParser.getVoteNumber(searchNodesMask[by1:by2, bx1:bx2+1])
+        if voteNumber == 0:
+            isCovered = False
+            drawMask = PhyloParser.getLinesCoverRange(lines, searchNodesMask.shape, margin = 5)
+            searchNodesMask[np.where(drawMask == 255)] = mapIndex
+            nodeNumber = mapIndex
+            mapIndex +=1
+        else:
+            isCovered = True
+            drawMask = PhyloParser.getLinesCoverRange(lines, searchNodesMask.shape, margin = 5)
+            searchNodesMask[np.where(drawMask == 255)] = voteNumber
+            nodeNumber = voteNumber
+
+        return isCovered, nodeNumber, mapIndex
+
+    @staticmethod
+    def getLinesCoverRange(lines, shape, margin = 5):
+        mask = np.zeros(shape, dtype=np.uint8)
+        for line in lines:
+            x1, y1, x2, y2, length = line
+            mask[y1-margin:y2+1+margin, x1-margin:x2+1+margin] = 255
+
+        return mask
+
+    @staticmethod
+    def getVoteNumber(mask, mode = None):
+
+        hist1, bins = np.histogram(mask.ravel(),256,[0,256])
+
+
+        if mode == 'overlap':
+            nonzeroIndexes = np.nonzero(hist1)[0]
+            for nonzeroIndex in nonzeroIndexes:
+                if nonzeroIndex != 0:
+                    return nonzeroIndex
+            return 0
+
+
+        voteNumber = np.argmax(hist1)
+
+        return voteNumber
 
     @staticmethod
     def markBranchArray(node, branchArray):
