@@ -146,7 +146,6 @@ if __name__ == '__main__':
     
         
         print "original image"
-        print image[180:193, 37:50]
         PhyloParser.displayImage(image)
 #         print PhyloParser.image2text(image[33:, 366:453])
     
