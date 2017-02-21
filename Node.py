@@ -28,6 +28,8 @@ class Node():
         self.nodesNetwork = [] #update by method createNodes
 
 
+
+
     def isAnchor(self, anchorLines):
         if self.upperLeave in anchorLines:
             self.isUpperAnchor = True

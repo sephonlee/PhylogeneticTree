@@ -56,9 +56,13 @@ class ImageData():
     # filled by matchLine
     cleanImage = None
     parent= []
+    parentsIndexes = []
     children = []
+    childrenIndexes = []
     anchorLines = []
+    anchorLinesIndexes = []
     interLines = []
+    interLinesIndexes = []
     jointLines = []
     isBinary = True ###
     lineMatched = False
