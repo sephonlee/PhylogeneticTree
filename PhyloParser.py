@@ -5617,6 +5617,56 @@ class PhyloParser():
 
     # End static methos for getSpecies
     
+    
+    def constructTree(self, image_data, tracing = True, debug = False):
+        
+        if image_data.lineDetected and image_data.lineMatched:
+            
+            # Pair h-v branch (parent) and v-h branch (chilren)
+            image_data = self.createNodes(image_data, tracing)
+            if debug:
+                print "Display Nodes"
+                image_data.displayNodes()
+            
+            
+            image_data = self.createRootList(image_data, tracing)
+            if debug:
+                image_data.displayTrees('regular')
+                
+                
+            # Check if it's already recovered
+            # Result saved in image_data.treeReady
+#             image_data = self.checkDone(image_data)
+            
+            ###########################################
+            ### Recover missing components ############
+            
+            if not self.isTreeReady(image_data):#######
+                ## Fix false-positive sub-trees and mandatorily connect sub-trees    
+                image_data = self.fixTrees(image_data)
+                
+            if not self.isTreeReady(image_data):#######
+                ## Use orphan bonding box to recover tree leaves
+                image_data = self.recoverLineFromText(image_data) ####need test
+            
+            if not self.isTreeReady(image_data):#######
+                ## For now, it still defines the tree head. However, we need something else returned to notice it's not perfect
+                image_data.defineTreeHead()
+                print self.treeRecover(image_data) ########### #TODO: check useage of image_data.getTreeString()
+                image_data.treeStructure = self.treeRecover(image_data)
+                # image_data.treeHead.getNodeInfo()
+            else:
+                image_data.defineTreeHead()
+                image_data.treeStructure = self.treeRecover(image_data)
+
+            if debug:
+                image_data.displayTrees('final')                
+        else:
+            print "Error! Tree components are not found. Please do detectLine and matchLine before this method"
+        
+        return image_data
+    
+    
     def makeTree(self, image_data, debug = False, tracing = False, showResult = False):
         
         if image_data.lineDetected and image_data.lineMatched:
@@ -6010,6 +6060,33 @@ class PhyloParser():
         return image_data
 
 
+    # Return True if the tree is completed; otherwise return false
+    def isTreeReady(self, image_data):
+        rootList = image_data.rootList
+        isDone = True
+        rootList = sorted(rootList, key = lambda x: -x.numNodes)
+        rootNode = rootList[0]
+
+        #
+        if not rootNode.isComplete:
+            isDone =  False
+
+        #
+        if rootNode.root:
+            x1, y1, x2, y2, length = rootNode.root
+            for node in rootList:
+                if node != rootNode:
+                    if self.isDotWithinLine((x1, y1), node.branch) or self.isLefter(rootNode.branch, node.branch):
+                        isDone = False
+        #
+        else:
+            for node in rootList:
+                if node != rootNode:
+                    if self.isLefter(rootNode.branch, node.branch):
+                        isDone = False
+
+        return isDone
+            
             
 
     def checkDone(self, image_data):
