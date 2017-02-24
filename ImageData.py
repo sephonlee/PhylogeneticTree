@@ -51,7 +51,7 @@ class ImageData():
     horLineMappingDict = None
     verLineMask = None
     verLineMappingDict = None
-    lineGroup = False
+    lineGrouped = False
     
     # filled by matchLine
     cleanImage = None
