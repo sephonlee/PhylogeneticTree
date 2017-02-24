@@ -5653,7 +5653,7 @@ class PhyloParser():
         if image_data.lineDetected and image_data.lineMatched:
             
             # Pair h-v branch (parent) and v-h branch (chilren)
-<<<<<<< HEAD
+
             if image_data.lineGrouped:
                 image_data = self.createNodes_new(image_data, tracing)
 
@@ -5663,12 +5663,6 @@ class PhyloParser():
                 print "Display Nodes"
                 image_data.displayNodes()
 
-=======
-            image_data = self.createNodes(image_data, tracing)
-            if debug:
-                print "Display Nodes"
-                image_data.displayNodes()
->>>>>>> 2b68f84b2e82b00f09f3ff2a21008dbab5398fd1
             
             
             image_data = self.createRootList(image_data, tracing)
