@@ -65,12 +65,14 @@ if __name__ == '__main__':
     fileNameList = [x.rstrip() for x in fileNameList]
     # fileNameList = [folderPath + x for x in fileNameList]
 
-    for index in range(32, len(fileNameList)):
+    for index in range(48, len(fileNameList)):
         print index, fileNameList[index]
         filePath = folderPath + fileNameList[index]
         fileName = fileNameList[index]
+        fileName = 'PMC2614190_ebo-04-181-g01.jpg'
         # fileName = 'PMC2674049_1471-2148-9-74-4.jpg'
-        fileName = 'PMC1326215_1471-2148-5-71-6.jpg'
+        # fileName = 'PMC1326215_1471-2148-5-71-6.jpg'
+        # fileName = 'PMC2640363_1471-2148-9-21-5.jpg'
         filePath = folderPath + fileName
         if isfile(filePath) :
             image = cv.imread(filePath,0)
@@ -86,30 +88,27 @@ if __name__ == '__main__':
         # PhyloParser.displayImage(image)
 
 
-
-        image_data = phyloParser.detectLines(image_data, debug = False)
-
+        image_data = phyloParser.detectLines(image_data, debug = True)
 
         
         # image_data = phyloPaser.traceTree(image_data, debug = True)
         image_data = phyloParser.getCorners(image_data, debug = False)        
         image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
         image_data = phyloParser.includeLinesFromCorners(image_data)
+        image_data = phyloParser.removeRepeatedLines(image_data)
 
+        
 
-
-
-
-        # image_data = phyloParser.detectCorners(image_data)
-        # image_data = phyloParser.refineLinesByCorners(image_data)
-        # image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
-        # image_data = phyloPaser.getSpecies(image_data, debug = True)
-        image_data = phyloParser.matchLines(image_data, debug = False)
-        # image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
-        # print image_data.orphanBox2Text
-        # image_data = phyloParser.getSpecies(image_data, debug = True)
-        treeString = phyloParser.makeTree(image_data, debug = True, tracing = False, showResult = False)
-#         # image_data = phyloPaser.getSpecies(image_data)
+#         # image_data = phyloParser.detectCorners(image_data)
+#         # image_data = phyloParser.refineLinesByCorners(image_data)
+#         # image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
+#         # image_data = phyloPaser.getSpecies(image_data, debug = True)
+        image_data = phyloParser.matchLines(image_data, debug = True, useNew = True)
+#         # image_data = phyloPaser.getSpecies_v2(image_data, debug = True)
+#         # print image_data.orphanBox2Text
+#         # image_data = phyloParser.getSpecies(image_data, debug = True)
+        treeString = phyloParser.constructTree(image_data, debug = True, tracing = False)
+# #         # image_data = phyloPaser.getSpecies(image_data)
  
 
 #         a = ExperimentExecutor()
