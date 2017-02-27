@@ -5820,7 +5820,7 @@ class PhyloParser():
             if image_data.treeReady:
                 image_data.defineTreeHead()
                 image_data.treeStructure = self.treeRecover(image_data)
-
+                print image_data.treeStructure
                 if debug or showResult:
                     print "TODO: draw something here"
                     image_data.displayTrees('final')
@@ -5831,6 +5831,7 @@ class PhyloParser():
                 image_data.defineTreeHead()## For now, it still defines the tree head. However, we need something else returned to notice it's not perfect
                 print self.treeRecover(image_data)
                 image_data.treeStructure = self.treeRecover(image_data)
+
                 # image_data.treeHead.getNodeInfo()
                 if debug or showResult:
                     print "TODO: draw something here"
