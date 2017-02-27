@@ -2194,6 +2194,7 @@ class PhyloParser():
             if debug:
                 print "no mask"
                 
+#         image = image[100:110,155:165]
         image_data.upCornerList = PhyloParser.detectCorners(image, 1)
         image_data.downCornerList = PhyloParser.detectCorners(image, -1)
         image_data.jointUpList = PhyloParser.detectCorners(image, 2)
@@ -2327,9 +2328,13 @@ class PhyloParser():
                 patch = image[corner[0]-1:corner[0]+2, corner[1]-1:corner[1]+2].copy().astype("float")/255      
                 patch_variance =  np.var(patch)
             
+#                 print corner
+#                 print patch
+#                 print patch_variance
 #                 print filteredImage[corner[0]-1:corner[0]+2, corner[1]-1:corner[1]+2].copy().astype("float")
                 
                 patch_sum = max(np.amax(np.sum(patch, 0)), np.amax(np.sum(patch, 1)))
+
 #                 print "sum, ", patch_sum
 #                 print max(np.amax(np.sum(patch, 0)), np.amax(np.sum(patch, 1)))
 #                 print "filter value,", filteredImage[corner[0], corner[1]]
@@ -2343,7 +2348,7 @@ class PhyloParser():
                             new_cornerList.append((corner[0]+1, corner[1]-1)) # shift back in line
                             
                 if abs(mode) == 2:
-                    if  0.17 < patch_variance < 0.23 and patch_sum <= 2:
+                    if  0.17 < patch_variance < 0.247 and patch_sum <= 2:
                         if mode == 2:
                             new_cornerList.append((corner[0], corner[1]+1)) # shift back in line
                         else:
@@ -2921,7 +2926,39 @@ class PhyloParser():
     ## end static method for includeLinesFromCorners ##
     
     
-    
+    # match line groups
+    def matchLineGroups(self, image_data, useNew = False, debug = False):
+
+        if image_data.lineDetected:
+
+            image_data = self.matchParent_new(image_data)
+            image_data = self.matchChildren_new(image_data)
+
+            # image_data = self.removeText(image_data)
+
+
+            # print image_data.horLineMappingDict
+
+            # image_data.displayTargetLines('children')
+            # image_data.displayTargetLines('parent')
+            # for key, value in image_data.horLineMappingDict['lineMapping'].items():
+
+            #     print key, value
+            # print image_data.horLineMappingDict
+            # print image_data.verLineMappingDict
+            if debug:
+                image_data.displayTargetLines('parent')
+                image_data.displayTargetLines('children')
+                image_data.displayTargetLines('interLines')
+                image_data.displayTargetLines('anchorLines')
+            
+            image_data.lineMatched = True
+            
+    #     else:
+    #         print "Error! Please do detectLines before this method"
+        
+        return image_data
+       
     
     def matchLines(self, image_data, useNew = False, debug = False):
 
@@ -3505,12 +3542,12 @@ class PhyloParser():
         
         # transform contours to bonding boxes
         contourBoxes = []
-        img = image.copy()
+#         img = image.copy()
         for cnt in contours:
             contourBoxes.append(PhyloParser.getContourInfo(cnt))
-            b = PhyloParser.getContourInfo(cnt)
-            cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
-        PhyloParser.displayImage(img)
+#             b = PhyloParser.getContourInfo(cnt)
+#             cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+#         PhyloParser.displayImage(img)
                         
         # sort boxes and anchorlines from top to bot for further matching       
         contourBoxes = sorted(contourBoxes, key = lambda x: (x[0], x[2])) #top, left
@@ -5653,39 +5690,32 @@ class PhyloParser():
         if image_data.lineDetected and image_data.lineMatched:
             
             # Pair h-v branch (parent) and v-h branch (chilren)
-<<<<<<< HEAD
             if image_data.lineGrouped:
                 image_data = self.createNodes_new(image_data, tracing)
-
             else:
                 image_data = self.createNodes(image_data, tracing)
+                
             if debug:
                 print "Display Nodes"
                 image_data.displayNodes()
-
-=======
-            image_data = self.createNodes(image_data, tracing)
-            if debug:
-                print "Display Nodes"
-                image_data.displayNodes()
->>>>>>> 2b68f84b2e82b00f09f3ff2a21008dbab5398fd1
-            
-            
+                
             image_data = self.createRootList(image_data, tracing)
             if debug:
+                print "display Tree"
                 image_data.displayTrees('regular')
                 
-                
-            # Check if it's already recovered
-            # Result saved in image_data.treeReady
-#             image_data = self.checkDone(image_data)
+ 
             
             ###########################################
             ### Recover missing components ############
             
             if not self.isTreeReady(image_data):#######
-                ## Fix false-positive sub-trees and mandatorily connect sub-trees    
+                ## Fix false-positive sub-trees and mandatorily connect sub-trees
+                rightVerticalLineX = PhyloParser.getRightVerticalLineX(image_data.image, image_data.rootList)
+                image_data.rootList = PhyloParser.labelSuspiciousAnchorLine(image_data.rootList, rightVerticalLineX, image_data.line2Text)
+            
                 image_data = self.fixTrees(image_data)
+#                 print image_data.rootList
                 
             if not self.isTreeReady(image_data):#######
                 ## Use orphan bonding box to recover tree leaves
@@ -5885,6 +5915,140 @@ class PhyloParser():
 
 
 
+    @staticmethod
+    # return a list describing the x position of the rightest vertical lines in each y
+    def getRightVerticalLineX(img, rootList):
+        print "getRightVerticalLineX"
+        rightVerticalLineX = np.zeros(img.shape[0])
+        
+        for root in rootList:
+            descendants = [root]
+            
+            # traverse descedants
+            while True:
+                node = descendants.pop()
+            
+                # add children into descendants
+                if node.to[0] is not None:
+                    descendants.append(node.to[0])
+                if node.to[1] is not None:
+                    descendants.append(node.to[1])
+                if len(node.otherTo) > 0:
+                    for n in node.otherTo:
+                        descendants.append(n)
+                        
+                # update rightVerticalLineX
+                y_top = node.branch[1]
+                y_bot = node.branch[3]
+                temp = np.zeros(img.shape[0])
+                temp[y_top:y_bot+1] = node.branch[0]          
+                rightVerticalLineX = np.maximum(temp, rightVerticalLineX)
+         
+                if len(descendants) == 0:
+                    break
+                
+        return rightVerticalLineX
+                
+    @staticmethod
+    # return a list describing the x position of the rightest vertical lines in each y
+    def labelSuspiciousAnchorLine(rootList, rightVerticalLineX, line2Text):                
+                
+        for root in rootList:
+            descendants = [root]
+            anchorLines = []
+            suspiciousAnchorLines = []
+            verifiedAnchorLines = []
+            
+            # traverse descedants
+            while True:
+                node = descendants.pop()
+                
+                # add children into descendants
+                if node.to[0] is not None:
+                    descendants.append(node.to[0])
+                elif node.upperLeave is not None:
+                    #this is anchorline candidates
+                    anchorLines.append(node.upperLeave)
+                    
+                if node.to[1] is not None:
+                    descendants.append(node.to[1])
+                elif node.lowerLeave is not None:
+                    #this is anchorline candidates
+                    anchorLines.append(node.lowerLeave)        
+                    
+                # get interleaves that does not connect to a node
+                interLeave = node.interLeave[:]
+                if len(node.otherTo) > 0:
+                    for n in node.otherTo:
+                        descendants.append(n)
+                        if n.root in interLeave:
+                            interLeave.remove(n.root)
+ 
+
+                if len(descendants) == 0:
+                    break
+            
+#             PhyloParser.displayATree(root)
+            for line in anchorLines:
+                y = line[1]
+                x_right = line[2]
+                
+                # 1. there is a vertical branch on it's right
+                # 2. it does not have paired text
+                if rightVerticalLineX[y] >= x_right and not line2Text.has_key(line):
+                    suspiciousAnchorLines.append(line)
+                else:
+                    verifiedAnchorLines.append(line)
+                    
+            root.verifiedAnchorLines = verifiedAnchorLines
+            root.suspiciousAnchorLines = suspiciousAnchorLines
+            
+        return rootList
+                
+        
+        
+        
+    @staticmethod
+    def displayATree(image, rootNode):
+        if len(image.shape) ==2:
+            whatever = image.copy()
+            whatever = cv.cvtColor(whatever, cv.COLOR_GRAY2RGB)
+        else:
+            whatever = image.copy()
+        count = 0
+        stack = []
+        stack.append(rootNode)
+        color = PhyloParser.getColor(count)
+        while stack:
+            node = stack.pop()
+            if node.to[0]:
+                stack.append(node.to[0])
+            if node.to[1]:
+                stack.append(node.to[1])
+            if not node.isBinary:
+                for to in node.otherTo:
+                    if to:
+                        stack.append(to)
+            if node.root:
+                x1, y1, x2, y2, length = node.root
+                cv.rectangle(whatever , (x1, y1), (x2, y2), color=color, thickness=2)
+            if node.branch:
+                x1, y1, x2, y2, length = node.branch
+                cv.rectangle(whatever , (x1, y1), (x2, y2), color=color, thickness=2)
+            if node.upperLeave:
+                x1, y1, x2, y2, length = node.upperLeave
+                cv.rectangle(whatever , (x1, y1), (x2, y2), color=color, thickness=2)
+            if node.lowerLeave:
+                x1, y1, x2, y2, length = node.lowerLeave
+                cv.rectangle(whatever , (x1, y1), (x2, y2), color=color, thickness=2)
+            if not node.isBinary:
+                for line in node.interLeave:
+                    x1, y1, x2, y2, length = line
+                    cv.rectangle(whatever , (x1, y1), (x2, y2), color=color, thickness=2)
+
+        plt.imshow(whatever)
+        plt.show()
+        
     @staticmethod
     def checkAnchorLines(image_data):
         
