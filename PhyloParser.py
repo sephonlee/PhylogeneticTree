@@ -5748,15 +5748,15 @@ class PhyloParser():
                 ## Use orphan bonding box to recover tree leaves
                 image_data = self.recoverLineFromText(image_data) ####need test
             
+            
+            # define 
+            image_data.defineTreeHead()
+            
+            # merge tree structure and species text
+            image_data.treeStructure = self.mergeTreeAndText(image_data)
+            
             if not self.isTreeReady(image_data):#######
-                ## For now, it still defines the tree head. However, we need something else returned to notice it's not perfect
-                image_data.defineTreeHead()
-                print self.treeRecover(image_data) ########### #TODO: check useage of image_data.getTreeString()
-                image_data.treeStructure = self.treeRecover(image_data)
-                # image_data.treeHead.getNodeInfo()
-            else:
-                image_data.defineTreeHead()
-                image_data.treeStructure = self.treeRecover(image_data)
+                print image_data.treeStructure
 
             if debug:
                 image_data.displayTrees('final')                
@@ -5933,7 +5933,7 @@ class PhyloParser():
             return potentialNodes[0]
 
     @staticmethod
-    def treeRecover(image_data, mode = 'structure'):
+    def mergeTreeAndText(image_data, mode = 'structure'):
         if mode == 'structure':
             return image_data.treeHead.getTreeString()
         elif mode == 'species':
