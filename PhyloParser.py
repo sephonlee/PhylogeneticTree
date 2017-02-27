@@ -2927,7 +2927,7 @@ class PhyloParser():
     
     
     # match line groups
-    def matchLineGroups(self, image_data, useNew = False, debug = False):
+    def matchLineGroups(self, image_data, debug = False):
 
         if image_data.lineDetected:
 
