@@ -1302,7 +1302,8 @@ class PhyloParser():
             lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
             lineDict['rline'] = targetLine
 
-
+        if mode == 'hor':
+            print mappingDict
 
 
         for lineIndex, lineDict in mappingDict['lineMapping'].items():
@@ -1386,6 +1387,11 @@ class PhyloParser():
             del mappingDict['overlapMapping'][noiseIndex]
             # print '----------------------------After deleting-------------------------'
             # print mappingDict
+        PhyloParser.displayImage(mask[:,:,0])
+
+        if mode == 'hor':
+            print mappingDict
+
 
         for lineIndex, lineDict in mappingDict['lineMapping'].items():
             lineList.append(lineDict['rline'])
