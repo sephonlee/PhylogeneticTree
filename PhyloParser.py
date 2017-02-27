@@ -256,7 +256,7 @@ class PhyloParser():
 
         edges = cv.Canny(image, CANNY_THRESH_1, CANNY_THRESH_2)
 
-        PhyloParser.displayImage(edges)
+
 
 
 #         treeMask, nonTreeMask, controus, hierarchy = PhyloParser.findContours(edges)
