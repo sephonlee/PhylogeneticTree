@@ -2014,7 +2014,7 @@ class PhyloParser():
         return image_data
    
         
-    ## static method for detectLine ##remremoveTextoveText
+    ## static method for detectLine ##removeTextoveText
     @staticmethod
     def purifyLines(lineList, image, negatedImage,  mode,  varianceThreshold=60):
         varList = []
@@ -2596,9 +2596,9 @@ class PhyloParser():
         downPointSet_hor = PhyloParser.removeDuplicatePoint(downPointSet_hor, 0)
 
         if debug:
-            ver_lines = PhyloParser.pointSetToLine(pointSet_ver, type="corners")
-            hor_lines_up =  PhyloParser.pointSetToLine(upPointSet_hor, type="joints")
-            hor_lines_down =  PhyloParser.pointSetToLine(downPointSet_hor, type="joints")
+            ver_lines = PhyloParser.pointSetToLine(image_data.image_preproc_for_corner, pointSet_ver, type="corners")
+            hor_lines_up =  PhyloParser.pointSetToLine(image_data.image_preproc_for_corner, upPointSet_hor, type="joints")
+            hor_lines_down =  PhyloParser.pointSetToLine(image_data.image_preproc_for_corner, downPointSet_hor, type="joints")
             
             PhyloParser.displayCornersAndLine(image, [upCornerList_hor, jointUpList_hor], [ver_lines, hor_lines_up, hor_lines_down])
         
@@ -2703,7 +2703,7 @@ class PhyloParser():
     
     @staticmethod
     # need sorted already
-    def pointSetToLine(pointSetList, type = "corners"):
+    def pointSetToLine(image, pointSetList, type = "corners"):
         lineList = []
         for pointSet in pointSetList:
             
@@ -2718,7 +2718,21 @@ class PhyloParser():
                 x2 =  points[-1][1]
             
                 lineLength = max(abs(x2-x1),abs(y2-y1))
-                lineList.append((x1, y1, x2, y2, lineLength))
+                
+                if type == "corners": #vertical
+                    # two points not inline, pick the one with lower pixel value as y
+                    if x1 != x2 and image[y1, x1] <= image[y2, x2]:
+                        lineList.append((x1, y1, x1, y1, lineLength))
+                    else:
+                        lineList.append((x2, y1, x2, y1, lineLength))
+                        
+                    lineList.append((x1, y1, x2, y2, lineLength))
+                else: #horizontal
+                    # two points not inline, pick the one with lower pixel value as y
+                    if y1 != y2 and image[y1, x1] <= image[y2, x2]:
+                        lineList.append((x1, y1, x2, y1, lineLength))
+                    else:
+                        lineList.append((x1, y2, x2, y2, lineLength))
         
         return lineList
     
@@ -2943,14 +2957,13 @@ class PhyloParser():
     # merge the lines created from corners with lines created from line detection
     def includeLinesFromCorners(image_data):
         if image_data.lineDetectedFromCorners and image_data.lineDetected:
-            ver_lines = PhyloParser.pointSetToLine(image_data.pointSet_ver, type="corners")
-            hor_lines_up =  PhyloParser.pointSetToLine(image_data.upPointSet_hor, type="joints")
-            hor_lines_down =  PhyloParser.pointSetToLine(image_data.downPointSet_hor, type="joints")
-
+            ver_lines = PhyloParser.pointSetToLine(image_data.image_preproc_for_corner, image_data.pointSet_ver, type="corners")
+            hor_lines_up =  PhyloParser.pointSetToLine(image_data.image_preproc_for_corner, image_data.upPointSet_hor, type="joints")
+            hor_lines_down =  PhyloParser.pointSetToLine(image_data.image_preproc_for_corner, image_data.downPointSet_hor, type="joints")
+            
             hor_lines_up = PhyloParser.purifyLines(hor_lines_up, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'hor')
             hor_lines_down = PhyloParser.purifyLines(hor_lines_down, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'hor')
             ver_lines = PhyloParser.purifyLines(ver_lines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'ver')
-
 
             image_data.horLines += hor_lines_up
             image_data.horLines += hor_lines_down
@@ -5743,8 +5756,8 @@ class PhyloParser():
             
             if not self.isTreeReady(image_data):#######
                 ## Fix false-positive sub-trees and mandatorily connect sub-trees
-                rightVerticalLineX = PhyloParser.getRightVerticalLineX(image_data.image, image_data.rootList)
-                image_data.rootList = PhyloParser.labelSuspiciousAnchorLine(image_data.rootList, rightVerticalLineX, image_data.line2Text)
+#                 rightVerticalLineX = PhyloParser.getRightVerticalLineX(image_data.image, image_data.rootList)
+#                 image_data.rootList = PhyloParser.labelSuspiciousAnchorLine(image_data.rootList, rightVerticalLineX, image_data.line2Text)
                 print "fixTree"
                 image_data = self.fixTrees(image_data)
                 print "end"
@@ -5764,9 +5777,11 @@ class PhyloParser():
             # select largest sub-tree as the final tree
             image_data.defineTreeHead()
 
+#             self.mergeTreeAndText_v2(image_data)
+
             # merge tree structure and species text
 #             if image_data.speciesNameReady:
-            image_data.treeStructure = self.mergeTreeAndText(image_data) ######bugged
+            image_data.treeStructure = self.mergeTreeAndText(image_data, mode="structure") ######bugged
 
             if debug:
                 image_data.displayTrees('final')                
@@ -5999,6 +6014,80 @@ class PhyloParser():
         else:
             potentialNodes = sorted(potentialNodes, key =PhyloParser.sortNodeByLeftEnd)
             return potentialNodes[0]
+
+
+    @staticmethod
+    def matchLineWithOrphanBox(line, orphaneBox2Text, margin = 2):
+        
+        result = []
+        for key in orphaneBox2Text:
+            y = line[1];
+            right = line[2]
+#             if key[0] < y + verticle_anchor_margin
+            
+            if (y-margin >= key[0] and y-margin <= key[1]) \
+            or (y-margin <= key[1] and y+margin >= key[1]) \
+            or (y+margin >= key[0] and y-margin <= key[1]) \
+            and right <= key[2]:
+            
+                result.append((orphaneBox2Text[key], key[2]-right))
+        
+        if len(result) > 0:  
+            result = sorted(result, key = lambda x: x[1])
+            return result[0][0]["text"]
+        else:
+            return "unknown"
+    
+    
+    @staticmethod
+    def mergeTreeAndText_v2(image_data):
+        print "mergeTreeAndText_v2"
+        print image_data.treeHead
+        
+        node_list = [image_data.treeHead];
+        
+        print image_data.line2Text
+        print image_data.orphanBox2Text
+        
+        while len(node_list) > 0:
+            
+            node = node_list.pop();
+            
+            print "branch", node.branch
+            
+            if node.to[0] is None:
+                if image_data.line2Text.has_key(node.upperLeave):
+                    print "upperLeave:", image_data.line2Text[node.upperLeave]
+                else:
+                    print "upperLeave: search orphan", PhyloParser.matchLineWithOrphanBox(node.upperLeave, image_data.orphanBox2Text)
+            else:
+                node_list.append(node.to[0])
+                
+
+            if node.to[1] is None:
+                if image_data.line2Text.has_key(node.lowerLeave):
+                    print "lowerLeave:", image_data.line2Text[node.lowerLeave]
+                else:
+                    print "lowerLeave: search orphan", PhyloParser.matchLineWithOrphanBox(node.lowerLeave, image_data.orphanBox2Text)
+            else:
+                node_list.append(node.to[1])
+                
+            
+            if len(node.otherTo) > 0:
+                for i, children in enumerate(node.otherTo):
+                    if children is None:
+                        if image_data.line2Text.has_key(node.interLeave[i]):
+                            print "interLeave:", image_data.line2Text[node.interLeave[i]]
+                        else:
+                            print "interLeave: search orphan", PhyloParser.matchLineWithOrphanBox(node.interLeave[i], image_data.orphanBox2Text)
+                    else:
+                        node_list.append(children)
+        
+            
+            
+        image_data.displayTrees('regular')
+        
+        
 
     @staticmethod
     def mergeTreeAndText(image_data, mode = 'structure'):
