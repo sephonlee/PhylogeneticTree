@@ -1416,6 +1416,8 @@ class PhyloParser():
             # print '----------------------------After deleting-------------------------'
             # print mappingDict
 
+#         PhyloParser.displayImage(mask[:,:,0])
+
 
         # if mode == 'hor':
         #     print mappingDict
