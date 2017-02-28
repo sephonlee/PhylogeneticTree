@@ -26,7 +26,7 @@ class Node():
         self.isConnected = False
         self.score = None # update by method evaluateNode
         self.nodesNetwork = [] #update by method createNodes
-
+        self.nodesIncluded = []
 
 
 

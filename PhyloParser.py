@@ -225,8 +225,6 @@ class PhyloParser():
 #             print "display non-tree mask"
 #             PhyloParser.displayImage(image_data.nonTreeMask)
 
-        image = cv.equalizeHist(image)
-        PhyloParser.displayImage(image)
 
 
         image, edgeMask, hasBackground= PhyloParser.removeBackground(image)
@@ -1205,8 +1203,8 @@ class PhyloParser():
             image = image_data.image.copy()
         height, width = image.shape
 
-        horLineMask = np.zeros((height, width, 2), dtype = np.uint8)
-        verLineMask = np.zeros((height, width, 2), dtype = np.uint8)
+        horLineMask = np.zeros((height, width, 2), dtype = int)
+        verLineMask = np.zeros((height, width, 2), dtype = int)
 
         horLineMappingDict = {}
         horLineMappingDict['lineMapping'] = {}
@@ -1218,6 +1216,8 @@ class PhyloParser():
         image_data.horLines, image_data.horLineMask, image_data.horLineMappingDict = PhyloParser.getUniqueLinesList(horLines, horLineMask, horLineMappingDict, image_data, mode = 'hor')
         image_data.verLines, image_data.verLineMask, image_data.verLineMappingDict = PhyloParser.getUniqueLinesList(verLines, verLineMask, verLineMappingDict, image_data, mode = 'ver')
         image_data.lineGrouped = True
+
+
 
 
         if debug:
@@ -1334,7 +1334,9 @@ class PhyloParser():
             lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
             lineDict['rline'] = targetLine
 
-
+        # if mode == 'hor':
+        #     print mappingDict['overlapMapping']
+        #     print mappingDict['lineMapping'][42]
 
 
         for lineIndex, lineDict in mappingDict['lineMapping'].items():
@@ -1366,7 +1368,6 @@ class PhyloParser():
                                         if overlapIndex not in noisePool:
                                             noisePool.append(overlapIndex)
                             elif mode == 'ver':
-
                                 if oy1 >= ty1 - tlength/10 and oy2 <= ty2 + tlength/10:
                                     
                                     midPoint = (tx1+ox1)/2
@@ -1388,16 +1389,19 @@ class PhyloParser():
 
                 if isNoise:
                     overlapIndexCheckList = []
+
                     for noiseIndex in noisePool:
                         noiseIndexes.append(noiseIndex)
                         lineDict['noise'][noiseIndex] = mappingDict['lineMapping'][noiseIndex].copy()
                         for subNoiseIndex, subnoises in mappingDict['lineMapping'][noiseIndex]['noise'].items():
                             lineDict['noise'][subNoiseIndex] = subnoises.copy()
+
                         mask[PhyloParser.mapping2Dto3D(np.where(mask[:,:,0] == noiseIndex), 0)] = lineIndex
                         for overlapIndex in mappingDict['lineMapping'][noiseIndex]['overlap']:
                             if noiseIndex in mappingDict['overlapMapping'][overlapIndex]:
                                 mappingDict['overlapMapping'][overlapIndex].remove(noiseIndex)
                             overlapIndexCheckList.append(overlapIndex)
+
 
                     if len(overlapIndexCheckList) >0:
                         for overlapMappingIndex in overlapIndexCheckList:
@@ -1411,12 +1415,15 @@ class PhyloParser():
                                     noiseOverlapIndexes.append(overlapMappingIndex)
                                 
                                 # print mappingDict
+        
+
         # if mode == 'hor':
         #     print '----------------------------Before deleting-------------------------'
         #     print mappingDict
 
         # print noiseIndexes
         # print noiseOverlapIndexes
+
 
         for noiseIndex in noiseIndexes:
             del mappingDict['lineMapping'][noiseIndex]
@@ -2193,7 +2200,7 @@ class PhyloParser():
         return lineList
     
     @staticmethod
-    def cutLines(horLines, verLines, length_threshold = 20, line_ratio_threshold = 0.2):
+    def cutLines(horLines, verLines, length_threshold = 0, line_ratio_threshold = 0.2):
 
         newList = []
         margin = 5
@@ -2209,7 +2216,6 @@ class PhyloParser():
 
                         newline1 = [x1, y1, vx1, y2, vx1-x1]
                         newline2 = [vx1, y1, x2, y2, x2-vx1]
-                        print (vx1-x1+0.0) / length, (vx1 - x1+0.0)/length
                         if (vx1-x1+0.0) / length > line_ratio_threshold and (vx1 - x1+0.0)/length < 1-line_ratio_threshold:
                             newList.append(tuple(newline1))
                             newList.append(tuple(newline2))
@@ -3091,14 +3097,12 @@ class PhyloParser():
             intersectionArea = np.where((verLineMask[:,:,0] == verLineIndex) & (horLineMask[:,:,0] != 0))
             intersectionIndexes = list(horLineMask[PhyloParser.mapping2Dto3D(intersectionArea, 0)])
             # print 'step1', intersectionIndexes
-            # print overlapIndexes
 
             for overlapIndex in overlapIndexes:
                 intersectionIndexes += list(horLineMappingDict['overlapMapping'][overlapIndex])
             # print 'step2', intersectionIndexes
             potentialChildren = list(set(intersectionIndexes))
             midPoint = verLineGroup['midPoint']
-
             leaves = []
             leavesIndex = []
             for potChildIndex in potentialChildren:
@@ -5815,8 +5819,7 @@ class PhyloParser():
                 if debug:
                     print "display Tree with recovered line"
                     image_data.displayTrees('regular')
-                            
-            
+
             # select largest sub-tree as the final tree
             image_data.defineTreeHead()
 
@@ -5825,7 +5828,7 @@ class PhyloParser():
             # merge tree structure and species text
 #             if image_data.speciesNameReady:
             image_data.treeStructure = self.mergeTreeAndText(image_data) ######bugged
-
+            print image_data.treeStructure
             if debug:
                 image_data.displayTrees('final')                
         else:
@@ -6383,14 +6386,11 @@ class PhyloParser():
                         isFixed = False
                         isUpper = True
                         if not ((breakNode.to[0] or breakNode.upperLeave) or (breakNode.to[1] or breakNode.lowerLeave)):
-                            pass
-                        elif (breakNode.to[0] or breakNode.upperLeave) and not (breakNode.to[1] or breakNode.lowerLeave):
-                            # print "lower"
                             x1, y1, x2, y2, length = breakNode.branch
                             result = self.getNodeBranchOnTheRight(breakNode, rootList, mode = 'lower')
-
-                            if result:  
-
+                            
+                            if result and len(result.nodesIncluded + node.nodesIncluded) == len(list(set(result.nodesIncluded + node.nodesIncluded))): 
+                                node.nodesIncluded += result.nodesIncluded
                                 to = list(breakNode.to)
                                 to[1] = result
                                 breakNode.to = tuple(to)
@@ -6400,24 +6400,69 @@ class PhyloParser():
                                 if result.isComplete:
                                     # print "remove"
                                     if result in tmpList:
-                                        tmpList.remove(result)                                
-                                node.breakSpot.remove(breakNode)
+                                        tmpList.remove(result) 
+                                if PhyloParser.isNodeComplete(breakNode):                               
+                                    node.breakSpot.remove(breakNode)
+                                result.whereFrom = breakNode
+                                
+                            else:
+                                isUpper = False
+
+                            x1, y1, x2, y2, length = breakNode.branch
+                            result = self.getNodeBranchOnTheRight(breakNode, rootList, mode = 'upper')
+
+                            # print result
+                            if result and len(result.nodesIncluded + node.nodesIncluded) == len(list(set(result.nodesIncluded + node.nodesIncluded))): 
+                                to = list(breakNode.to)
+                                to[0] = result
+                                breakNode.to = tuple(to)
+                                if PhyloParser.isNodeComplete(breakNode):                               
+                                    node.breakSpot.remove(breakNode)
+                                result.origin = node
+                                node.numNodes+=result.numNodes
+                                if result.isComplete:
+                                    # print "remove"
+                                    if result in tmpList:
+                                        tmpList.remove(result)
+                                result.whereFrom = breakNode
+                                
+
+                        elif (breakNode.to[0] or breakNode.upperLeave) and not (breakNode.to[1] or breakNode.lowerLeave):
+                            # print "lower"breakSpot
+                            x1, y1, x2, y2, length = breakNode.branch
+                            result = self.getNodeBranchOnTheRight(breakNode, rootList, mode = 'lower')
+                            if result and len(result.nodesIncluded + node.nodesIncluded) == len(list(set(result.nodesIncluded + node.nodesIncluded))):                                 
+                                node.nodesIncluded += result.nodesIncluded
+                                to = list(breakNode.to)
+                                to[1] = result
+                                breakNode.to = tuple(to)
+                                result.whereFrom = breakNode
+                                result.origin = node
+                                node.numNodes +=result.numNodes
+                                if result.isComplete:
+                                    # print "remove"
+                                    if result in tmpList:
+                                        tmpList.remove(result) 
+                                if PhyloParser.isNodeComplete(breakNode):                               
+                                    node.breakSpot.remove(breakNode)
                                 result.whereFrom = breakNode
                                 isFixed = True
                             else:
                                 isUpper = False
 
 
-
                         elif not (breakNode.to[0] or breakNode.upperLeave) and (breakNode.to[1] or breakNode.lowerLeave):
                             x1, y1, x2, y2, length = breakNode.branch
                             result = self.getNodeBranchOnTheRight(breakNode, rootList, mode = 'upper')
+
                             # print result
-                            if result:
+                            if result and len(result.nodesIncluded + node.nodesIncluded) == len(list(set(result.nodesIncluded + node.nodesIncluded))): 
+                                node.nodesIncluded += result.nodesIncluded
                                 to = list(breakNode.to)
                                 to[0] = result
                                 breakNode.to = tuple(to)
-                                node.breakSpot.remove(breakNode)
+                                if PhyloParser.isNodeComplete(breakNode):                               
+                                    node.breakSpot.remove(breakNode)
                                 result.origin = node
                                 node.numNodes+=result.numNodes
                                 if result.isComplete:
@@ -6442,6 +6487,7 @@ class PhyloParser():
                 if len(node.breakSpot) == 0 and node.whereFrom != None:
                     tmpList.remove(node)
         rootList = tmpList[:]
+
         rootList = sorted(rootList, key = lambda x: -x.numNodes)
         if len(rootList) == 1:
             rootList[0].isComplete = True
@@ -6696,8 +6742,12 @@ class PhyloParser():
                             nodeTo = list(node.to)
                             nodeTo[0] = newNode
                             node.to = tuple(nodeTo)
-
-                    return False
+                            if node.isRoot:
+                                node.breakSpot.append(newNode)
+                            else:
+                                rootNode = node.origin
+                                rootNode.breakSpot.append(node)
+                            return False
             else:
                 if node.isRoot:
                     node.breakSpot.append(node)
@@ -6720,6 +6770,11 @@ class PhyloParser():
                             nodeTo = list(node.to)
                             nodeTo[1] = newNode
                             node.to = tuple(nodeTo)
+                            if node.isRoot:
+                                node.breakSpot.append(newNode)
+                            else:
+                                rootNode = node.origin
+                                rootNode.breakSpot.append(node)                            
                             return False
             else:
                 if node.isRoot:
@@ -6743,6 +6798,11 @@ class PhyloParser():
                         if self.isSameLine(lines[0], node.interLeave[index]):
                             newNode = Node(node.interLeave[index], lines[1])
                             node.otherTo[index] = newNode
+                            if node.isRoot:
+                                node.breakSpot.append(newNode)
+                            else:
+                                rootNode = node.origin
+                                rootNode.breakSpot.append(node)
                             return False
             else:
                 if node.isRoot:
@@ -7056,7 +7116,7 @@ class PhyloParser():
 
         rootNode.area = area
 
-
+        rootNode.nodesIncluded = visit
         if isComplete:
             rootNode.isComplete = True
         loop = False, None
@@ -7127,7 +7187,20 @@ class PhyloParser():
         #         p_rootInex, p_branchIndex = parent
         #         if c_branchIndex == p_branchIndex:
         #             isFound = True
-                    
+    
+    @staticmethod
+    def isSameDot(dot1, dot2, margin = 5):
+        y1, x1 = dot1
+        y2, x2 = dot2
+
+        if x2 < x1 + margin and x2 > x1 - margin and y2 < y1 + margin and y2 > y1 - margin:
+            return True
+        else:
+            return False
+
+
+
+
     @staticmethod
     def old2newConverter(nodeInfo, mappingDict):
         root, branch, leaves = nodeInfo
@@ -7138,47 +7211,91 @@ class PhyloParser():
             rootLine = None
         branchLine = verLineMappingDict['lineMapping'][branch]['rline']
 
-        
-        if len(leaves) == 2:
+        upperLeave = None
+        lowerLeave = None
+        isUpperAnchor = False
+        isLowerAnchor = False
+        interLeave = []
+        isInterAnchor = []
+        otherTo = []
+        interLabel = []
+        leaves = sorted(leaves, key = lambda x: horLineMappingDict['lineMapping'][x]['rline'][1])
+        x1, y1, x2, y2, length = branchLine
 
-            leaves = sorted(leaves, key = lambda x: horLineMappingDict['lineMapping'][x]['rline'][1])
+        for leaf in leaves:
+            lx1, ly1, lx2, ly2, llength = horLineMappingDict['lineMapping'][leaf]['rline']
 
-            upperLeave = horLineMappingDict['lineMapping'][leaves[0]]['rline']
-            lowerLeave = horLineMappingDict['lineMapping'][leaves[1]]['rline']
-            a = Node(rootLine, branchLine, upperLeave, lowerLeave)
-            a.isBinary = True
-            if horLineMappingDict['lineMapping'][leaves[0]]['type'] == 'anchorLine':
-                a.isUpperAnchor = True
-            if horLineMappingDict['lineMapping'][leaves[1]]['type'] == 'anchorLine':
-                a.isLowerAnchor = True
-        elif len(leaves) >2:
-            leaves = sorted(leaves, key = lambda x: horLineMappingDict['lineMapping'][x]['rline'][1])
-            upperLeave = horLineMappingDict['lineMapping'][leaves[0]]['rline']
-            lowerLeave = horLineMappingDict['lineMapping'][leaves[-1]]['rline']   
-            a = Node(rootLine, branchLine, upperLeave, lowerLeave)
-
-            if horLineMappingDict['lineMapping'][leaves[0]]['type'] == 'anchorLine':
-                a.isUpperAnchor = True
-            if horLineMappingDict['lineMapping'][leaves[-1]]['type'] == 'anchorLine':
-                a.isLowerAnchor = True
-            for leaveIndex in range(1, len(leaves)-1):
-                interLeaveLine = horLineMappingDict['lineMapping'][leaves[leaveIndex]]['rline']
-                a.interLeave.append(interLeaveLine)
-                a.otherTo.append(None)
-                a.isInterAnchor.append(horLineMappingDict['lineMapping'][leaves[leaveIndex]]['type'])
-                a.interLabel.append(None)
-        elif len(leaves) == 1:
-            branchMidPt = ((branchLine[1] + branchLine[3])/2, branchLine[0])
-            leaveLine = horLineMappingDict['lineMapping'][leaves[0]]['rline']
-            if leaveLine[1] > branchMidPt[0]:
-                a = Node(rootLine, branchLine, None, leaveLine)
-                if horLineMappingDict['lineMapping'][leaves[0]]['type'] == 'anchorLine':
-                    a.isUpperAnchor = True
-
+            if not upperLeave and PhyloParser.isSameDot((ly1, lx1), (y1, x1)):
+                upperLeave = horLineMappingDict['lineMapping'][leaf]['rline']
+                if horLineMappingDict['lineMapping'][leaf]['type'] == 'anchorLine':
+                    isUpperAnchor = True
+            elif not lowerLeave and PhyloParser.isSameDot((ly1, lx1), (y2, x2)):
+                lowerLeave = horLineMappingDict['lineMapping'][leaf]['rline']
+                if horLineMappingDict['lineMapping'][leaf]['type'] == 'anchorLine':
+                    isLowerAnchor = True
             else:
-                a = Node(rootLine, branchLine, leaveLine, None)
-                if horLineMappingDict['lineMapping'][leaves[0]]['rline'] == 'anchorLine':
-                    a.isLowerAnchor = True
+                interLeave.append(horLineMappingDict['lineMapping'][leaf]['rline'])
+                if horLineMappingDict['lineMapping'][leaf]['type'] == 'anchorLine':
+                    isInterAnchor.append(True)
+                else:
+                    isInterAnchor.append(False)
+                otherTo.append(None)
+                interLabel.append(None)
+
+        a = Node(rootLine, branchLine, upperLeave, lowerLeave)
+
+        a.isUpperAnchor = isUpperAnchor
+        a.isLowerAnchor = isLowerAnchor
+
+        if len(interLeave) == 0:
+            a.isBinary = True
+        else:
+            a.isBinary = False
+            a.interLeave = interLeave
+            a.otherTo = otherTo
+            a.isInterAnchor = isInterAnchor
+            a.interLabel = interLabel
+
+        # if len(leaves) == 2:
+
+        #     leaves = sorted(leaves, key = lambda x: horLineMappingDict['lineMapping'][x]['rline'][1])
+
+        #     upperLeave = horLineMappingDict['lineMapping'][leaves[0]]['rline']
+        #     lowerLeave = horLineMappingDict['lineMapping'][leaves[1]]['rline']
+        #     a = Node(rootLine, branchLine, upperLeave, lowerLeave)
+        #     a.isBinary = True
+        #     if horLineMappingDict['lineMapping'][leaves[0]]['type'] == 'anchorLine':
+        #         a.isUpperAnchor = True
+        #     if horLineMappingDict['lineMapping'][leaves[1]]['type'] == 'anchorLine':
+        #         a.isLowerAnchor = True
+        # elif len(leaves) >2:
+        #     leaves = sorted(leaves, key = lambda x: horLineMappingDict['lineMapping'][x]['rline'][1])
+        #     upperLeave = horLineMappingDict['lineMapping'][leaves[0]]['rline']
+        #     lowerLeave = horLineMappingDict['lineMapping'][leaves[-1]]['rline']   
+        #     a = Node(rootLine, branchLine, upperLeave, lowerLeave)
+
+        #     if horLineMappingDict['lineMapping'][leaves[0]]['type'] == 'anchorLine':
+        #         a.isUpperAnchor = True
+        #     if horLineMappingDict['lineMapping'][leaves[-1]]['type'] == 'anchorLine':
+        #         a.isLowerAnchor = True
+        #     for leaveIndex in range(1, len(leaves)-1):
+        #         interLeaveLine = horLineMappingDict['lineMapping'][leaves[leaveIndex]]['rline']
+        #         a.interLeave.append(interLeaveLine)
+        #         a.otherTo.append(None)
+        #         a.isInterAnchor.append(horLineMappingDict['lineMapping'][leaves[leaveIndex]]['type'])
+        #         a.interLabel.append(None)
+        # elif len(leaves) == 1:
+        #     branchMidPt = ((branchLine[1] + branchLine[3])/2, branchLine[0])
+        #     leaveLine = horLineMappingDict['lineMapping'][leaves[0]]['rline']
+        #     if leaveLine[1] > branchMidPt[0]:
+        #         a = Node(rootLine, branchLine, None, leaveLine)
+        #         if horLineMappingDict['lineMapping'][leaves[0]]['type'] == 'anchorLine':
+        #             a.isUpperAnchor = True
+
+        #     else:
+        #         a = Node(rootLine, branchLine, leaveLine, None)
+        #         if horLineMappingDict['lineMapping'][leaves[0]]['rline'] == 'anchorLine':
+        #             a.isLowerAnchor = True
         return a
     # @staticmethod
     # def createNodes(image_data):
