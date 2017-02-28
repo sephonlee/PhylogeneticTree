@@ -1303,7 +1303,10 @@ class PhyloParser():
             lineDict['rline'] = targetLine
 
         if mode == 'hor':
-            print mappingDict
+            print mappingDict['lineMapping'][30]
+            for index in mappingDict['lineMapping'][30]['overlap']:
+                print 'index', mappingDict['overlapMapping'][index]
+            print mappingDict['overlapMapping'][65]
 
 
         for lineIndex, lineDict in mappingDict['lineMapping'].items():
@@ -1380,6 +1383,9 @@ class PhyloParser():
         #     print '----------------------------Before deleting-------------------------'
         #     print mappingDict
 
+        # print noiseIndexes
+        # print noiseOverlapIndexes
+
         for noiseIndex in noiseIndexes:
             del mappingDict['lineMapping'][noiseIndex]
 
@@ -1389,8 +1395,8 @@ class PhyloParser():
             # print mappingDict
 #         PhyloParser.displayImage(mask[:,:,0])
 
-        if mode == 'hor':
-            print mappingDict
+        # if mode == 'hor':
+        #     print mappingDict
 
 
         for lineIndex, lineDict in mappingDict['lineMapping'].items():
@@ -1508,6 +1514,8 @@ class PhyloParser():
                         else:
 
                             mappingDict['overlapMapping'][newOverlapIndex] = [coverIndex, mapIndex]
+                            mappingDict['lineMapping'][mapIndex]['overlap'].append(newOverlapIndex)
+                            mappingDict['lineMapping'][coverIndex]['overlap'].append(newOverlapIndex)                         
                             drawRange = PhyloParser.mapping2Dto3D(np.where((drawMask == 205) & (mask[:,:,0] == coverIndex)), 1)
                             mask[drawRange] = newOverlapIndex
                             newOverlapIndex +=1                       
@@ -3040,7 +3048,10 @@ class PhyloParser():
             intersectionIndexes = list(horLineMask[PhyloParser.mapping2Dto3D(intersectionArea, 0)])
             # print 'step1', intersectionIndexes
             # print overlapIndexes
+
             for overlapIndex in overlapIndexes:
+                if 30 in horLineMappingDict['overlapMapping'][overlapIndex]:
+                    print overlapIndex
                 intersectionIndexes += list(horLineMappingDict['overlapMapping'][overlapIndex])
             # print 'step2', intersectionIndexes
             potentialChildren = list(set(intersectionIndexes))
