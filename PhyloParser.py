@@ -1193,6 +1193,8 @@ class PhyloParser():
         image_data.horLines, image_data.horLineMask, image_data.horLineMappingDict = PhyloParser.getUniqueLinesList(horLines, horLineMask, horLineMappingDict, image_data, mode = 'hor')
         image_data.verLines, image_data.verLineMask, image_data.verLineMappingDict = PhyloParser.getUniqueLinesList(verLines, verLineMask, verLineMappingDict, image_data, mode = 'ver')
         image_data.lineGrouped = True
+
+
         # for key, value in horLineMappingDict.items():
         #     if key == 'overlapMapping':
         #         print value
@@ -1302,11 +1304,7 @@ class PhyloParser():
             lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
             lineDict['rline'] = targetLine
 
-        if mode == 'hor':
-            print mappingDict['lineMapping'][30]
-            for index in mappingDict['lineMapping'][30]['overlap']:
-                print 'index', mappingDict['overlapMapping'][index]
-            print mappingDict['overlapMapping'][65]
+
 
 
         for lineIndex, lineDict in mappingDict['lineMapping'].items():
@@ -1321,7 +1319,7 @@ class PhyloParser():
                             tx1, ty1, tx2, ty2, tlength = mappingDict['lineMapping'][lineIndex]['rline']
 
                             if mode == 'hor':
-                                if ox1 > tx1 - tlength/10 and ox2 < tx2 + tlength/10:
+                                if ox1 >= tx1 - tlength/10 and ox2 <= tx2 + tlength/10:
                                     midPoint = (ty1+oy1) / 2
                                     pixelValues = image_lineDetection[midPoint:midPoint + 1,ox1:ox2]
 
@@ -1331,7 +1329,7 @@ class PhyloParser():
                                     allPts = sum(pixelValueDict.values())
                                     for key, count in pixelValueDict.items():
                                         if key < 255/2:
-                                            blackPts +=1
+                                            blackPts +=count
 
                                     if blackPts > allPts/2:
                                         isNoise = True
@@ -1339,16 +1337,20 @@ class PhyloParser():
                                             noisePool.append(overlapIndex)
                             elif mode == 'ver':
 
-                                if oy1 > ty1 - tlength/10 and oy2 < ty2 + tlength/10:
+                                if oy1 >= ty1 - tlength/10 and oy2 <= ty2 + tlength/10:
+
                                     midPoint = (tx1+ox1)/2
                                     pixelValues = image_lineDetection[oy1:oy2,midPoint :midPoint +1]
+
                                     values, counts = np.unique(pixelValues, return_counts=True)
                                     pixelValueDict = dict(zip(values, counts))
+
                                     blackPts = 0
                                     allPts = sum(pixelValueDict.values())
                                     for key, count in pixelValueDict.items():
                                         if key < 255/2:
-                                            blackPts +=1
+                                            blackPts +=count
+
                                     if blackPts>allPts/2:
                                         isNoise = True
                                         if overlapIndex not in noisePool:
@@ -1393,7 +1395,7 @@ class PhyloParser():
             del mappingDict['overlapMapping'][noiseIndex]
             # print '----------------------------After deleting-------------------------'
             # print mappingDict
-        PhyloParser.displayImage(mask[:,:,0])
+
 
         # if mode == 'hor':
         #     print mappingDict
