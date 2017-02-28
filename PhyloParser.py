@@ -188,6 +188,10 @@ class PhyloParser():
         return 
 
 
+
+
+
+
     @staticmethod
     def preprocces(image_data, debug = False):
         
@@ -221,6 +225,10 @@ class PhyloParser():
 #             print "display non-tree mask"
 #             PhyloParser.displayImage(image_data.nonTreeMask)
 
+        image = cv.equalizeHist(image)
+        PhyloParser.displayImage(image)
+
+
         image, edgeMask, hasBackground= PhyloParser.removeBackground(image)
 
         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(255 - PhyloParser.negateImage(image)) 
@@ -238,6 +246,8 @@ class PhyloParser():
         if debug:
             print "bilateralFilter image"
             PhyloParser.displayImage(image)
+
+
                         
         image_data.image_preproc = image
         image_data.hasBackground = hasBackground
@@ -5772,8 +5782,7 @@ class PhyloParser():
             
             # Pair h-v branch (parent) and v-h branch (children)
             image_data = self.createNodesFromLineGroups(image_data, tracing)
-            print image_data.horLineMappingDict
-            print image_data.verLineMappingDict
+
             if debug:
                 print "Display Nodes"
                 image_data.displayNodes()
