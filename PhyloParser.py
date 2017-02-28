@@ -350,6 +350,7 @@ class PhyloParser():
         backgroundList = []
         bins = bins[0:255]
         diff = diff[0:255]
+   
         indexes = peakutils.indexes(diff, thres=peakThreshold, min_dist=minDistThreshold)
         # print indexes
         tmp = []
@@ -1171,7 +1172,21 @@ class PhyloParser():
 
 
     @staticmethod
-    def groupLines(image_data):
+    def postProcessLines(image_data):
+
+        image_data.horLines = PhyloParser.cutLines(image_data.horLines, image_data.verLines)
+
+        horLines = PhyloParser.purifyLines(image_data.horLines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'hor')
+        verLines = PhyloParser.purifyLines(image_data.verLines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'ver')
+       
+        image_data.horLines = horLines
+        image_data.verLines = verLines
+
+        return image_data
+
+
+    @staticmethod
+    def groupLines(image_data, debug = False):
         horLines = image_data.horLines[:]
         verLines = image_data.verLines[:]
         if image_data.preprocessed:    
@@ -1195,9 +1210,14 @@ class PhyloParser():
         image_data.lineGrouped = True
 
 
+        if debug:
+            print 'groupLines debugging'
+            image_data.displayTargetLines('horLines')
+            image_data.displayTargetLines('verLines')
+
         # for key, value in horLineMappingDict.items():
         #     if key == 'overlapMapping':
-        #         print value
+        #         print valuef
         #     elif key == 'lineMapping':
         #         for indexKey, mapValue in value.items():
         #             print '----------------------------'
@@ -1328,7 +1348,7 @@ class PhyloParser():
                                     blackPts = 0
                                     allPts = sum(pixelValueDict.values())
                                     for key, count in pixelValueDict.items():
-                                        if key < 255/2:
+                                        if key < 235:
                                             blackPts +=count
 
                                     if blackPts > allPts/2:
@@ -1338,19 +1358,19 @@ class PhyloParser():
                             elif mode == 'ver':
 
                                 if oy1 >= ty1 - tlength/10 and oy2 <= ty2 + tlength/10:
-
+                                    
                                     midPoint = (tx1+ox1)/2
                                     pixelValues = image_lineDetection[oy1:oy2,midPoint :midPoint +1]
 
                                     values, counts = np.unique(pixelValues, return_counts=True)
                                     pixelValueDict = dict(zip(values, counts))
-
+                                    
                                     blackPts = 0
                                     allPts = sum(pixelValueDict.values())
                                     for key, count in pixelValueDict.items():
-                                        if key < 255/2:
+                                        if key < 235:
                                             blackPts +=count
-
+                                    
                                     if blackPts>allPts/2:
                                         isNoise = True
                                         if overlapIndex not in noisePool:
@@ -1999,13 +2019,7 @@ class PhyloParser():
 
         # split horizontal lines that cut by vertical lines
         # to solve the problem of Poseidon trigeminal stick
-        image_data.horLines = PhyloParser.cutLines(image_data.horLines, image_data.verLines)
 
-
-
-        horLines = PhyloParser.purifyLines(image_data.horLines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'hor')
-        verLines = PhyloParser.purifyLines(image_data.verLines, image_data.image_preproc_for_line_detection, PhyloParser.negateImage(image_data.image_preproc_for_line_detection), 'ver')
-       
         if debug:
             print "detectLines debugging"
             image_data.displayTargetLines('horLines')
@@ -2021,7 +2035,7 @@ class PhyloParser():
         varList_ = []
         aveList = []
         aveList_ = []
-        # PhyloParser.displayImage(image)
+
         for line in lineList:
             x1, y1, x2, y2, length = line
             if mode == 'hor':
@@ -2037,7 +2051,6 @@ class PhyloParser():
                 varList_.append(line)
             # varList.append(var)
             # aveList.append(ave)
-
         # varList = sorted(varList, key = lambda x: -x)
         # aveList = sorted(aveList, key = lambda x: -x)
         # PhyloParser.displayLines(image, varList)
@@ -2170,10 +2183,11 @@ class PhyloParser():
         return lineList
     
     @staticmethod
-    def cutLines(horLines, verLines, length_threshold = 20, line_ratio_threshold = 0.3):
+    def cutLines(horLines, verLines, length_threshold = 20, line_ratio_threshold = 0.2):
 
         newList = []
         margin = 5
+
         for line in horLines:
             if line[4] < length_threshold:
                 newList.append(line)
@@ -2182,8 +2196,10 @@ class PhyloParser():
                 isnotcut = True
                 for vx1, vy1, vx2, vy2, vlength in verLines:
                     if x1+margin < vx1 and vx1 < x2-margin and vy1 < y1 and y1 < vy2:
+
                         newline1 = [x1, y1, vx1, y2, vx1-x1]
                         newline2 = [vx1, y1, x2, y2, x2-vx1]
+                        print (vx1-x1+0.0) / length, (vx1 - x1+0.0)/length
                         if (vx1-x1+0.0) / length > line_ratio_threshold and (vx1 - x1+0.0)/length < 1-line_ratio_threshold:
                             newList.append(tuple(newline1))
                             newList.append(tuple(newline2))
@@ -2191,7 +2207,7 @@ class PhyloParser():
                             break
                 if isnotcut:
                     newList.append(line)
-                    
+          
         return newList
 
     ## end static method for detectLine ##
@@ -2957,6 +2973,7 @@ class PhyloParser():
     # merge the lines created from corners with lines created from line detection
     def includeLinesFromCorners(image_data):
         if image_data.lineDetectedFromCorners and image_data.lineDetected:
+
             ver_lines = PhyloParser.pointSetToLine(image_data.image_preproc_for_corner, image_data.pointSet_ver, type="corners")
             hor_lines_up =  PhyloParser.pointSetToLine(image_data.image_preproc_for_corner, image_data.upPointSet_hor, type="joints")
             hor_lines_down =  PhyloParser.pointSetToLine(image_data.image_preproc_for_corner, image_data.downPointSet_hor, type="joints")
@@ -3067,8 +3084,6 @@ class PhyloParser():
             # print overlapIndexes
 
             for overlapIndex in overlapIndexes:
-                if 30 in horLineMappingDict['overlapMapping'][overlapIndex]:
-                    print overlapIndex
                 intersectionIndexes += list(horLineMappingDict['overlapMapping'][overlapIndex])
             # print 'step2', intersectionIndexes
             potentialChildren = list(set(intersectionIndexes))
@@ -3112,6 +3127,24 @@ class PhyloParser():
 
                 childrenIndexes[countIndexes] = leavesIndex
                 countIndexes +=1
+
+
+        for horLineIndex, horLineGroup in horLineMappingDict['lineMapping'].items():
+            if len(horLineGroup['children'])>1:
+                isCloserIndex = None
+                isCloserSpot = None
+                for childIndex in horLineGroup['children']:
+                    x1, y1, x2, y2, length = verLineMappingDict['lineMapping'][childIndex]['rline']
+                    if not isCloserIndex or x1 > isCloserSpot:
+                        if isCloserIndex:
+                            verLineMappingDict['lineMapping'][isCloserIndex]['children'].remove(horLineIndex)
+                        isCloserIndex = childIndex
+                        isCloserSpot = x1
+                    else:
+                        verLineMappingDict['lineMapping'][childIndex]['children'].remove(horLineIndex)
+                newChildren = [childIndex]
+                horLineGroup['children'] = newChildren
+
 
 
         image_data.children = children
@@ -5739,7 +5772,8 @@ class PhyloParser():
             
             # Pair h-v branch (parent) and v-h branch (children)
             image_data = self.createNodesFromLineGroups(image_data, tracing)
-
+            print image_data.horLineMappingDict
+            print image_data.verLineMappingDict
             if debug:
                 print "Display Nodes"
                 image_data.displayNodes()
@@ -5781,7 +5815,7 @@ class PhyloParser():
 
             # merge tree structure and species text
 #             if image_data.speciesNameReady:
-            image_data.treeStructure = self.mergeTreeAndText(image_data, mode="structure") ######bugged
+            image_data.treeStructure = self.mergeTreeAndText(image_data) ######bugged
 
             if debug:
                 image_data.displayTrees('final')                
@@ -6772,7 +6806,7 @@ class PhyloParser():
                         for newNode in newNodeList:
                             if newNode.root and PhyloParser.isSameLine(node.lowerLeave, newNode.root):
                                 tmp = list(node.to)
-                                tmp[1] = newNode
+                                tmp[1] = newNode  
                                 node.to = tuple(tmp)
                                 newNode.whereFrom = node
                 if not node.isBinary:
