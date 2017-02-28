@@ -7291,12 +7291,13 @@ class PhyloParser():
 
         image_data = PhyloParser.connectNodes_old(image_data)
 
-        nodeList, searchNodesMask, nodesMappingDict = PhyloParser.removeRepeatedNodes(nodeList, image)
-        image_data.nodeList = nodeList
-        image_data.searchNodesMask = searchNodesMask
-        image_data.nodesMappingDict = nodesMappingDict
 
-        # image_data.displayNodes()
+        # # nodeList, searchNodesMask, nodesMappingDict = PhyloParser.removeRepeatedNodes(nodeList, image)
+        # image_data.nodeList = nodeList
+        # # image_data.searchNodesMask = searchNodesMask
+        # # image_data.nodesMappingDict = nodesMappingDict
+        # image_data.branchArray = branchArray
+        # # image_data.displayNodes()
 
 
 
@@ -7317,7 +7318,7 @@ class PhyloParser():
                 lineMap[nodeNumber].append((node, len(lines)))
             else:
                 lineMap[nodeNumber] = [(node, len(lines))]
-        print lineMap
+
         # PhyloParser.displayImage(searchNodesMask)
 
         newNodeList = []
