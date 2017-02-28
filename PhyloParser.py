@@ -1395,11 +1395,9 @@ class PhyloParser():
             del mappingDict['overlapMapping'][noiseIndex]
             # print '----------------------------After deleting-------------------------'
             # print mappingDict
-<<<<<<< HEAD
-#         PhyloParser.displayImage(mask[:,:,0])
-=======
 
->>>>>>> ba5e91c2c3374c44917bcc9a967e8d48b2d93ef5
+#         PhyloParser.displayImage(mask[:,:,0])
+
 
         # if mode == 'hor':
         #     print mappingDict
