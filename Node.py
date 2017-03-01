@@ -2,13 +2,13 @@
 class Node():
     def __init__(self, root = None, branch = None, upperLeave = None, lowerLeave = None):
         self.root = root
-        self.branch = branch
-        self.upperLeave = upperLeave
-        self.interLeave = []
-        self.lowerLeave = lowerLeave
-        self.to = (None, None)
-        self.otherTo = [] 
-        self.whereFrom = None
+        self.branch = branch #vertical line
+        self.upperLeave = upperLeave  #top horizontal line
+        self.interLeave = [] #connected horizontal line, indicating non-binary tree
+        self.lowerLeave = lowerLeave #bottom horizontal line
+        self.to = (None, None) #(top children node, bottom children node)
+        self.otherTo = [] #list of connected children (not top bot bottom)
+        self.whereFrom = None #parent node
         self.origin = None
         self.isRoot = False
         self.isBinary = False
@@ -21,12 +21,15 @@ class Node():
         self.lowerLabel = None
         self.interLabel = []
         self.area = None
-        self.breakSpot = []
+        self.breakSpot = [] #only root has something in the list
         self.status = 0
         self.isConnected = False
         self.score = None # update by method evaluateNode
         self.nodesNetwork = [] #update by method createNodes
 
+        # Only enable for root node
+        self.verifiedAnchorLines = None #checked by PhyloParser.getSuspiciousAnchorLline
+        self.suspiciousAnchorLines = None #checked by PhyloParser.getSuspiciousAnchorLline
 
 
 
@@ -85,64 +88,68 @@ class Node():
     def sortByY(self, item):
         return item[0][1]
 
-    # def getTreeSpecies(speciesList):
+#     def getTreeSpecies(self, speciesList):
+# 
+#         if self.to[0]:
+#             upperChildren, speciesIndex = self.to[0].getTreeSpecies(speciesList)
+#         else:
+#             if self.upperLabel:
+#                 upperChildren = self.upperLabel
+#             elif self.isUpperAnchor:
+#                 if self.upperLeave in speciesList:
+#                     upperChildren = speciesList[self.upperLeave]
+#                 else:
+#                     upperChildren = "%s" %str(speciesIndex)
+#                     speciesIndex+=1
+#             else:
+#                 upperChildren = "**"
+#         if self.to[1]:
+#             lowerChildren, speciesIndex = self.to[1].getTreeSpecies(speciesList)
+#         else:
+#             if self.lowerLabel:
+#                 lowerChildren = self.lowerLabel
+#             elif self.isLowerAnchor:
+#                 if self.lowerLeave in speciesList:
+#                     lowerChildren = speciesList[self.lowerLeave]
+#                 else:
+#                     lowerChildren = "%s" %str(speciesIndex)
+#                     speciesIndex+=1
+#             else:
+#                 lowerChildren = "**"
+# 
+#         if self.isBinary:
+#             return "(%s, %s)" %(upperChildren, lowerChildren), speciesIndex
+#         else:
+#             result = "(%s," %upperChildren
+# 
+#             for index, to in enumerate(self.otherTo):
+#                 if to:
+#                     interChildren, speciesIndex = to.getTreeSpecies(speciesList)
+#                 else:
+#                     if self.interLabel[index]:
+#                         interChildren = self.interLabel
+#                     elif self.isInterAnchor[index]:
+#                         interChildren = "%s" %str(speciesIndex)
+#                         speciesIndex+=1
+#                     else:
+#                         interChildren = "**"
+#                 result += interChildren + ','
+# 
+#             return result + '%s)' %lowerChildren, speciesIndex        
 
-    #     if self.to[0]:
-    #         upperChildren, speciesIndex = self.to[0].getTreeSpecies(speciesList)
-    #     else:
-    #         if self.upperLabel:
-    #             upperChildren = self.upperLabel
-    #         elif self.isUpperAnchor:
-    #             if self.upperLeave in speciesList:
-    #                 upperChildren = speciesList[self.upperLeave]
-    #             else:
-    #                 upperChildren = "%s" %str(speciesIndex)
-    #                 speciesIndex+=1
-    #         else:
-    #             upperChildren = "**"
-    #     if self.to[1]:
-    #         lowerChildren, speciesIndex = self.to[1].getTreeSpecies(speciesList)
-    #     else:
-    #         if self.lowerLabel:
-    #             lowerChildren = self.lowerLabel
-    #         elif self.isLowerAnchor:
-    #             if self.lowerLeave in speciesList:
-    #                 lowerChildren = speciesList[self.lowerLeave]
-    #             else:
-    #                 lowerChildren = "%s" %str(speciesIndex)
-    #                 speciesIndex+=1
-    #         else:
-    #             lowerChildren = "**"
+    def getTreeSpecies(self, speciesList):
+        return
 
-    #     if self.isBinary:
-    #         return "(%s, %s)" %(upperChildren, lowerChildren), speciesIndex
-    #     else:
-    #         result = "(%s," %upperChildren
+    def getTreeString(self, useText = False):
+#         print self.printTree(0)
+        return self.printTree(0, useText=useText)[0]
 
-    #         for index, to in enumerate(self.otherTo):
-    #             if to:
-    #                 interChildren, speciesIndex = to.getTreeSpecies(speciesList)
-    #             else:
-    #                 if self.interLabel[index]:
-    #                     interChildren = self.interLabel
-    #                 elif self.isInterAnchor[index]:
-    #                     interChildren = "%s" %str(speciesIndex)
-    #                     speciesIndex+=1
-    #                 else:
-    #                     interChildren = "**"
-    #             result += interChildren + ','
-
-    #         return result + '%s)' %lowerChildren, speciesIndex        
-
-    def getTreeString(self):
-        return self.printTree(0)[0]
-
-    def printTree(self, speciesIndex):
+    def printTree(self, speciesIndex, useText = False):
 
         if self.to[0]:
-            upperChildren, speciesIndex = self.to[0].printTree(speciesIndex)
+            upperChildren, speciesIndex = self.to[0].printTree(speciesIndex, useText=useText)
         else:
-            if self.upperLabel:
+            if self.upperLabel and useText:
                 upperChildren = self.upperLabel
             elif self.isUpperAnchor:
                 upperChildren = "%s" %str(speciesIndex)
@@ -150,9 +157,9 @@ class Node():
             else:
                 upperChildren = "**"
         if self.to[1]:
-            lowerChildren, speciesIndex = self.to[1].printTree(speciesIndex)
+            lowerChildren, speciesIndex = self.to[1].printTree(speciesIndex, useText=useText)
         else:
-            if self.lowerLabel:
+            if self.lowerLabel and useText:
                 lowerChildren = self.lowerLabel
             elif self.isLowerAnchor:
                 lowerChildren = "%s" %str(speciesIndex)
@@ -166,11 +173,13 @@ class Node():
             result = "(%s," %upperChildren
 
             for index, to in enumerate(self.otherTo):
+                
                 if to:
-                    interChildren, speciesIndex = to.printTree(speciesIndex)
+                    interChildren, speciesIndex = to.printTree(speciesIndex, useText=useText)
                 else:
-                    if self.interLabel[index]:
-                        interChildren = self.interLabel
+                    
+                    if self.interLabel[index] and useText:
+                        interChildren = self.interLabel[index]
                     elif self.isInterAnchor[index]:
                         interChildren = "%s" %str(speciesIndex)
                         speciesIndex+=1
