@@ -47,13 +47,13 @@ class PhyloTree(Tree):
             tree.name = label 
             
         return 
+    
     @staticmethod
-    def getNodeNum(tree, level = 0, num = 0):
+    def getNodeNum(tree, num = 1):
         children = tree.children
         if children is not None:
             for c in tree.get_children(tree):
-                num  = PhyloTree.getNodeNum(c, level = level +1, num = num) + 1
-        
+                num = PhyloTree.getNodeNum(c, num = num) + 1        
         return num
 
     
@@ -340,7 +340,7 @@ if __name__ == '__main__':
     # tree.render("/Users/sephon/Downloads/tree_example.png", tree_style=ts)
     
 
-    string = 'J0J1J1J1J0*J0*J0*J0J1J1J2J0J1J1J1J0J2J1J2J1J1'
+    string = 'J0J1J1J1J1J0J2J0J0J3J0J2J0J0J3J0J2J0J1J0J0J3J0J1J3J1'
 
 
 
@@ -348,20 +348,24 @@ if __name__ == '__main__':
 
     print t1
 
-    print PhyloTree.getNodeNum(t1)
+#     print PhyloTree.getNodeNum(t1)
 
 
     t1 = PhyloTree("((a,(b,c)),(d,(e,f)));")
     t2 = PhyloTree("((a,b),(c,(d,e)));")
+#     t1 = PhyloTree("((A,B),(C,D));")
+#     t2 = PhyloTree("((C,D),(A,B));")
     
 #     t1 = PhyloTree("((X,(X,X)), (X,(X,X)));")
 #     t2 = PhyloTree("((X,(X,X)), ((X,X),(X,X)));")
 
-    PhyloTree.rename_node(t1, rename_all=True)
-    PhyloTree.rename_node(t2, rename_all=True)
+#     PhyloTree.rename_node(t1, rename_all=True)
+#     PhyloTree.rename_node(t2, rename_all=True)
 
     print t1
+    print PhyloTree.getNodeNum(t1)
     print t2
+    print PhyloTree.getNodeNum(t2)
 
     
     print "distance", PhyloTree.zhang_shasha_distance(t1, t2)
