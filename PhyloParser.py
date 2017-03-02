@@ -6332,6 +6332,7 @@ class PhyloParser():
                             connectNode = PhyloParser.getNodeBranchOnTheRight(node, rootList, mode = 'upper')
                             if connectNode:
                                 rootNode.numNodes += connectNode.numNodes
+                                rootNode.nodesIncluded += connectNode.nodesIncluded
                                 tmpTo = list(node.to)
                                 tmpTo[0] = connectNode
                                 node.to = tuple(tmpTo)
@@ -6343,6 +6344,7 @@ class PhyloParser():
                             connectNode = PhyloParser.getNodeBranchOnTheRight(node, rootList, mode = 'lower')
                             if connectNode:
                                 rootNode.numNodes += connectNode.numNodes
+                                rootNode.nodesIncluded += connectNode.nodesIncluded
                                 tmpTo = list(node.to)
                                 tmpTo[1] = connectNode
                                 node.to = tuple(tmpTo)
@@ -6356,6 +6358,7 @@ class PhyloParser():
                                     connectNode = PhyloParser.getNodeBranchOnTheRight(node, rootList, mode = interLine)
                                     if connectNode:
                                         rootNode.numNodes += connectNode.numNodes
+                                        rootNode.nodesIncluded += connectNode.nodesIncluded
                                         node.otherTo[lineIndex] = connectNode
                                 elif node.otherTo[lineIndex] and node.otherTo[lineIndex] not in seen:
                                     stack.append(node.otherTo[lineIndex])
@@ -6854,66 +6857,176 @@ class PhyloParser():
                     #     rootList.remove(rootNode)
 
 
+        # rootList = sorted(rootList, key = lambda x: -x.numNodes)
+        rootList = sorted(rootList, key = lambda x: (x.numNodes, x.branch[0]))
 
-        rootList = sorted(rootList, key = lambda x: -x.numNodes)
+        connectedRootNodes = []
 
         if tracing:
-
-            mask, breakNodes, newNodeList = PhyloParser.findMissingLines(rootList[0].breakSpot, [], image_data)
-            seen = []
-            for node in newNodeList:
-                if not node.to[0] and not node.isUpperAnchor:
-                    if node.upperLeave:
-                        for newNode in newNodeList:
-                            if newNode.root and PhyloParser.isSameLine(node.upperLeave, newNode.root) and newNode not in seen:
-                                tmp = list(node.to)
-                                tmp[0] = newNode
-                                node.to = tuple(tmp)
-                                newNode.whereFrom = node
-                if not node.to[1] and not node.isLowerAnchor:
-                    if node.lowerLeave:
-                        for newNode in newNodeList:
-                            if newNode.root and PhyloParser.isSameLine(node.lowerLeave, newNode.root):
-                                tmp = list(node.to)
-                                tmp[1] = newNode  
-                                node.to = tuple(tmp)
-                                newNode.whereFrom = node
-                if not node.isBinary:
-                    for index, line in enumerate(node.interLeave):
-                        if not node.otherTo[index] and not node.isInterAnchor[index]:
-                            if line:
+            for topRootNode in rootList:
+                if topRootNode not in connectedRootNodes:
+                # image_data.nodeList = rootList
+                # image_data.displayNodes()
+                    mask, breakNodes, newNodeList = PhyloParser.findMissingLines(topRootNode.breakSpot, [], image_data, mask = image_data.nodesCoveredMask)
+                    seen = []
+                    image_data.nodeList = breakNodes
+                    for node in newNodeList:
+                        if not node.to[0] and not node.isUpperAnchor:
+                            if node.upperLeave:
                                 for newNode in newNodeList:
-                                    if newNode.root and PhyloParser.isSameLine(line, newNode.root):
-                                        node.otherTo[index] = newNode
+                                    if newNode.root and PhyloParser.isSameLine(node.upperLeave, newNode.root) and newNode not in seen:
+                                        tmp = list(node.to)
+                                        tmp[0] = newNode
+                                        node.to = tuple(tmp)
                                         newNode.whereFrom = node
 
-
-            for node in breakNodes:
-                if not node.to[0] and not node.isUpperAnchor:
-                    if node.upperLeave:
-                        for newNode in newNodeList:
-                            if newNode.root and PhyloParser.isSameLine(node.upperLeave, newNode.root):
-                                tmp = list(node.to)
-                                tmp[0] = newNode
-                                node.to = tuple(tmp)
-                                newNode.whereFrom = node
-                if not node.to[1] and not node.isLowerAnchor:
-                    if node.lowerLeave:
-                        for newNode in newNodeList:
-                            if newNode.root and PhyloParser.isSameLine(node.lowerLeave, newNode.root):
-                                tmp = list(node.to)
-                                tmp[1] = newNode
-                                node.to = tuple(tmp)
-                                newNode.whereFrom = node
-                if not node.isBinary:
-                    for index, line in enumerate(node.interLeave):
-                        if not node.otherTo[index] and not node.isInterAnchor[index]:
-                            if line:
+                                foundRoot =None
+                                for rootNode in rootList:
+                                    if rootNode!=topRootNode and rootNode not in connectedRootNodes:
+                                        rootBranch = rootNode.branch
+                                        endPt = (upperLeave[2], upperLeave[3])
+                                        if PhyloParser.isDotWithinLine(endPt, rootBranch):
+                                            tmp = list(node.to)
+                                            tmp[0] = rootNode
+                                            node.to = tuple(tmp)
+                                            rootNode.whereFrom = node
+                                            foundRoot = rootNode
+                                            node.origin.numNodes += rootNode.numNodes
+                                            node.origin.nodesIncluded += rootNode.nodesIncluded
+                                            break
+                                if foundRoot:
+                                    rootList.remove(foundRoot)
+                        if not node.to[1] and not node.isLowerAnchor:
+                            if node.lowerLeave:
                                 for newNode in newNodeList:
-                                    if newNode.root and  PhyloParser.isSameLine(line, newNode.root):
-                                        node.otherTo[index] = newNode
+                                    if newNode.root and PhyloParser.isSameLine(node.lowerLeave, newNode.root):
+                                        tmp = list(node.to)
+                                        tmp[1] = newNode  
+                                        node.to = tuple(tmp)
                                         newNode.whereFrom = node
+                                foundRoot =None
+                                for rootNode in rootList:
+                                    if rootNode!=topRootNode and rootNode not in connectedRootNodes:
+                                        rootBranch = rootNode.branch
+                                        endPt = (lowerLeave[2], lowerLeave[3])
+                                        if PhyloParser.isDotWithinLine(endPt, rootBranch):
+                                            tmp = list(node.to)
+                                            tmp[1] = rootNode
+                                            node.to = tuple(tmp)
+                                            rootNode.whereFrom = node
+                                            foundRoot = rootNode
+                                            node.origin.numNodes += rootNode.numNodes
+                                            node.origin.nodesIncluded += rootNode.nodesIncluded
+                                            break
+                                if foundRoot:
+                                    rootList.remove(foundRoot)
 
+                        if not node.isBinary:
+                            for index, line in enumerate(node.interLeave):
+                                if not node.otherTo[index] and not node.isInterAnchor[index]:
+                                    if line:
+                                        for newNode in newNodeList:
+                                            if newNode.root and PhyloParser.isSameLine(line, newNode.root):
+                                                node.otherTo[index] = newNode
+                                                newNode.whereFrom = node
+                                        foundRoot = None
+                                        for rootNode in rootList:
+                                            if rootNode!=topRootNode and rootNode not in connectedRootNodes:
+                                                rootBranch = rootNode.branch
+                                                endPt = (line[2], line[3])
+                                                if PhyloParser.isDotWithinLine(endPt, rootBranch):
+                                                    node.otherTo[index] = rootNode
+                                                    rootNode.whereFrom = node
+                                                    foundRoot = rootNode
+                                                    node.origin.numNodes += rootNode.numNodes
+                                                    node.origin.nodesIncluded += rootNode.nodesIncluded
+                                                    break
+                                        if foundRoot:
+                                            rootList.remove(foundRoot)
+
+                    for node in breakNodes:
+
+                        if not node.to[0] and not node.isUpperAnchor:
+                            if node.upperLeave:
+                                for newNode in newNodeList:
+                                    if newNode.root and PhyloParser.isSameLine(node.upperLeave, newNode.root):
+                                        tmp = list(node.to)
+                                        tmp[0] = newNode
+                                        node.to = tuple(tmp)
+                                        newNode.whereFrom = node
+                                foundRoot =None
+                                for rootNode in rootList:
+                                    if rootNode!=topRootNode and rootNode not in connectedRootNodes:
+                                        rootBranch = rootNode.branch
+                                        endPt = (node.upperLeave[2], node.upperLeave[3])
+
+                                        if PhyloParser.isDotWithinLine(endPt, rootBranch):
+
+                                            
+                                            tmp = list(node.to)
+                                            tmp[0] = rootNode
+                                            node.to = tuple(tmp)
+                                            rootNode.whereFrom = node
+                                            foundRoot = rootNode
+                                            node.origin.numNodes += rootNode.numNodes
+                                            node.origin.nodesIncluded += rootNode.nodesIncluded
+                                            break
+                                if foundRoot:
+                                    rootList.remove(foundRoot)
+                        if not node.to[1] and not node.isLowerAnchor:
+                            if node.lowerLeave:
+                                for newNode in newNodeList:
+                                    if newNode.root and PhyloParser.isSameLine(node.lowerLeave, newNode.root):
+                                        tmp = list(node.to)
+                                        tmp[1] = newNode
+                                        node.to = tuple(tmp)
+                                        newNode.whereFrom = node
+                                foundRoot =None
+                                for rootNode in rootList:
+                                    if rootNode!=topRootNode and rootNode not in connectedRootNodes:
+                                        rootBranch = rootNode.branch
+                                        endPt = (node.lowerLeave[2], node.lowerLeave[3])
+                                        if PhyloParser.isDotWithinLine(endPt, rootBranch):
+                                            
+                                            tmp = list(node.to)
+                                            tmp[1] = rootNode
+                                            node.to = tuple(tmp)
+                                            rootNode.whereFrom = node
+                                            foundRoot = rootNode
+                                            node.origin.numNodes += rootNode.numNodes
+                                            node.origin.nodesIncluded += rootNode.nodesIncluded
+                                            break
+                                if foundRoot:
+                                    rootList.remove(foundRoot)
+                        if not node.isBinary:
+                            for index, line in enumerate(node.interLeave):
+                                if not node.otherTo[index] and not node.isInterAnchor[index]:
+                                    if line:
+                                        for newNode in newNodeList:
+                                            if newNode.root and  PhyloParser.isSameLine(line, newNode.root):
+                                                node.otherTo[index] = newNode
+                                                newNode.whereFrom = node
+                                        foundRoot = None
+                                        for rootNode in rootList:
+                                            if rootNode!=topRootNode and rootNode not in connectedRootNodes:
+                                                rootBranch = rootNode.branch
+                                                endPt = (line[2], line[3])
+                                                if PhyloParser.isDotWithinLine(endPt, rootBranch):
+                                                       
+                                                    node.otherTo[index] = rootNode
+                                                    rootNode.whereFrom = node
+                                                    foundRoot = rootNode
+                                                    node.origin.numNodes += rootNode.numNodes
+                                                    node.origin.nodesIncluded += rootNode.nodesIncluded
+                                                    break
+                                        if foundRoot:
+                                            rootList.remove(foundRoot)
+        
+        for node in connectedRootNodes:
+            if node in rootList:
+                rootList.remove(node)
+
+        rootList = sorted(rootList, key = lambda x: -x.numNodes)
         image_data.rootList = rootList
         return image_data
 
@@ -7136,13 +7249,30 @@ class PhyloParser():
 
         # for verLineIndex, 
 
+    @staticmethod
+    def drawNodesCoveredMask(node, nodesCoveredMask, mappingDictList):
+        horLineMappingDict, verLineMappingDict = mappingDictList
+        parent, verLineIndex, lineChildren = node
+        # if parent:
+        #     for line in horLineMappingDict['lineMapping'][parent]['lineGroup']:
+        #         x1, y1, x2, y2, length = line
+        #         nodesCoveredMask[y1:y2+1, x1:x2] = 255
+
+        for line in verLineMappingDict['lineMapping'][verLineIndex]['lineGroup']:
+            x1, y1, x2, y2, length = line
+            nodesCoveredMask[y1:y2, x1:x2+1] = 255
+
+        # for child in lineChildren:
+        #     for line in horLineMappingDict['lineMapping'][child]['lineGroup']:
+        #         x1, y1, x2, y2, length = line
+        #         nodesCoveredMask[y1:y2+1, x1:x2] = 255
 
     @staticmethod
     def createNodesFromLineGroups(image_data, tracing = False):
 
         image = image_data.image
         height, width = image.shape
-        nodesCoverdMask = np.zeros((height, width), dtype = np.uint8)
+        nodesCoveredMask = np.zeros((height, width), dtype = np.uint8)
         # parents = image_data.parentsIndexes
         # children = image_data.childrenIndexes
         horLineMask = image_data.horLineMask
@@ -7153,6 +7283,7 @@ class PhyloParser():
         nodes = {}
         notCompleteNode = []
         oldversion_nodeList = []
+        brokenNodes = []
         for verLineIndex, verLineGroup in verLineMappingDict['lineMapping'].items():
             if len(verLineGroup['children'])!=0:
                 lineChildren = verLineGroup['children'][:]
@@ -7160,24 +7291,36 @@ class PhyloParser():
                 for parent in verLineGroup['parent']:
                     newversion_node = [parent, verLineIndex, lineChildren]
                     nodes[nodeIndex] = [parent, verLineIndex, lineChildren]
+                    PhyloParser.drawNodesCoveredMask(newversion_node, nodesCoveredMask, [horLineMappingDict, verLineMappingDict])
                     oldversion_node = PhyloParser.old2newConverter(newversion_node, [horLineMappingDict, verLineMappingDict])
                     oldversion_nodeList.append(oldversion_node)
-                    if len(verLineGroup['children'])<2:
+                    if PhyloParser.isNodeComplete(oldversion_node):
                         notCompleteNode.append(nodeIndex)
+                        brokenNodes.append(oldversion_node)
                     nodeIndex+=1
                     isFound = True
                 if not isFound:
                     newversion_node = [None, verLineIndex, lineChildren]
                     nodes[nodeIndex] = [None, verLineIndex, lineChildren]
+                    PhyloParser.drawNodesCoveredMask(newversion_node, nodesCoveredMask, [horLineMappingDict, verLineMappingDict])
                     oldversion_node = PhyloParser.old2newConverter(newversion_node, [horLineMappingDict, verLineMappingDict])
                     oldversion_nodeList.append(oldversion_node)
                     notCompleteNode.append(nodeIndex)
                     nodeIndex+=1
+
+        # if tracing:
+        #     print 'Before first Tracing'
+        #     # PhyloParser.displayImage(lineCoveredMask)
+
+        #     nodesCoveredMask, brokenNodes, oldversion_nodeList = PhyloParser.findMissingLines(brokenNodes, oldversion_nodeList, image_data, mask = nodesCoveredMask)
+        #     print 'After first Tracing'
         
         image_data.nodeList = oldversion_nodeList
+
+
         image_data = PhyloParser.connectNodes_old(image_data)
 
-        
+        image_data.nodesCoveredMask = nodesCoveredMask
 
         return image_data
         # for childIndex, child in children.items():
@@ -7928,36 +8071,45 @@ class PhyloParser():
             # PhyloParser.displayTrunk(image, current_trunk)
             
             trunkList.append(current_trunk)
-            
-            for startPoint in current_trunk.nextStartPoint:
-                y, x = startPoint
-                if mask != None:
-                    if not PhyloParser.isCoveredByNodes(startPoint, mask):
-                        new_trunk = TrunkNode(startPoint)
-                        
-                        if PhyloParser.isDotWithinLine((x,y), current_trunk.upperLine):
-                            new_trunk.rootLine = current_trunk.upperLine
-                        elif PhyloParser.isDotWithinLine((x,y), current_trunk.lowerLine):
-                            new_trunk.rootLine = current_trunk.lowerLine
-                        else:
-                            for index, line in enumerate(current_trunk.nonBinaryLines):
-                                if PhyloParser.isDotWithinLine((x,y), line):
-                                    new_trunk.rootLine = line
-        #                 print "new_trunk_bud", new_trunk.buds
-
+            if mask != None:
+                for index, interLine in enumerate(current_trunk.interLines):
+                    if not PhyloParser.isLineCrossed(interLine, mask):
+                        new_trunk = TrunkNode(current_trunk.nextStartPoint[index])
+                        new_trunk.rootLine = interLine
                         queue_trunk.append(new_trunk)
-                else:
-                    new_trunk = TrunkNode(startPoint)
-                    if PhyloParser.isDotWithinLine((x,y), current_trunk.upperLine):
-                        new_trunk.rootLine = current_trunk.upperLine
-                    elif PhyloParser.isDotWithinLine((x,y), current_trunk.lowerLine):
-                        new_trunk.rootLine = current_trunk.lowerLine
-                    else:
-                        for index, line in enumerate(current_trunk.nonBinaryLines):
-                            if PhyloParser.isDotWithinLine((x,y), line):
-                                new_trunk.rootLine = line
 
-                    queue_trunk.append(new_trunk)
+
+
+
+        #     for startPoint in current_trunk.nextStartPoint:
+        #         y, x = startPoint
+        #         if mask != None:
+        #             if not PhyloParser.isCoveredByNodes(startPoint, mask):
+        #                 new_trunk = TrunkNode(startPoint)
+                        
+        #                 if PhyloParser.isDotWithinLine((x,y), current_trunk.upperLine):
+        #                     new_trunk.rootLine = current_trunk.upperLine
+        #                 elif PhyloParser.isDotWithinLine((x,y), current_trunk.lowerLine):
+        #                     new_trunk.rootLine = current_trunk.lowerLine
+        #                 else:
+        #                     for index, line in enumerate(current_trunk.nonBinaryLines):
+        #                         if PhyloParser.isDotWithinLine((x,y), line):
+        #                             new_trunk.rootLine = line
+        # #                 print "new_trunk_bud", new_trunk.buds
+
+        #                 queue_trunk.append(new_trunk)
+        #         else:
+        #             new_trunk = TrunkNode(startPoint)
+        #             if PhyloParser.isDotWithinLine((x,y), current_trunk.upperLine):
+        #                 new_trunk.rootLine = current_trunk.upperLine
+        #             elif PhyloParser.isDotWithinLine((x,y), current_trunk.lowerLine):
+        #                 new_trunk.rootLine = current_trunk.lowerLine
+        #             else:
+        #                 for index, line in enumerate(current_trunk.nonBinaryLines):
+        #                     if PhyloParser.isDotWithinLine((x,y), line):
+        #                         new_trunk.rootLine = line
+
+        #             queue_trunk.append(new_trunk)
         
         # PhyloParser.displayTreeFromTrunk(image, point2Trunk)
 #         print "point2Trunk"
@@ -7967,6 +8119,18 @@ class PhyloParser():
             return (trunkList, True)
         else:
             return (trunkList, False)
+
+    @staticmethod
+    def isLineCrossed(line, mask):
+        lineMask = np.zeros(mask.shape, dtype=np.uint8)
+        x1, y1, x2, y2, length = line
+        quarterPt = float( x1 * 3 + x2) / 4
+        lineMask[y1:y2+1,quarterPt:x2] = 255
+        overlapRange = np.where((mask == 255) & (lineMask == 255))
+        if len(overlapRange[0])!=0:
+            return True
+        else:
+            return False
 
     @staticmethod
     def findLineLengthFromPoint(oriNode, image):

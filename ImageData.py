@@ -85,7 +85,7 @@ class ImageData():
     treeStructure = None
     fullTree = None
     branchArray = None 
-
+    nodesCoveredMask = None
     
     def __init__(self, image):
         self.image = image
