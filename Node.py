@@ -12,7 +12,7 @@ class Node():
         self.origin = None
         self.isRoot = False
         self.isBinary = False
-        self.numNodes = None
+        self.numNodes = 1
         self.isUpperAnchor = False
         self.isLowerAnchor = False
         self.isInterAnchor = []
