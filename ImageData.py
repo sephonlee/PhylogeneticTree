@@ -229,6 +229,7 @@ class ImageData():
             stack.append(rootNode)
             color = self.getColor(count)
             while stack:
+
                 node = stack.pop()
                 if node.to[0]:
                     stack.append(node.to[0])
@@ -379,15 +380,32 @@ class ImageData():
             print "something bad happens" 
             treeString = self.treeHead.getTreeString()## For now, it still defines the tree head. However, we need something else returned to notice it's not perfect
             return treeString ## For now, it still defines the tree head. However, we need something else returned to notice it's not perfect
-    def printMappingDict(self):
-        for key, value in self.mappingDict.items():
-            if key == 'overlapMapping':
-                print value
-            elif key == 'lineMapping':
-                for indexKey, mapValue in value.items():
-                    print '----------------------------'
-                    print 'Index = ',indexKey
-                    print 'length = ', mapValue['length']
-                    print 'overlap = ', mapValue['overlap']
-                    print 'linegroup: ', mapValue['lineGroup']
-                    print 'numNoiseGroup:' , len(mapValue['noise'])
+    def printMappingDict(self, mode):
+        if mode == 'hor':
+            for key, value in self.horLineMappingDict.items():
+                if key == 'overlapMapping':
+                    print value
+                elif key == 'lineMapping':
+                    for indexKey, mapValue in value.items():
+                        print '----------------------------'
+                        print 'Index = ',indexKey
+                        print 'length = ', mapValue['length']
+                        print 'overlap = ', mapValue['overlap']
+                        print 'linegroup: ', mapValue['lineGroup']
+                        print 'numNoiseGroup:' , len(mapValue['noise'])
+                        print 'parent:', mapValue['parent']
+                        print 'children:', mapValue['children']
+        elif mode == 'ver':
+            for key, value in self.verLineMappingDict.items():
+                if key == 'overlapMapping':
+                    print value
+                elif key == 'lineMapping':
+                    for indexKey, mapValue in value.items():
+                        print '----------------------------'
+                        print 'Index = ',indexKey
+                        print 'length = ', mapValue['length']
+                        print 'overlap = ', mapValue['overlap']
+                        print 'linegroup: ', mapValue['lineGroup']
+                        print 'numNoiseGroup:' , len(mapValue['noise'])
+                        print 'parent:', mapValue['parent']
+                        print 'children:', mapValue['children']

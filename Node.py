@@ -27,9 +27,13 @@ class Node():
         self.score = None # update by method evaluateNode
         self.nodesNetwork = [] #update by method createNodes
 
+
         # Only enable for root node
         self.verifiedAnchorLines = None #checked by PhyloParser.getSuspiciousAnchorLline
         self.suspiciousAnchorLines = None #checked by PhyloParser.getSuspiciousAnchorLline
+
+        self.nodesIncluded = [] # updated by fixTree
+
 
 
 
