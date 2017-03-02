@@ -5845,7 +5845,7 @@ class PhyloParser():
 
             image_data = self.createRootList(image_data, tracing)
             
-            image_data = PhyloParser.checkRootWithTextBox(image_data)## not yet done
+#             image_data = PhyloParser.checkRootWithTextBox(image_data)## not yet done
             if debug:
                 print "display Tree"
                 image_data.displayTrees('regular')
