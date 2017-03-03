@@ -559,9 +559,49 @@ class PhyloParser():
 # #         PhyloParser.displayImage(nonTreeMask)
         return mask, nonTreeMask, contours, hierarchy
 
+    @staticmethod
+    def resizeImageByLineWidth(image, linewidth = 4):
+        w = PhyloParser.findLineWidth(image)
+        print "linewidth = ", w
+        
+        if w > 0 :
+            ratio = linewidth / float(w)
+            image = cv.resize(image,(0,0), fx = ratio, fy = ratio, interpolation = cv.INTER_CUBIC)
+        return image
 
-
-
+    @staticmethod
+    # return line width of the tree
+    # approach: 
+    # 1. use contour finder to separate tree
+    # 2. Iteratively Use opening until detecting a change of overall pixel values 
+    def findLineWidth(image):
+        mask, nonTreeMask, contours, hierarchy = PhyloParser.findContours(255 - PhyloParser.negateImage(image)) 
+        
+        linewidth = 1
+        original_pixel_sum = np.sum(mask)
+        
+#         print "original_pixel_sum", original_pixel_sum
+        
+#         PhyloParser.displayImage(mask)
+        
+        while linewidth <= 20:
+            
+            kernel = np.ones((linewidth,linewidth), np.uint8)
+            result = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
+            pixel_sum = np.sum(result)
+            
+#             print "pixel_sum", pixel_sum, original_pixel_sum / pixel_sum
+#             PhyloParser.displayImage(result)
+            
+            if pixel_sum == 0 or original_pixel_sum / pixel_sum > 2:
+                break
+            else:
+                linewidth += 1
+        
+        if linewidth == 20:
+            return -1
+        else:
+            return linewidth - 1
 
     @staticmethod
     # return a mask of the tree, a mask of text and contours
@@ -590,6 +630,9 @@ class PhyloParser():
         
         mask = np.zeros((height,width), dtype=np.uint8)
         cv.drawContours(mask, contours, maxIndex, (255), thickness = -1, hierarchy = hierarchy, maxLevel = 1)
+        
+#         print "mask"
+#         PhyloParser.displayImage(mask)
         
         kernel = np.ones((5,5),np.uint8)
         tmpMask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
@@ -1957,14 +2000,16 @@ class PhyloParser():
         mode = 0
         height, width = image.shape
         oriImage = image.copy()
-        if height>heightThreshold:
-            ratio = (height - heightThreshold) * 3 / 200
-            minVerLine = 12 + ratio
-            minHorLine = 7 + ratio
-        else:
-            minVerLine = 10 + height / 250
-            minHorLine = 4 + height / 150
-        print 'minVerLine:', minVerLine, ' minHorLine:', minHorLine
+        
+        minVerLine, minHorLine = PhyloParser.getLineThreshold(image)
+#         if height>heightThreshold:
+#             ratio = (height - heightThreshold) * 3 / 200
+#             minVerLine = 12 + ratio
+#             minHorLine = 7 + ratio
+#         else:
+#             minVerLine = 10 + height / 250
+#             minHorLine = 4 + height / 150
+#         print 'minVerLine:', minVerLine, ' minHorLine:', minHorLine
 
         verLines = PhyloParser.getLines(image, mode, minLength = minVerLine)
 
@@ -1982,6 +2027,19 @@ class PhyloParser():
         return horLines, verLines
    
 
+
+    @staticmethod 
+    def getLineThreshold(image):
+        height, width = image.shape
+#         if height>heightThreshold:
+#             ratio = (height - heightThreshold) * 3 / 200
+#             minVerLine = 12 + ratio
+#             minHorLine = 7 + ratio
+#         else:
+        minVerLine = 8 + height / 100
+        minHorLine = 3 + width / 100
+        print 'minVerLine:', minVerLine, ' minHorLine:', minHorLine
+        return minVerLine, minHorLine
 
     @staticmethod
     def detectLines(image_data, debug = False, heightThreshold = 500):
@@ -2021,14 +2079,17 @@ class PhyloParser():
 
         # find vertical lines
         mode = 0
-        height, width = image_data.image.shape
-        if height>heightThreshold:
-            ratio = (height - heightThreshold) * 3 / 200
-            minVerLine = 12 + ratio
-            minHorLine = 7 + ratio
-        else:
-            minVerLine = 10 + height / 250
-            minHorLine = 4 + height / 150
+        
+        minVerLine, minHorLine = PhyloParser.getLineThreshold(image_data.image)
+#         height, width = image_data.image.shape
+#         if height>heightThreshold:
+#             ratio = (height - heightThreshold) * 3 / 200
+#             minVerLine = 12 + ratio
+#             minHorLine = 7 + ratio
+#         else:
+#             minVerLine = 10 + height / 250
+#             minHorLine = 4 + height / 150
+
         print 'minVerLine:', minVerLine, ' minHorLine:', minHorLine
         # plt.imshow(image, cmap='Greys_r')
         # plt.show()
@@ -5890,7 +5951,7 @@ class PhyloParser():
                 print "mergeTreeAndText"
                 self.mergeTreeAndText(image_data)
                 print "end mergeTreeAndText"
-                useText = False
+                useText = True
                 
             print "getTreeString"
             image_data.treeStructure = self.getTreeString(image_data, useText=useText)
@@ -6260,7 +6321,7 @@ class PhyloParser():
                     name = None ####
                     if children is None:
                         if node.interLeave[i] is not None:# leave found (must)
-                            if image_data.line2Text.has_key(node.interLeave[i]):
+                            if image_data.line2Text.has_key(node.interLeave[i]) and len(image_data.line2Text[node.interLeave[i]]['text']) > 0:
                                 name = image_data.line2Text[node.interLeave[i]]['text'][0]
                                 print "interLeave:", name
                             else:
