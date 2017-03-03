@@ -35,6 +35,7 @@ class TrunkNode():
 
     def getTrunkInfo(self):
         print '------trunk Information-------'
+        print 'rootLine', self.rootLine
         print 'branch: ', self.trunkLine
         print 'upperLeave: ', self.upperLine
         print 'lowerLeave: ', self.lowerLine

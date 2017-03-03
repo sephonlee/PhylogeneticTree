@@ -30,6 +30,7 @@ class Node():
 
         # Only enable for root node
         self.verifiedAnchorLines = None #checked by PhyloParser.getSuspiciousAnchorLline
+        self.unsureAnchorLines = None #checked by PhyloParser.getSuspiciousAnchorLline
         self.suspiciousAnchorLines = None #checked by PhyloParser.getSuspiciousAnchorLline
 
         self.nodesIncluded = [] # updated by fixTree
