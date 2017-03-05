@@ -87,6 +87,10 @@ class ImageData():
     branchArray = None 
     nodesCoveredMask = None
     
+    # parameter for using classifier to identify true anchorline
+    rightVerticalLineX = None #the x position of the rightest vertical branch
+    avg_anchorLine_x = None #the average x position of the right vertices of anchor lines
+    
     def __init__(self, image):
         self.image = image
         self.originalImage = image.copy()
