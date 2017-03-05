@@ -27,11 +27,17 @@ class Node():
         self.score = None # update by method evaluateNode
         self.nodesNetwork = [] #update by method createNodes
 
+        # verification
+        self.interAnchorVerification = []
+        self.biAnchorVerification = (None, None) #(top children node, bottom children node) 1: suspicious, -1: unsure, 0: verified positive, 7: not leave
+ 
 
         # Only enable for root node
         self.verifiedAnchorLines = None #checked by PhyloParser.getSuspiciousAnchorLline
-        self.unsureAnchorLines = None #checked by PhyloParser.getSuspiciousAnchorLline
+#         self.unsureAnchorLines = None #checked by PhyloParser.getSuspiciousAnchorLline
         self.suspiciousAnchorLines = None #checked by PhyloParser.getSuspiciousAnchorLline
+        
+       
 
         self.nodesIncluded = [] # updated by fixTree
 
@@ -149,7 +155,7 @@ class Node():
 #         print self.printTree(0)
         return self.printTree(0, useText=useText)[0]
 
-    def printTree(self, speciesIndex, useText = False):
+    def printTree(self, speciesIndex, useText = False, removeSuspicious = False):
 
         if self.to[0]:
             upperChildren, speciesIndex = self.to[0].printTree(speciesIndex, useText=useText)
@@ -182,7 +188,6 @@ class Node():
                 if to:
                     interChildren, speciesIndex = to.printTree(speciesIndex, useText=useText)
                 else:
-                    
                     if self.interLabel[index] and useText:
                         interChildren = self.interLabel[index]
                     elif self.isInterAnchor[index]:
