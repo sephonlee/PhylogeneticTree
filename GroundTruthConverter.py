@@ -1,7 +1,9 @@
-from ete3 import Tree, TreeStyle
+from ete3 import Tree, TreeStyle, NodeStyle
 from zss import simple_distance, Node, distance
+# from newick import read as nread
+import io
 import re
-
+    
 
 pattern = 'a-zA-Z'
 reg = re.compile(pattern)
@@ -44,8 +46,11 @@ class PhyloTree(Tree):
         if rename_all:
             tree.name = label    
         elif tree.name == "":
+#             print "here"
             tree.name = label 
             
+            
+#         print "tree.name", tree.name
         return 
     
     @staticmethod
@@ -55,6 +60,34 @@ class PhyloTree(Tree):
             for c in tree.get_children(tree):
                 num = PhyloTree.getNodeNum(c, num = num) + 1        
         return num
+    
+#     @staticmethod
+    def drawTree(self):
+        ts = TreeStyle()
+        ts.show_leaf_name = True
+    #     ts.margin_right = 20
+        ts.branch_vertical_margin = 10
+    #     ts.branch_horizontal_margin = 10
+        
+        # Draws nodes as small red spheres of diameter equal to 10 pixels
+        nstyle = NodeStyle()
+        nstyle["shape"] = "circle"
+        nstyle["size"] = 1
+        
+        # Gray dashed branch lines
+    #     nstyle["hz_line_type"] = 2
+    #     nstyle["hz_line_color"] = "#cccccc"
+        
+        # Applies the same static style to all nodes in the tree. Note that,
+        # if "nstyle" is modified, changes will affect to all nodes
+        for n in self.traverse():
+            n.set_style(nstyle)
+    
+    
+        self.show(tree_style=ts)
+        
+#     @staticmethod
+#     read
 
     
 def getElement(str, index):
@@ -325,9 +358,10 @@ if __name__ == '__main__':
     # # string = "A0B,C2D,E1F1*K0L0*M0N0*O,P,Q2R0*S,T,U1V0*W1*X,Y2*Z0AA,AB1AC,AD5"
     # string = "A0B,C2D,E1F1*K0L0*M0N0*O,P,Q2*R0*S,T,U1V0*W1*X,Y2*Z0AA,AB1AC,AD4"
     # string = "A0B0C2D0E1F1*K0L0*M0N0*O0P0*Q2*R0*S0T0*U1V0*W1*X0Y2*Z0AA0AB1AC0AD4"
-    # tree_string =  string2TreeString(string, rename = True)   
-    # print "coded string:", string
-    # print "tree string", tree_string    
+    string = "J0J1J1J0J1J0J2J2J0J1J0J2J0J2J1J0J1J0J2J0J4J0J1J1J0J1J3"
+    tree_string =  string2TreeString(string, rename = True)   
+#     print "coded string:", string
+    print "tree string", tree_string    
     # tree = PhyloTree(tree_string+";")
     # print tree
     # print PhyloTree.rename_node(tree, rename_all=True)
@@ -340,32 +374,89 @@ if __name__ == '__main__':
     # tree.render("/Users/sephon/Downloads/tree_example.png", tree_style=ts)
     
 
+
+        
+
+
+    
     string = 'J0J1J1J1J1J0J2J0J0J3J0J2J0J0J3J0J2J0J1J0J0J3J0J1J3J1'
 
 
 
-    t1 = PhyloTree(string2TreeString(string) + ';')
+#     t1 = PhyloTree(string2TreeString(string) + ';')
 
-    print t1
+#     print t1
+    
+#     t1 = PhyloTree("(((((((Lafidae, Stercorariidae), Sternidae), Rynchopidae),Glareolidae,Burhinidae,Chionidae,(((Haematopodidae, Recurvirostridae), Vanellinae), Charadriinae)), ((((((Jacanidae, Rostratulidae), Gallinagininae), Tringinae), (Arenariinae, Calidrinae)), Phalaropodinae), Thinocoridae)), Alcidae), Outgroups);")
+    
+#     ts = TreeStyle()
+#     ts.show_leaf_name = True
+# #     ts.margin_right = 20
+#     ts.branch_vertical_margin = 5
+# #     ts.branch_horizontal_margin = 10
+#     
+#     # Draws nodes as small red spheres of diameter equal to 10 pixels
+#     nstyle = NodeStyle()
+#     nstyle["shape"] = "circle"
+#     nstyle["size"] = 1
+#     
+#     # Gray dashed branch lines
+# #     nstyle["hz_line_type"] = 2
+# #     nstyle["hz_line_color"] = "#cccccc"
+#     
+#     # Applies the same static style to all nodes in the tree. Note that,
+#     # if "nstyle" is modified, changes will affect to all nodes
+#     for n in t1.traverse():
+#         n.set_style(nstyle)
+
+
+#     t1.show(tree_style=ts)
 
 #     print PhyloTree.getNodeNum(t1)
 
 
-    t1 = PhyloTree("((a,(b,c)),(d,(e,f)));")
-    t2 = PhyloTree("((a,b),(c,(d,e)));")
-#     t1 = PhyloTree("((A,B),(C,D));")
-#     t2 = PhyloTree("((C,D),(A,B));")
+#     t1 = PhyloTree("((a,(a,)),(d,(e,f)));")
+#     t2 = PhyloTree("((a,b),(c,(d,e)));")
+    
+    
+    
+    
+#     t1 = PhyloTree("(a,(c,(d,(h,(I,J)))));")
+#     t2 = PhyloTree("(((((a, b), c),g), h),e);")
+    t1 = PhyloTree("((A,B,E),(C,D));")
+    t2 = PhyloTree("((E,F),(G,H,X));")
+    
+    t1 = PhyloTree("((((((((1,2),3),((4,5),6)),7),(((8,9),10),11),12,13),14),(15,16),17,18),19,20);")
     
 #     t1 = PhyloTree("((X,(X,X)), (X,(X,X)));")
 #     t2 = PhyloTree("((X,(X,X)), ((X,X),(X,X)));")
 
-#     PhyloTree.rename_node(t1, rename_all=True)
-#     PhyloTree.rename_node(t2, rename_all=True)
+    
+    for n in t1.traverse():
+        print "name", n.name
+     
+    print 
+    for n in t2.traverse():
+        print "name", n.name   
+        
 
+    PhyloTree.rename_node(t1, rename_all=True)
+    PhyloTree.rename_node(t2, rename_all=True)
+
+    print 
+    for n in t1.traverse():
+        print "name", n.name
+    
+    print 
+    for n in t2.traverse():
+        print "name", n.name
+        
+    print 
+        
     print t1
-    print PhyloTree.getNodeNum(t1)
+#     print PhyloTree.getNodeNum(t1)
     print t2
-    print PhyloTree.getNodeNum(t2)
+#     print PhyloTree.getNodeNum(t2)
 
     
     print "distance", PhyloTree.zhang_shasha_distance(t1, t2)
@@ -404,38 +495,38 @@ if __name__ == '__main__':
 #     print t2
     
     #     
-    A = (Node("J")
-            .addkid(Node("J")
-                .addkid(Node("A"))
-                .addkid(Node("J").addkid(Node("B"))
-                                .addkid(Node("C"))))
-            .addkid(Node("J")
-                    .addkid(Node("D"))
-                    .addkid(Node("J").addkid(Node("E"))
-                            .   addkid(Node("F"))))
-        )
-    
-    
-    B = (Node("J")
-            .addkid(Node("J")
-                .addkid(Node("A"))
-                .addkid(Node("B")))
-            .addkid(Node("J")
-                    .addkid(Node("C"))
-                    .addkid(Node("J").addkid(Node("D"))
-                            .   addkid(Node("E"))))
-        )
-    # 
-    
-#     rename_node(t1, 0, label ="X")
-#     rename_node(t2, 0, label ="X")
-    print
-    print "t1"
-    print post_order(t1, 0)
-    print
-    print "A"
-    print post_order(A, 0)
-
-    print "here", simple_distance(t1, t2, PhyloTree.get_children, PhyloTree.get_label)
+#     A = (Node("J")
+#             .addkid(Node("J")
+#                 .addkid(Node("A"))
+#                 .addkid(Node("J").addkid(Node("B"))
+#                                 .addkid(Node("C"))))
+#             .addkid(Node("J")
+#                     .addkid(Node("D"))
+#                     .addkid(Node("J").addkid(Node("E"))
+#                             .   addkid(Node("F"))))
+#         )
+#     
+#     
+#     B = (Node("J")
+#             .addkid(Node("J")
+#                 .addkid(Node("A"))
+#                 .addkid(Node("B")))
+#             .addkid(Node("J")
+#                     .addkid(Node("C"))
+#                     .addkid(Node("J").addkid(Node("D"))
+#                             .   addkid(Node("E"))))
+#         )
+#     # 
+#     
+# #     rename_node(t1, 0, label ="X")
+# #     rename_node(t2, 0, label ="X")
+#     print
+#     print "t1"
+#     print post_order(t1, 0)
+#     print
+#     print "A"
+#     print post_order(A, 0)
+# 
+#     print "here", simple_distance(t1, t2, PhyloTree.get_children, PhyloTree.get_label)
 
 
