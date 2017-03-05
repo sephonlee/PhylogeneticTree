@@ -5,7 +5,6 @@
 # import textRemover
 import cv2 as cv
 import numpy as np
-import pickle
 from matplotlib import pyplot as plt
 from ete3 import Tree
 import operator, os
@@ -13,6 +12,10 @@ import random
 from os import listdir
 from os.path import isfile, join
 from GroundTruthConverter import *
+
+from sklearn.externals import joblib
+
+
 
 from PhyloParser import *
 
@@ -33,10 +36,12 @@ def saveResult(data, output):
 
 if __name__ == '__main__':
     
-    
-    phyloParser = PhyloParser()
-    ground_truth_path  = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/hq_ground_truth.csv"
+    clfPath = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/line_patch/models/RF.pkl"
+    phyloParser = PhyloParser(clfPath = clfPath)
+    ground_truth_path  = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/hq_ground_truth0228.csv"
+    folderPath = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/high_quality_tree'
     ground_truth = {}
+    fileNameList = []
     with open(ground_truth_path ,'rb') as incsv:
         reader = csv.reader(incsv, dialect='excel')
         reader.next()
@@ -44,13 +49,13 @@ if __name__ == '__main__':
         for row in reader:
             ground_truth[row[0]] = row[1]    
 #             print row[0], row[1]
+            fileNameList.append(row[0])
     
     
     
     
-    folderPath = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/high_quality_tree'
-    fileNameList = getFilesInFolder(folderPath)
-    outFileName = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/high_quality_tree_result_line_corners_tracing.csv'     
+#     fileNameList = getFilesInFolder(folderPath)
+    outFileName = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/high_quality_tree_result_line_corner_v2_20170304.csv'     
     results = []
 
 #     for index, fileName in enumerate(fileNameList):
@@ -59,67 +64,78 @@ if __name__ == '__main__':
 #     folderPath = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/high_quality_tree"
 #     fileNameList = ["PMC1435931_1471-2148-6-18-3.jpg"]
 
-#     fileNameList = ["PMC1450269_1471-213X-6-13-2.jpg"]
+#     fileNameList = ["PMC3035803_btq706f1.jpg"]
+#     fileNameList = ["PMC2697986_1471-2148-9-107-3.jpg"]
+#     fileNameList = ["PMC2813288_pone.0008954.g004.jpg"]
+#     fileNameList = ["PMC554778_1471-2148-5-20-5.jpg"]
+#     fileNameList = ["PMC1326215_1471-2148-5-71-6.jpg"]
+#     fileNameList = ["PMC184354_1471-2148-3-16-7.jpg"]
+#     fileNameList = ["PMC2686707_1471-213X-9-29-4.jpg"]
+    fileNameList = ["PMC2644698_1471-2229-8-133-4.jpg"]
+#     fileNameList = ["PMC1978502_1471-2148-7-139-2.jpg"] ## infinite loop
 
     for index in range(0, len(fileNameList)):
 
-#         try:
-        filePath = os.path.join(folderPath, fileNameList[index])
-        print 
-        print "%s (%d / %d)"%(fileNameList[index], index, len(fileNameList))
-        
-        if isfile(filePath) :
-            image = cv.imread(filePath,0)
+        try:
+            filePath = os.path.join(folderPath, fileNameList[index])
+            print 
+            print "%s (%d / %d)"%(fileNameList[index], index, len(fileNameList))
             
-        PhyloParser.displayImage(image)
-
-#         image = image[100:110,155:165]
-        image_data = ImageData(image)
-        image_data = phyloParser.preprocces(image_data, debug=False)
-        # image_data = phyloPaser.getCorners(image_data, debug = False)
-        image_data = phyloParser.detectLines(image_data, debug = False)
-        
-        image_data = phyloParser.getCorners(image_data, debug = False)        
-        image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
-        image_data = phyloParser.includeLinesFromCorners(image_data)
-#         image_data = phyloParser.refineLinesByCorners(image_data)
-
-
-        image_data = phyloParser.groupLines(image_data)
-        image_data = phyloParser.matchLineGroups(image_data, debug = False)
-        
-        # image_data = phyloParser.getSpecies(image_data, debug = True)
-#         image_data = phyloParser.getSpecies_v3(image_data, debug = False)
-        image_data = phyloParser.constructTree(image_data, tracing = False , debug = False)
-
-        
-
-        # PhyloParser1.0
-#         image_data = phyloParser.matchLines(image_data, debug = False)
-#         image_data = phyloParser.makeTree(image_data, tracing = False, debug = False, showResult = False)
-
-        
-        truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
-        result_string = image_data.treeStructure
-        
-        t1 = PhyloTree(image_data.treeStructure + ";")
-        t2 = PhyloTree(truth_string + ";")
-        PhyloTree.rename_node(t1, rename_all=True)
-        PhyloTree.rename_node(t2, rename_all=True)
-        
-        print image_data.treeStructure
-        print t1
-        print t2
-        distance = PhyloTree.zhang_shasha_distance(t1, t2)
-        num_node = PhyloTree.getNodeNum(t2)
-        score = distance/float(num_node)
-        print "distance %d/%d = %f" %(distance, num_node, score)
-        results.append([fileNameList[index], distance, num_node, score])
+            if isfile(filePath) :
+                image = cv.imread(filePath,0)
+                
+    #         PhyloParser.displayImage(image)
+            image = PhyloParser.resizeImageByLineWidth(image)
+#             PhyloParser.displayImage(image)
             
-#         except:
+             
+            image_data = ImageData(image)
+            image_data = phyloParser.preprocces(image_data, debug=False)
+        
+            image_data = phyloParser.detectLines(image_data, debug = False)
+            
+            image_data = phyloParser.getCorners(image_data, debug = False)   
+            image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
+            image_data = phyloParser.includeLinesFromCorners(image_data)
+            image_data = phyloParser.postProcessLines(image_data)
+            
+        #         image_data = phyloParser.refineLinesByCorners(image_data)
+        
+            image_data = phyloParser.groupLines(image_data)
+            image_data = phyloParser.matchLineGroups(image_data, debug = False)
+            
+            # image_data = phyloParser.getSpecies(image_data, debug = True)
+            print "getSpecies_v3"
+            image_data = phyloParser.getSpecies_v3(image_data, debug = False)
+            print "end getSpecies_v3"
+            image_data = phyloParser.constructTree(image_data, tracing = False , debug = True)
+        
+            
+        
+            # PhyloParser1.0
+        #         image_data = phyloParser.matchLines(image_data, debug = False)
+        #         image_data = phyloParser.makeTree(image_data, tracing = False, debug = False, showResult = False)
+        
+            truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
+            print image_data.treeStructure
+            t1 = PhyloTree(image_data.treeStructure + ";")
+            t2 = PhyloTree(truth_string + ";")
+            PhyloTree.rename_node(t1, rename_all=True)
+            PhyloTree.rename_node(t2, rename_all=True)
+            
+            print t1
+    #             t1.drawTree()
+            print t2
+            distance = PhyloTree.zhang_shasha_distance(t1, t2)
+            num_node = PhyloTree.getNodeNum(t2)
+            score = distance/float(num_node)
+            print "distance %d/%d = %f" %(distance, num_node, score)
+            results.append([fileNameList[index], distance, num_node, score])
+            
+        except:
 #             truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
 #             t2 = PhyloTree(truth_string + ";")
 #             num_node = count_node(t2)
-#             results.append([fileNameList[index], -1, -1, -1])
+            results.append([fileNameList[index], -1, -1, -1])
         
     saveResult(results, outFileName)
