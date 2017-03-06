@@ -1392,8 +1392,21 @@ class PhyloParser():
             targetIndex = len(lineDict['lineGroup'])/2
             targetLine = lineDict['lineGroup'][targetIndex]
             x1, y1, x2, y2, length = targetLine
-            lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
-            lineDict['rline'] = targetLine
+            if mode == 'hor':
+                lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
+                mmax = lineDict['lineGroup'][-1][1]
+                mmin = lineDict['lineGroup'][0][1]
+                lineDict['midPoint'] = ((mmax+mmin)/2, (x1+x2)/2)
+                lineDict['rline'] = (x1, (mmax+mmin)/2, x2, (mmax+mmin)/2, length)
+            else:
+                lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[0])
+                mmax = lineDict['lineGroup'][-1][0]
+                mmin = lineDict['lineGroup'][0][0]
+                lineDict['midPoint'] = ((y1+y2)/2, (mmax + mmin)/2)
+                lineDict['rline'] = ((mmax+mmin)/2, y1, (mmax+mmin)/2, y2, length)
+
+            
+           
 
         # if mode == 'hor':
         #     print mappingDict['overlapMapping']

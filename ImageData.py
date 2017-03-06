@@ -372,6 +372,7 @@ class ImageData():
         
     
     def defineTreeHead(self):
+        self.rootList = sorted(self.rootList, key = lambda x: -x.numNodes)
         self.treeHead = self.rootList[0]
         
     # return final tree structure described by string
