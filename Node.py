@@ -157,6 +157,11 @@ class Node():
 
     def printTree(self, speciesIndex, useText = False, removeSuspicious = False):
 
+#         print "branch", self.branch
+#         print self.upperLeave
+#         print self.interLeave
+#         print self.lowerLeave
+        
         if self.to[0]:
             upperChildren, speciesIndex = self.to[0].printTree(speciesIndex, useText=useText)
         else:
@@ -166,6 +171,10 @@ class Node():
                 upperChildren = "%s" %str(speciesIndex)
                 speciesIndex+=1
             else:
+#                 print 
+#                 print 'here', self.biAnchorVerification[0]
+#                 print self.upperLeave
+#                 print
                 upperChildren = "**"
         if self.to[1]:
             lowerChildren, speciesIndex = self.to[1].printTree(speciesIndex, useText=useText)

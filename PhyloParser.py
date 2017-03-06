@@ -244,7 +244,7 @@ class PhyloParser():
 
 
         
-        # PhyloParser.displayImage(image_data.treeMask)
+        PhyloParser.displayImage(image_data.treeMask)
         # PhyloParser.displayImage(image_data.nonTreeMask)
 
         # Old method using sliding window
@@ -5961,7 +5961,7 @@ class PhyloParser():
                 print ""
 
             print "refineAnchorLine"
-            image_data = PhyloParser.refineAnchorLine(image_data)
+#             image_data = PhyloParser.refineAnchorLine(image_data)
 
 
 # ------------------------------------------------------------------------ #
@@ -5984,6 +5984,7 @@ class PhyloParser():
             ## use orphane box to recover line
             if not self.isTreeReady(image_data) and image_data.speciesNameReady:#######
                 ## Use orphan bonding box to recover tree leaves
+                image_data = self.recoverInterLeaveFromOrphanBox(image_data)
 #                 image_data = self.recoverLineFromText(image_data) ########need test
                 if debug:
                     print "display Tree with recovered line"
@@ -6244,6 +6245,8 @@ class PhyloParser():
 
 
     @staticmethod
+    # search right area 
+    # return the leftest matched orphan box
     def matchComponentWithOrphanBox(component, orphanBox2Text, margin = 2):
         
         result = []
@@ -6354,7 +6357,7 @@ class PhyloParser():
                 name = None
                 if node.lowerLeave is not None: # leave found
                     if image_data.line2Text.has_key(node.lowerLeave) and len(image_data.line2Text[node.lowerLeave]['text']) > 0:
-#                         print "node.upperLeave", node.lowerLeave
+#                         print "node.lowerLeave", node.lowerLeave
                         name = image_data.line2Text[node.lowerLeave]['text'][0]
 #                         print "lowerLeave:", name
                     else:
@@ -6745,6 +6748,26 @@ class PhyloParser():
                     
                 elif node.upperLeave is not None:
                     pass
+#                     isTrueAnchor = node.biAnchorVerification[0]
+#                     if isTrueAnchor == 0: # upper leave is false anchorline
+#                         # find next inter-node that is not false anchorline to be the upperleave
+#                         # it cound be an anchorline or a subtree
+#                         if len(node.otherTo) > 0: 
+#                             j = 0
+#                             while j < len(node.otherTo[0]):
+#                                 new_node = node.otherTo[0]
+#                                 isTrueAnchor_new_node = new_node.interAnchorVerification[j]
+#                                 if isTrueAnchor_new_node != 0: # this inter-node is not false leave, then rotate to be the top leave
+#                                     node.to[0] = new_node
+#                                     del node.interLeave[j]
+#                                     del node.otherTo[j]
+#                                     del node.interAnchorVerification[j]
+#                                     break
+#                                 
+#                                 j += 1
+#                     else:    
+#                         pass
+                    
                 
                 ##### lower leave
                 if node.to[1] is not None and node.to[1] != node: #prevent infinite loop:
@@ -7035,6 +7058,21 @@ class PhyloParser():
         image_data.children = children
         return image_data
 
+
+    @staticmethod
+    def recoverInterLeaveFromOrphanBox(image_data):
+
+        rootNode = image_data.rootList[0]
+        breakSpot = rootNode.breakSpot
+        
+        print "number of breakspot", len(breakSpot)
+        for node in breakSpot:
+            PhyloParser.displayATree(image_data.image, node)
+            
+        return 
+        
+
+
     @staticmethod
     def recoverLineFromText(image_data):
         print "recoverLineFromText"
@@ -7047,6 +7085,7 @@ class PhyloParser():
         orphanBox2Text = image_data.orphanBox2Text
         anchorLines = image_data.anchorLines
         refBreakSpot = breakSpot[:]
+        
         for node in refBreakSpot:
             isMatched = False
             branch = node.branch
@@ -7060,12 +7099,12 @@ class PhyloParser():
 
                     if score1 >= 10 and score2 > 0.07:
 
-                        if branch_y1 >= textBox_y1 and branch_y1 <= textBox_y2:
-                            newAnchor = (branch_x1, branch_y1, branch_x1 + 5, branch_y1, 5)
+                        if branch_y1 >= textBox_y1 and branch_y1 <= textBox_y2: ## will be handled later
+                            newAnchor = (branch_x1, branch_y1, branch_x1 + 5, branch_y1, 5) ####
                             node.upperLeave = newAnchor
                             node.isUpperAnchor = True
-                        elif branch_y2 >= textBox_y1 and branch_y2 <= textBox_y2:
-                            newAnchor = (branch_x1, branch_y2, branch_x1 + 5, branch_y2, 5)
+                        elif branch_y2 >= textBox_y1 and branch_y2 <= textBox_y2: ## will be handled later
+                            newAnchor = (branch_x1, branch_y2, branch_x1 + 5, branch_y2, 5) ####
                             node.lowerLeave = newAnchor
                             node.isLowerAnchor = True
                         else:
