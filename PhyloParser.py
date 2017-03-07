@@ -6007,9 +6007,6 @@ class PhyloParser():
             # select largest sub-tree as the final tree
             image_data.defineTreeHead()
 
-            for node in image_data.treeHead.breakSpot:
-                print node.branch
-                image_data.displayNode(node)
 
             # merge tree structure and species text
             useText = False
