@@ -244,7 +244,7 @@ class PhyloParser():
 
 
         
-        PhyloParser.displayImage(image_data.treeMask)
+#         PhyloParser.displayImage(image_data.treeMask)
         # PhyloParser.displayImage(image_data.nonTreeMask)
 
         # Old method using sliding window
@@ -3799,6 +3799,9 @@ class PhyloParser():
         ## match line and boxes
         lineIndex2ClusterBoxes, lineIndex2BoxIndex, lineIndex2SubBoxes, lineInTextIndex, noTextLineIndex, orphanBoxFromShareBox, activateBoxIndices, shareBoxIndices, orphanBoxIndices = PhyloParser.matchAnchorLineAndContourBox(image, anchorLines, contourBoxes)
         
+        
+        print "count shareBoxIndices", len(shareBoxIndices)
+        
         ## collect orphan boxes
         orphanBoxes = PhyloParser.clusterOrphanBox(image, anchorLines, contourBoxes, orphanBoxFromShareBox, orphanBoxIndices)
         
@@ -5954,27 +5957,28 @@ class PhyloParser():
 # ------------------------------------------------------------------------ #
 
             ## verified leaves
-            print "getRightVerticalLineX"
+#             print "getRightVerticalLineX"
             image_data.rightVerticalLineX = PhyloParser.getRightVerticalLineX(image_data.image, image_data.rootList)
             
-            print "getAvgRightEndPointOfLines", image_data.anchorLines
+#             print "getAvgRightEndPointOfLines", image_data.anchorLines
             image_data.avg_anchorLine_x =  PhyloParser.getAvgRightEndPointOfLines(image_data.anchorLines)
             
-            print "labelSuspiciousAnchorLine"
+#             print "labelSuspiciousAnchorLine"
             image_data = self.labelSuspiciousAnchorLine(image_data, useClf=True)
             
-            for i, node in enumerate(image_data.rootList):
-                print i, node.branch
-                print "verifiedAnchorLines", len(node.verifiedAnchorLines)
-#                 PhyloParser.displayLines(image_data.image, node.verifiedAnchorLines)
-                print "suspiciousAnchorLines", len(node.suspiciousAnchorLines)
-#                 PhyloParser.displayLines(image_data.image, node.suspiciousAnchorLines)
-                print "unsureAnchorLines", len(node.unsureAnchorLines)
-#                 PhyloParser.displayLines(image_data.image, node.unsureAnchorLines)
-                print ""
+            if debug:
+                for i, node in enumerate(image_data.rootList):
+                    print i, node.branch
+                    print "verifiedAnchorLines", len(node.verifiedAnchorLines)
+    #                 PhyloParser.displayLines(image_data.image, node.verifiedAnchorLines)
+                    print "suspiciousAnchorLines", len(node.suspiciousAnchorLines)
+    #                 PhyloParser.displayLines(image_data.image, node.suspiciousAnchorLines)
+                    print "unsureAnchorLines", len(node.unsureAnchorLines)
+    #                 PhyloParser.displayLines(image_data.image, node.unsureAnchorLines)
+                    print ""
 
-            print "refineAnchorLine"
-#             image_data = PhyloParser.refineAnchorLine(image_data)
+#             print "refineAnchorLine"
+            image_data = PhyloParser.refineAnchorLine(image_data)
 
 
 # ------------------------------------------------------------------------ #
@@ -5993,11 +5997,16 @@ class PhyloParser():
                 if debug:
                     print "display Fixed Tree"
                     image_data.displayTrees('regular')
-                
+            
+            print "recoverInterLeaveFromOrphanBox"    
+#             image_data = self.recoverInterLeaveFromOrphanBox(image_data)
+            print self.isTreeReady(image_data)
+            
             ## use orphane box to recover line
             if not self.isTreeReady(image_data) and image_data.speciesNameReady:#######
+                
                 ## Use orphan bonding box to recover tree leaves
-                image_data = self.recoverInterLeaveFromOrphanBox(image_data)
+#                 image_data = self.recoverInterLeaveFromOrphanBox(image_data)
 #                 image_data = self.recoverLineFromText(image_data) ########need test
                 if debug:
                     print "display Tree with recovered line"
@@ -7075,14 +7084,75 @@ class PhyloParser():
     @staticmethod
     def recoverInterLeaveFromOrphanBox(image_data):
 
+
+#         rootNode = image_data.rootList[0]
+#         descendants = [root]
+#             
+#         # traverse descedants
+#         while True:
+#             node = descendants.pop()
+# 
+#             #### uppder leave
+#             # add children into descendants
+#             if node.to[0] is not None and node.to[0] != node: #prevent infinite loop:
+#                 descendants.append(node.to[0])
+#                 
+#             elif node.upperLeave is not None:
+#                 pass
+#             
+#             ##### lower leave
+#             if node.to[1] is not None and node.to[1] != node: #prevent infinite loop:
+#                 descendants.append(node.to[1])
+#                 
+#             elif node.lowerLeave is not None:
+#                 pass
+#                     
+#             # get interleaves that does not connect to a node                
+#             remove_index = []
+#             if len(node.otherTo) > 0:
+#                 for i in range(0, len(node.otherTo)):
+#                     isTrueAnchor = node.interAnchorVerification[i]
+#                     if isTrueAnchor == 0:
+#                         remove_index.append(i)
+#                 
+#                 remove_index.sort(reverse=True)
+#                 for index in remove_index:
+#                     del node.interLeave[index]
+#                     del node.otherTo[index]
+#                     del node.interAnchorVerification[index]
+#             
+#             if len(node.otherTo) > 0:
+#                 
+#                 for i in range(0, len(node.otherTo)):
+#                     n = node.otherTo[i]
+#                     interleaf = node.interLeave[i]
+#                     if n is None:
+#                         pass
+#                     else:
+#                         if n != node: #prevent infinite loop
+#                             descendants.append(n)
+#                         
+# 
+#             if len(descendants) == 0:
+#                 break
+#         
+#     image_data.rootList = rootList
+#     return image_data
+#     
+    
+
+
         rootNode = image_data.rootList[0]
         breakSpot = rootNode.breakSpot
         
         print "number of breakspot", len(breakSpot)
         for node in breakSpot:
-            PhyloParser.displayATree(image_data.image, node)
+            print "node.branch", node.branch
+            print "top leave", node.upperLeave
+            print "bot leave", node.lowerLeave
+            image_data.displayNode(node)
             
-        return 
+        return image_data
         
 
 
