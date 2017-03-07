@@ -6017,6 +6017,10 @@ class PhyloParser():
             # select largest sub-tree as the final tree
             image_data.defineTreeHead()
 
+            for node in image_data.treeHead.breakSpot:
+                print node.branch
+                image_data.displayNode(node)
+
             # merge tree structure and species text
             useText = False
             if image_data.speciesNameReady:
@@ -7407,6 +7411,9 @@ class PhyloParser():
                             else:
                                 rootNode = node.origin
                                 rootNode.breakSpot.append(node)
+                            if PhyloParser.isNodeComplete(node):
+                                if node in node.origin.breakSpot:
+                                    node.origin.breakSpot.remove(node)
                             return False
             else:
 
@@ -7437,6 +7444,9 @@ class PhyloParser():
                             else:
                                 rootNode = node.origin
                                 rootNode.breakSpot.append(node)                            
+                            if PhyloParser.isNodeComplete(node):
+                                if node in node.origin.breakSpot:
+                                    node.origin.breakSpot.remove(node)
                             return False
             else:
                 if node.isRoot:
@@ -7465,6 +7475,9 @@ class PhyloParser():
                             else:
                                 rootNode = node.origin
                                 rootNode.breakSpot.append(node)
+                            if PhyloParser.isNodeComplete(node):
+                                if node in node.origin.breakSpot:
+                                    node.origin.breakSpot.remove(node)
                             return False
             else:
                 if node.isRoot:
@@ -7517,6 +7530,10 @@ class PhyloParser():
 
 
         # rootList = sorted(rootList, key = lambda x: -x.numNodes)
+
+        for rootNode in rootList:
+            rootNode.breakSpot = list(set(rootNode.breakSpot))
+
 
         image_data.rootList = rootList
         return image_data
