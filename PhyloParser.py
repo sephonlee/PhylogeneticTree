@@ -7697,6 +7697,7 @@ class PhyloParser():
                     if node.lowerLeave:
                         if PhyloParser.isLineAndNodeConnected(node.lowerLeave, refNode) and refNode not in isConnected:
                             if not node.to[1]:
+                                refNode.getNodeInfo()
                                 tmp = list(node.to)
                                 tmp[1] = refNode
                                 node.to = tuple(tmp)
@@ -7754,12 +7755,16 @@ class PhyloParser():
                     newNodeList.append(brokenNode)
             else:
                 trunk = trunkList[0]
+
                 brokenNode, mask, refinedLines = PhyloParser.matchNodeAndTrunk(brokenNode, trunk, mask, refinedLines, mode = 'new')
                 newNodeList.append(brokenNode)
+                trunk.getTrunkInfo()
+                brokenNode.getNodeInfo()
                 for index, trunk in enumerate(trunkList):
                     if index!=0 and len(trunk.leaves) == 0 and not len(trunk.interLines) == 0:
                         # PhyloParser.displayTrunk(image_data.image, trunk)
                         newNode = Node(None, None, None, None)
+
                         newNode, mask, refinedLines = PhyloParser.matchNodeAndTrunk(newNode, trunk, mask, refinedLines, mode = 'new')
                         newNodeList.append(newNode)
                         # brokenNodes.append(newNode)
@@ -7768,6 +7773,7 @@ class PhyloParser():
                         # image_data.displayNode(newNode)
                         # nodeList.append(newNode)
                 PhyloParser.connectNodesInAList(newNodeList)
+                brokenNode.getNodeInfo()
         
 
         # margin = 2
@@ -7809,6 +7815,10 @@ class PhyloParser():
                 # image_data.nodeList = topRootNode.breakSpot
                 # image_data.displayNodes()
                 mask, newNodeList = PhyloParser.findMissingNodesByTracing(brokenNode, image_data, mask = image_data.nodesCoveredMask)
+                # image_data.nodeList = newNodeList
+                # image_data.displayNodes()
+                # for node in newNodeList:
+                #     node.getNodeInfo()
                 if len(newNodeList)>1:
                     image_data.nodeList += newNodeList[1:]
                 stack = []
