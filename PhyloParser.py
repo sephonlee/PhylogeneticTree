@@ -5999,8 +5999,8 @@ class PhyloParser():
                     image_data.displayTrees('regular')
             
             print "recoverInterLeaveFromOrphanBox"    
-#             image_data = self.recoverInterLeaveFromOrphanBox(image_data)
-            print self.isTreeReady(image_data)
+            image_data = self.recoverInterLeaveFromOrphanBox(image_data)
+#             print self.isTreeReady(image_data)
             
             ## use orphane box to recover line
             if not self.isTreeReady(image_data) and image_data.speciesNameReady:#######
