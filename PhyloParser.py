@@ -244,7 +244,7 @@ class PhyloParser():
 
 
         
-        # PhyloParser.displayImage(image_data.treeMask)
+#         PhyloParser.displayImage(image_data.treeMask)
         # PhyloParser.displayImage(image_data.nonTreeMask)
 
         # Old method using sliding window
@@ -1389,23 +1389,37 @@ class PhyloParser():
             lineDict['parent'] = []
             lineDict['children'] = []
             lineDict['type'] = None
-            targetIndex = len(lineDict['lineGroup'])/2
-            targetLine = lineDict['lineGroup'][targetIndex]
-            x1, y1, x2, y2, length = targetLine
-            if mode == 'hor':
+            
+            if mode =='hor':
                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
-                mmax = lineDict['lineGroup'][-1][1]
-                mmin = lineDict['lineGroup'][0][1]
-                lineDict['midPoint'] = ((mmax+mmin)/2, (x1+x2)/2)
-                lineDict['rline'] = (x1, (mmax+mmin)/2, x2, (mmax+mmin)/2, length)
             else:
                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[0])
-                mmax = lineDict['lineGroup'][-1][0]
-                mmin = lineDict['lineGroup'][0][0]
-                lineDict['midPoint'] = ((y1+y2)/2, (mmax + mmin)/2)
-                lineDict['rline'] = ((mmax+mmin)/2, y1, (mmax+mmin)/2, y2, length)
+                
+            targetIndex = len(lineDict['lineGroup'])/2
+            if mode == 'ver':
+                targetLine = lineDict['lineGroup'][-1]
+            else:
+                targetLine = lineDict['lineGroup'][targetIndex]
+            x1, y1, x2, y2, length = targetLine
 
             
+            lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
+            lineDict['rline'] = targetLine
+                       
+#             if mode == 'hor':
+#                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
+#                 mmax = lineDict['lineGroup'][-1][1]
+#                 mmin = lineDict['lineGroup'][0][1]
+#                 lineDict['midPoint'] = ((mmax+mmin)/2, (x1+x2)/2)
+#                 lineDict['rline'] = (x1, (mmax+mmin)/2, x2, (mmax+mmin)/2, length)
+#             else:
+#                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[0])
+#                 mmax = lineDict['lineGroup'][-1][0]
+#                 mmin = lineDict['lineGroup'][0][0]
+#                 lineDict['midPoint'] = ((y1+y2)/2, (mmax + mmin)/2)
+#                 lineDict['rline'] = ((mmax+mmin)/2, y1, (mmax+mmin)/2, y2, length)
+# 
+#             
            
 
         # if mode == 'hor':
@@ -3809,6 +3823,9 @@ class PhyloParser():
         ## match line and boxes
         lineIndex2ClusterBoxes, lineIndex2BoxIndex, lineIndex2SubBoxes, lineInTextIndex, noTextLineIndex, orphanBoxFromShareBox, activateBoxIndices, shareBoxIndices, orphanBoxIndices = PhyloParser.matchAnchorLineAndContourBox(image, anchorLines, contourBoxes)
         
+        
+        print "count shareBoxIndices", len(shareBoxIndices)
+        
         ## collect orphan boxes
         orphanBoxes = PhyloParser.clusterOrphanBox(image, anchorLines, contourBoxes, orphanBoxFromShareBox, orphanBoxIndices)
         
@@ -5963,26 +5980,27 @@ class PhyloParser():
 # ------------------------------------------------------------------------ #
 
             ## verified leaves
-            print "getRightVerticalLineX"
+#             print "getRightVerticalLineX"
             image_data.rightVerticalLineX = PhyloParser.getRightVerticalLineX(image_data.image, image_data.rootList)
             
-            print "getAvgRightEndPointOfLines", image_data.anchorLines
+#             print "getAvgRightEndPointOfLines", image_data.anchorLines
             image_data.avg_anchorLine_x =  PhyloParser.getAvgRightEndPointOfLines(image_data.anchorLines)
             
-            print "labelSuspiciousAnchorLine"
+#             print "labelSuspiciousAnchorLine"
             image_data = self.labelSuspiciousAnchorLine(image_data, useClf=True)
             
-            for i, node in enumerate(image_data.rootList):
-                print i, node.branch
-                print "verifiedAnchorLines", len(node.verifiedAnchorLines)
-#                 PhyloParser.displayLines(image_data.image, node.verifiedAnchorLines)
-                print "suspiciousAnchorLines", len(node.suspiciousAnchorLines)
-#                 PhyloParser.displayLines(image_data.image, node.suspiciousAnchorLines)
-                print "unsureAnchorLines", len(node.unsureAnchorLines)
-#                 PhyloParser.displayLines(image_data.image, node.unsureAnchorLines)
-                print ""
+            if debug:
+                for i, node in enumerate(image_data.rootList):
+                    print i, node.branch
+                    print "verifiedAnchorLines", len(node.verifiedAnchorLines)
+    #                 PhyloParser.displayLines(image_data.image, node.verifiedAnchorLines)
+                    print "suspiciousAnchorLines", len(node.suspiciousAnchorLines)
+    #                 PhyloParser.displayLines(image_data.image, node.suspiciousAnchorLines)
+                    print "unsureAnchorLines", len(node.unsureAnchorLines)
+    #                 PhyloParser.displayLines(image_data.image, node.unsureAnchorLines)
+                    print ""
 
-            print "refineAnchorLine"
+#             print "refineAnchorLine"
             image_data = PhyloParser.refineAnchorLine(image_data)
 
 
@@ -6002,10 +6020,16 @@ class PhyloParser():
                 if debug:
                     print "display Fixed Tree"
                     image_data.displayTrees('regular')
-                
+            
+            print "recoverInterLeaveFromOrphanBox"    
+            image_data = self.recoverInterLeaveFromOrphanBox(image_data)
+#             print self.isTreeReady(image_data)
+            
             ## use orphane box to recover line
             if not self.isTreeReady(image_data) and image_data.speciesNameReady:#######
+                
                 ## Use orphan bonding box to recover tree leaves
+#                 image_data = self.recoverInterLeaveFromOrphanBox(image_data)
 #                 image_data = self.recoverLineFromText(image_data) ########need test
                 if debug:
                     print "display Tree with recovered line"
@@ -6267,6 +6291,72 @@ class PhyloParser():
 
 
     @staticmethod
+    # return orphan boxes that are at the right of the given vertical line
+    # returned orphan boxes are sorted from top to bot in y 
+    def matchVerticalBranchWithOrphanBox(verLine, orphanBox2Text, x_margin = 15, box_size_threshold = 5):
+        
+        x_left, y_top, x_right, y_bot, length = verLine
+        
+        matchBoxes= []
+#         img = image.copy()
+        for b, text in orphanBox2Text.items():
+
+            b_top, b_bot, b_left, b_right = b
+            
+            ## determine if the box is meaningful                
+            if b_right - b_left > box_size_threshold and b_bot - b_top > box_size_threshold and text['text'] is not None and text['text'] != "":
+                
+                ## determine if the box is matched 
+                if ((b_top <= y_top and b_bot >= y_top) or (b_top <= y_bot and b_bot >= y_bot) or (b_top >= y_top and b_bot <= y_bot)) \
+                and b_left >= x_right and b_left <= x_right + x_margin:
+                    matchBoxes.append([b, text])
+    #                 cv.rectangle(img,(b[2],b[0]),(b[3],b[1]),(0,125,0),2)
+        
+#         PhyloParser.displayLines(img, [verLine])
+        
+        matchBoxes = sorted(matchBoxes, key = lambda x: x[0][0])
+        
+        # remove duplicate (bugs from getSpecies_v3)
+        i = 0
+        while i < len(matchBoxes) - 1:
+            current_b = matchBoxes[i][0]
+            next_b = matchBoxes[i+1][0]
+            
+            if current_b[1] > next_b[0] and \
+                ((next_b[2] < current_b[3] and next_b[3] >= current_b[3]) or \
+                (next_b[2] <= current_b[2] and next_b[3] > current_b[2])):
+                # find duplicate
+                del matchBoxes[i+1]
+            else:
+                i += 1
+
+        return matchBoxes
+    
+    @staticmethod
+    # return boxes corresponding to the given vertex
+    # returned boxes are sorted from left to right in x
+    def getBoxCorrespond2Vertex(vertex, boxes, margin = 2):
+        
+        result = []
+        for box in boxes:
+            key = box[0]
+            y = vertex[1]
+            right = vertex[0]
+                        
+            if ((y-margin >= key[0] and y-margin <= key[1]) \
+                or (y-margin <= key[1] and y+margin >= key[1]) \
+                or (y+margin >= key[0] and y-margin <= key[1])) \
+                and right <= key[2]:
+                
+                    result.append(box)        
+        
+        result = sorted(result, key = lambda x: x[0][2])
+        return result
+        
+
+    @staticmethod
+    # search right area 
+    # return the leftest matched orphan box
     def matchComponentWithOrphanBox(component, orphanBox2Text, margin = 2):
         
         result = []
@@ -6295,6 +6385,7 @@ class PhyloParser():
         
 
     @staticmethod
+    # not use
     def matchLineWithOrphanBox(line, orphaneBox2Text, margin = 2):
         
         print line
@@ -6319,7 +6410,7 @@ class PhyloParser():
     
     
     @staticmethod
-    def replaceParentheses(string):
+    def replaceEscapeChar(string):
         try:
             if string is not None:
                 string = string.encode(encoding='UTF-8')
@@ -6354,12 +6445,15 @@ class PhyloParser():
             if node.to[0] is None:
                 name = None
                 if node.upperLeave is not None: # leave found
+                    print "node.upperLeave", node.upperLeave
+                    print "node.upperLabel", node.upperLabel
                     if image_data.line2Text.has_key(node.upperLeave) and len(image_data.line2Text[node.upperLeave]['text']) > 0:
 #                         print "node.upperLeave", node.upperLeave
 
                         name = image_data.line2Text[node.upperLeave]['text'][0]
-                        
 #                         print "upperLeave:", name
+#                     elif node.upperLabel is not None: #handle
+#                         name = node.upperLabel
                     else:
                         name = PhyloParser.matchComponentWithOrphanBox(node.upperLeave, image_data.orphanBox2Text)
 #                         print "upperLeave: search orphan", name
@@ -6368,7 +6462,7 @@ class PhyloParser():
                     name = PhyloParser.matchComponentWithOrphanBox(node.branch[0:2], image_data.orphanBox2Text)
 #                     print "branch top:", name
                     
-                node.upperLabel = PhyloParser.replaceParentheses(name)
+                node.upperLabel = PhyloParser.replaceEscapeChar(name)
             else:
                 node_list.append(node.to[0])
                 
@@ -6377,7 +6471,7 @@ class PhyloParser():
                 name = None
                 if node.lowerLeave is not None: # leave found
                     if image_data.line2Text.has_key(node.lowerLeave) and len(image_data.line2Text[node.lowerLeave]['text']) > 0:
-#                         print "node.upperLeave", node.lowerLeave
+#                         print "node.lowerLeave", node.lowerLeave
                         name = image_data.line2Text[node.lowerLeave]['text'][0]
 #                         print "lowerLeave:", name
                     else:
@@ -6387,7 +6481,7 @@ class PhyloParser():
                     name = PhyloParser.matchComponentWithOrphanBox(node.branch[2:4], image_data.orphanBox2Text)
 #                     print "branch bot:", name
 
-                node.lowerLabel = PhyloParser.replaceParentheses(name)
+                node.lowerLabel = PhyloParser.replaceEscapeChar(name)
             else:
                 node_list.append(node.to[1])
                 
@@ -6409,7 +6503,7 @@ class PhyloParser():
                     else:
                         node_list.append(children)
         
-                    node.interLabel[i] = PhyloParser.replaceParentheses(name) ####
+                    node.interLabel[i] = PhyloParser.replaceEscapeChar(name) ####
             
 #         image_data.displayTrees('regular')
         
@@ -6750,6 +6844,7 @@ class PhyloParser():
     @staticmethod
     # remove anchor lines that are determined false
     # remove inter-anchor line only
+    # update line2text, orphanBox, node.interLeave. node.otherTo, node.interAnchorVerification, node.isInterAnchor
     def refineAnchorLine(image_data, useClf = True):  
         
         rootList = image_data.rootList
@@ -6768,6 +6863,26 @@ class PhyloParser():
                     
                 elif node.upperLeave is not None:
                     pass
+#                     isTrueAnchor = node.biAnchorVerification[0]
+#                     if isTrueAnchor == 0: # upper leave is false anchorline
+#                         # find next inter-node that is not false anchorline to be the upperleave
+#                         # it cound be an anchorline or a subtree
+#                         if len(node.otherTo) > 0: 
+#                             j = 0
+#                             while j < len(node.otherTo[0]):
+#                                 new_node = node.otherTo[0]
+#                                 isTrueAnchor_new_node = new_node.interAnchorVerification[j]
+#                                 if isTrueAnchor_new_node != 0: # this inter-node is not false leave, then rotate to be the top leave
+#                                     node.to[0] = new_node
+#                                     del node.interLeave[j]
+#                                     del node.otherTo[j]
+#                                     del node.interAnchorVerification[j]
+#                                     break
+#                                 
+#                                 j += 1
+#                     else:    
+#                         pass
+                    
                 
                 ##### lower leave
                 if node.to[1] is not None and node.to[1] != node: #prevent infinite loop:
@@ -7058,6 +7173,101 @@ class PhyloParser():
         image_data.children = children
         return image_data
 
+
+    @staticmethod
+    # 
+    def recoverInterLeaveFromOrphanBox(image_data, debug = False):
+
+        rootNode = image_data.rootList[0]
+        breakSpot = rootNode.breakSpot
+
+        for node in breakSpot:
+#             print 
+#             print "node.branch", node.branch
+#             print "top leave", node.upperLeave
+#             print "bot leave", node.lowerLeave
+
+            x_left, y_top, x_right, y_bot, length = node.branch
+      
+            matchBoxes = PhyloParser.matchVerticalBranchWithOrphanBox(node.branch, image_data.orphanBox2Text)
+            print "matchBoxes", matchBoxes
+            print 
+            if node.upperLeave is None:
+                boxes = PhyloParser.getBoxCorrespond2Vertex(node.branch[0:2], matchBoxes)
+                if len(boxes) > 0:           
+                    # update the upper label
+                    box = boxes[0]
+                    name = box[1]['text']                    
+                    node.upperLeave = (x_left, y_top, x_right + 5, y_top, 5)##fake anchorilne
+                    node.upperLabel = PhyloParser.replaceEscapeChar(name)
+                    image_data.line2Text[node.upperLeave] = {'status': 'recovered_from_orphan', 'text': [PhyloParser.replaceEscapeChar(name)]}
+                    
+#                     print "node.upperLeave", node.upperLeave
+#                     print " node.upperLabel",  node.upperLabel
+                    # remove the box from matchBoxes
+                    for b in boxes:
+                        matchBoxes.remove(b)
+                else:
+                    # mandatory assign?
+                    pass
+                
+            if node.lowerLeave is None:
+                boxes = PhyloParser.getBoxCorrespond2Vertex(node.branch[2:4], matchBoxes)
+                if len(boxes) > 0:           
+                    # update the upper label
+                    box = boxes[0]
+                    name = box[1]['text']                    
+                    node.lowerLeave = (x_left, y_bot, x_right + 5, y_bot, 5)##fake anchorilne
+                    node.lowerLabel = PhyloParser.replaceEscapeChar(name)
+                    image_data.line2Text[node.lowerLabel] = {'status': 'recovered_from_orphan', 'text': [PhyloParser.replaceEscapeChar(name)]}
+                    
+#                     print "node.lowerLeave", node.lowerLeave
+#                     print " node.lowerLabel",  node.lowerLabel
+                    
+                    # remove the box from matchBoxes
+                    for b in boxes:
+                        matchBoxes.remove(b)
+                else:
+                    # mandatory assign?
+                    pass
+                        
+            if len(matchBoxes) > 0:
+                print "matchBoxes for interLeaves", matchBoxes
+                print "current interleaves", node.interLeave
+                node.isBinary = False
+                for mb in matchBoxes:
+                    b = mb[0]
+                    name = mb[1]['text']
+                    new_y = (b[0] + b[1])/2
+                    fakeLeave =  (x_right, new_y, x_right + 5, new_y, 5)##fake anchorilne
+                    
+                    # update line2text
+                    image_data.line2Text[fakeLeave] = {'status': 'recovered_from_orphan', 'text': [PhyloParser.replaceEscapeChar(name)]}
+                    
+                    
+                    # update node data
+                    node.interLeave.append(fakeLeave)
+                    node.isInterAnchor.append(True)
+                    node.interLabel.append(text)
+                    node.otherTo.append(None)
+                
+                    # sort from top to bottom in case there are nodes already in the list
+                        
+                    tmp = zip(node.interLeave, node.isInterAnchor, node.interLabel, node.otherTo)
+                    tmp.sort(key = lambda x: x[0][1])
+                    
+                    node.interLeave = map(lambda x: x[0], tmp)
+                    node.isInterAnchor = map(lambda x: x[1], tmp)
+                    node.interLabel = map(lambda x: x[2], tmp)
+                    node.otherTo = map(lambda x: x[3], tmp)
+            
+            if debug:
+                image_data.displayNode(node)
+            
+        return image_data
+        
+
+
     @staticmethod
     def recoverLineFromText(image_data):
         print "recoverLineFromText"
@@ -7070,6 +7280,7 @@ class PhyloParser():
         orphanBox2Text = image_data.orphanBox2Text
         anchorLines = image_data.anchorLines
         refBreakSpot = breakSpot[:]
+        
         for node in refBreakSpot:
             isMatched = False
             branch = node.branch
@@ -7083,12 +7294,12 @@ class PhyloParser():
 
                     if score1 >= 10 and score2 > 0.07:
 
-                        if branch_y1 >= textBox_y1 and branch_y1 <= textBox_y2:
-                            newAnchor = (branch_x1, branch_y1, branch_x1 + 5, branch_y1, 5)
+                        if branch_y1 >= textBox_y1 and branch_y1 <= textBox_y2: ## will be handled later
+                            newAnchor = (branch_x1, branch_y1, branch_x1 + 5, branch_y1, 5) ####
                             node.upperLeave = newAnchor
                             node.isUpperAnchor = True
-                        elif branch_y2 >= textBox_y1 and branch_y2 <= textBox_y2:
-                            newAnchor = (branch_x1, branch_y2, branch_x1 + 5, branch_y2, 5)
+                        elif branch_y2 >= textBox_y1 and branch_y2 <= textBox_y2: ## will be handled later
+                            newAnchor = (branch_x1, branch_y2, branch_x1 + 5, branch_y2, 5) ####
                             node.lowerLeave = newAnchor
                             node.isLowerAnchor = True
                         else:
