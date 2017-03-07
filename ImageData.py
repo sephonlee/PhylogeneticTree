@@ -69,7 +69,7 @@ class ImageData():
 
     # filled by getSpecies
     line2Text = {} # key: line,  value: text
-    orphanBox2Text = {} #key: box value: text; orphan boxes are boxes with not matched anchor lines
+    orphanBox2Text = {} #key: box,  value: text; orphan boxes are boxes with not matched anchor lines
     speciesNameReady = False
 #     box2Text = {} #key: box, value:text;
 #     textGroup = [] #element: key: "text_row" value: bonding box; key: "boxes" value: sub-boxes in the bonding box

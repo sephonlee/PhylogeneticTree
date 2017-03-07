@@ -21,7 +21,7 @@ class Node():
         self.lowerLabel = None
         self.interLabel = []
         self.area = None
-        self.breakSpot = [] #only root has something in the list
+        self.breakSpot = [] #only root has something in the list, first created by createRootList, also used by 
         self.status = 0
         self.isConnected = False
         self.score = None # update by method evaluateNode
