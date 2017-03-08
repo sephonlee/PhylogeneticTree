@@ -239,7 +239,7 @@ class PhyloParser():
 
 
         image, edgeMask, hasBackground= PhyloParser.removeBackground(image)
-        print "hasBackground", hasBackground
+#         print "hasBackground", hasBackground
         image_data.treeMask, image_data.nonTreeMask, image_data.contours, image_data.hierarchy = PhyloParser.findContours(255 - PhyloParser.negateImage(image)) 
 
 
@@ -322,7 +322,7 @@ class PhyloParser():
         hasBackground, backgroundList = PhyloParser.findBackgroundPixelPeak(hist1, hist2, bins)
 
 
-        print 'hasBackground?', hasBackground, backgroundList
+#         print 'hasBackground?', hasBackground, backgroundList
 
         if hasBackground:
             newnewImage = np.zeros(image.shape,np.uint8)
@@ -1693,7 +1693,7 @@ class PhyloParser():
             lineDict['children'] = []
             lineDict['type'] = None
             
-            ### new version ####
+            ## new version ####
 #             if mode =='hor':
 #                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
 #                 lineDict['rline_upper'] = lineDict['lineGroup'][0]
@@ -1729,14 +1729,10 @@ class PhyloParser():
             x1, y1, x2, y2, length = targetLine
 
             lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
-            lineDict['midPoint_1'] = ((y1+y2)/2, (x1+x2)/2)
-            lineDict['midPoint_-1'] = ((y1+y2)/2, (x1+x2)/2)
             lineDict['rline'] = targetLine
             lineDict['rline_upper'] = targetLine
             lineDict['rline_lower'] = targetLine
-            lineDict['rline_1'] = targetLine
-            lineDict['rline_-1'] = targetLine
-        
+
 
 
         for lineIndex, lineDict in mappingDict['lineMapping'].items():
@@ -2398,14 +2394,12 @@ class PhyloParser():
 #         else:
         minVerLine = 8 + height / 100
         minHorLine = 3 + width / 100
-        print 'minVerLine:', minVerLine, ' minHorLine:', minHorLine
         return minVerLine, minHorLine
 
     @staticmethod
     def detectLines(image_data, debug = False, heightThreshold = 500):
         
         # use preprocessed image
-        print image_data.preprocessed
         if image_data.preprocessed:    
             image = image_data.image_preproc.copy()
         else:
@@ -6284,15 +6278,12 @@ class PhyloParser():
             
             # Pair h-v branch (parent) and v-h branch (children)
             image_data = PhyloParser.createNodesFromLineGroups(image_data, tracing)
-
             if debug:
                 print "Display Nodes"
                 image_data.displayNodes()
 
-#             image_data = PhyloParser.checkRootWithTextBox(image_data)## not yet done
-
+            # Create Tree
             image_data = self.createRootList(image_data)
-
             if debug:
                 print "display Tree"
                 image_data.displayTrees('regular')
@@ -6302,7 +6293,6 @@ class PhyloParser():
                 image_data.treeHead = None
                 image_data.treeStructure = ""
                 return image_data
-            
             
 # ------------------------------------------------------------------------ #
 
@@ -6314,13 +6304,8 @@ class PhyloParser():
 # ------------------------------------------------------------------------ #
 
             ## verified leaves
-#             print "getRightVerticalLineX"
             image_data.rightVerticalLineX = PhyloParser.getRightVerticalLineX(image_data.image, image_data.rootList)
-            
-#             print "getAvgRightEndPointOfLines", image_data.anchorLines
             image_data.avg_anchorLine_x =  PhyloParser.getAvgRightEndPointOfLines(image_data.anchorLines)
-            
-#             print "labelSuspiciousAnchorLine"
             image_data = self.labelSuspiciousAnchorLine(image_data, useClf=True)
             
             if debug:
@@ -6369,7 +6354,6 @@ class PhyloParser():
             # select largest sub-tree as the final tree
             image_data.defineTreeHead()
 
-
             # merge tree structure and species text
             useText = False
             if image_data.speciesNameReady:
@@ -6378,12 +6362,7 @@ class PhyloParser():
                 print "end mergeTreeAndText"
                 useText = True
                 
-            print "getTreeString"
             image_data.treeStructure = self.getTreeString(image_data, useText=useText)
-            print "end getTreeString"
-
-            print image_data.treeStructure
-
             if debug:
                 image_data.displayTrees('final')                
         else:
@@ -6391,6 +6370,105 @@ class PhyloParser():
         
         return image_data
     
+
+
+    def constructTree_eval(self, image_data, fixTree = False, tracing = False, orphanHint = False, debug = False):
+        
+        if image_data.lineDetected and image_data.lineMatched:
+            
+            # Pair h-v branch (parent) and v-h branch (children)
+            image_data = PhyloParser.createNodesFromLineGroups(image_data, tracing)
+            if debug:
+                print "Display Nodes"
+                image_data.displayNodes()
+
+            # Create Tree
+            image_data = self.createRootList(image_data)
+            if debug:
+                print "display Tree"
+                image_data.displayTrees('regular')
+                
+            ## found no node
+            if len(image_data.rootList) == 0:
+                image_data.treeHead = None
+                image_data.treeStructure = ""
+                return image_data
+            
+# ------------------------------------------------------------------------ #
+
+            if tracing:
+                print "tracing"
+                image_data = self.connectRootByTracing(image_data)            
+
+
+# ------------------------------------------------------------------------ #
+
+            ## verified leaves
+            image_data.rightVerticalLineX = PhyloParser.getRightVerticalLineX(image_data.image, image_data.rootList)
+            image_data.avg_anchorLine_x =  PhyloParser.getAvgRightEndPointOfLines(image_data.anchorLines)
+            image_data = self.labelSuspiciousAnchorLine(image_data, useClf=True)
+            
+            if debug:
+                for i, node in enumerate(image_data.rootList):
+                    print i, node.branch
+                    print "verifiedAnchorLines", len(node.verifiedAnchorLines)
+    #                 PhyloParser.displayLines(image_data.image, node.verifiedAnchorLines)
+                    print "suspiciousAnchorLines", len(node.suspiciousAnchorLines)
+    #                 PhyloParser.displayLines(image_data.image, node.suspiciousAnchorLines)
+                    print "unsureAnchorLines", len(node.unsureAnchorLines)
+    #                 PhyloParser.displayLines(image_data.image, node.unsureAnchorLines)
+                    print ""
+
+            image_data = PhyloParser.refineAnchorLine(image_data)
+
+
+# ------------------------------------------------------------------------ #
+
+            ###########################################
+            ### Recover missing components ############
+            
+            ## directly connect right sub-trees of broken point
+            if not self.isTreeReady(image_data) and fixTree:#######
+                ## Fix false-positive sub-trees and mandatorily connect sub-trees
+                print "fixTrees"    
+                image_data = self.fixTrees(image_data)
+
+#                 print image_data.rootList
+                if debug:
+                    print "display Fixed Tree"
+                    image_data.displayTrees('regular')
+            
+            
+            ## use orphane box to recover line
+            # sort again to ensure the first root is the largest
+            image_data.rootList = sorted(image_data.rootList, key = lambda x: -x.numNodes)
+            if len(image_data.rootList[0].breakSpot) > 0 and image_data.speciesNameReady and orphanHint:
+                print "recoverInterLeaveFromOrphanBox"    
+                image_data = self.recoverInterLeaveFromOrphanBox(image_data) ## not test yet
+                if debug:
+                    print "recoverInterLeaveFromOrphanBox result"
+                    image_data.displayTrees('regular')
+
+# ------------------------------------------------------------------------ #
+
+            # select largest sub-tree as the final tree
+            image_data.defineTreeHead()
+
+            # merge tree structure and species text
+            useText = False
+            if image_data.speciesNameReady:
+                self.mergeTreeAndText(image_data)
+                useText = True
+                
+            image_data.treeStructure = self.getTreeString(image_data, useText=useText)
+            if debug:
+                image_data.displayTrees('final')                
+        else:
+            print "Error! Tree components are not found. Please do detectLine and matchLine before this method"
+        
+        return image_data
+
+
 
     def makeTree(self, image_data, debug = False, tracing = False, showResult = False):
         
@@ -6877,7 +6955,7 @@ class PhyloParser():
                     for n in node.otherTo:
                         if n is not None and n != node:
                             descendants.append(n)
-                            print "mid node", n.branch
+#                             print "mid node", n.branch
                         
                 # update rightVerticalLineX
                 y_top = node.branch[1]

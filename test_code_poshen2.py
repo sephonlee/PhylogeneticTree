@@ -55,12 +55,12 @@ if __name__ == '__main__':
     
     
 #     fileNameList = getFilesInFolder(folderPath)
-    outFileName = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/high_quality_tree_20170307_sean_fix.csv'     
+    outFileName = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/high_quality_tree_20170307_rline_new.csv'     
     results = []
 
 #     fileNameList = ["PMC1474148_ijbsv02p0133g05.jpg"]
 #     fileNameList = ["PMC1500873_gkl433f4.jpg"]
-#     fileNameList = ['PMC1609170_1471-2180-6-88-1.jpg']
+    fileNameList = ['PMC2859578_97320630004216F2.jpg']
 
     for index in range(0, len(fileNameList)):
 
@@ -79,9 +79,8 @@ if __name__ == '__main__':
              
             image_data = ImageData(image)
             image_data = phyloParser.preprocces(image_data, debug=False)
-        
+
             image_data = phyloParser.detectLines(image_data, debug = False)
-            
             image_data = phyloParser.getCorners(image_data, debug = False)   
             image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
             image_data = phyloParser.includeLinesFromCorners(image_data)
@@ -130,6 +129,6 @@ if __name__ == '__main__':
 # # #             truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
 # # #             t2 = PhyloTree(truth_string + ";")
 # # #             num_node = count_node(t2)
-            results.append([fileNameList[index], -1, -1, -1])
+                results.append([fileNameList[index], -1, -1, -1])
          
-    saveResult(results, outFileName)
+#     saveResult(results, outFileName)
