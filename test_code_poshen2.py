@@ -27,7 +27,7 @@ def getFilesInFolder(folderPath):
 def saveResult(data, output):
     with open(output, 'wb') as outcsv:
         writer = csv.writer(outcsv, dialect='excel')
-        header = ['filename', 'distance', 'num_node', "score"]
+        header = ['filename', 'distance', 'num_node', "score", "num_leaf", "count_contourBoxes", "count_shareBox"]
         writer.writerow(header)
         
         for row in data:
@@ -55,24 +55,12 @@ if __name__ == '__main__':
     
     
 #     fileNameList = getFilesInFolder(folderPath)
-    outFileName = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/high_quality_tree_result_line_corner_v2_20170304.csv'     
+    outFileName = '/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/high_quality_tree_20170307_sean_fix.csv'     
     results = []
 
-#     for index, fileName in enumerate(fileNameList):
-#         print index, fileName
-
-#     folderPath = "/Users/sephon/Desktop/Research/VizioMetrics/Corpus/Phylogenetic/CNN_corpus/high_quality_tree"
-#     fileNameList = ["PMC1435931_1471-2148-6-18-3.jpg"]
-
-#     fileNameList = ["PMC3035803_btq706f1.jpg"]
-#     fileNameList = ["PMC2697986_1471-2148-9-107-3.jpg"]
-#     fileNameList = ["PMC2813288_pone.0008954.g004.jpg"]
-#     fileNameList = ["PMC554778_1471-2148-5-20-5.jpg"]
-#     fileNameList = ["PMC1326215_1471-2148-5-71-6.jpg"]
-#     fileNameList = ["PMC184354_1471-2148-3-16-7.jpg"]
-#     fileNameList = ["PMC2686707_1471-213X-9-29-4.jpg"]
-    fileNameList = ["PMC2644698_1471-2229-8-133-4.jpg"]
-#     fileNameList = ["PMC1978502_1471-2148-7-139-2.jpg"] ## infinite loop
+#     fileNameList = ["PMC1474148_ijbsv02p0133g05.jpg"]
+#     fileNameList = ["PMC1500873_gkl433f4.jpg"]
+#     fileNameList = ['PMC1609170_1471-2180-6-88-1.jpg']
 
     for index in range(0, len(fileNameList)):
 
@@ -86,7 +74,7 @@ if __name__ == '__main__':
                 
     #         PhyloParser.displayImage(image)
             image = PhyloParser.resizeImageByLineWidth(image)
-#             PhyloParser.displayImage(image)
+    #             PhyloParser.displayImage(image)
             
              
             image_data = ImageData(image)
@@ -108,7 +96,7 @@ if __name__ == '__main__':
             print "getSpecies_v3"
             image_data = phyloParser.getSpecies_v3(image_data, debug = False)
             print "end getSpecies_v3"
-            image_data = phyloParser.constructTree(image_data, tracing = False , debug = True)
+            image_data = phyloParser.constructTree(image_data, tracing = False , debug = False)
         
             
         
@@ -116,6 +104,9 @@ if __name__ == '__main__':
         #         image_data = phyloParser.matchLines(image_data, debug = False)
         #         image_data = phyloParser.makeTree(image_data, tracing = False, debug = False, showResult = False)
         
+        
+            ####### evaluation
+            
             truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
             print image_data.treeStructure
             t1 = PhyloTree(image_data.treeStructure + ";")
@@ -128,14 +119,17 @@ if __name__ == '__main__':
             print t2
             distance = PhyloTree.zhang_shasha_distance(t1, t2)
             num_node = PhyloTree.getNodeNum(t2)
+            num_leaf = t2.getLeafCount()
             score = distance/float(num_node)
-            print "distance %d/%d = %f" %(distance, num_node, score)
-            results.append([fileNameList[index], distance, num_node, score])
             
-        except:
-#             truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
-#             t2 = PhyloTree(truth_string + ";")
-#             num_node = count_node(t2)
-            results.append([fileNameList[index], -1, -1, -1])
+            print "distance %d/%d = %f, leave=%d" %(distance, num_node, score, num_leaf)
+            print "contour count=%d , sharebox count=%d"%(image_data.count_contourBoxes, image_data.count_shareBox)
+            results.append([fileNameList[index], distance, num_node, score, num_leaf, image_data.count_contourBoxes, image_data.count_shareBox])
         
+        except:
+# # #             truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
+# # #             t2 = PhyloTree(truth_string + ";")
+# # #             num_node = count_node(t2)
+            results.append([fileNameList[index], -1, -1, -1])
+         
     saveResult(results, outFileName)
