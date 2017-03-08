@@ -61,6 +61,13 @@ class PhyloTree(Tree):
                 num = PhyloTree.getNodeNum(c, num = num) + 1        
         return num
     
+    def getLeafCount(self):
+        count = 0
+        for node in self.traverse():
+            if len(node.children) == 0:
+                count += 1
+        return count
+    
 #     @staticmethod
     def drawTree(self):
         ts = TreeStyle()
@@ -334,6 +341,10 @@ def post_order(tree, level):
 
 if __name__ == '__main__':
     
+    
+    
+    
+    
     # # str = "A\B\C\D,E|F|G|H,I|"
     # str = "A0B0C0D,E2F1G2H,I3"
     # str = "A,B1C1D1E1F0G,H2I1J,K3L,M1N,O2P0Q,R4S1"
@@ -357,13 +368,15 @@ if __name__ == '__main__':
     
     # # string = "A0B,C2D,E1F1*K0L0*M0N0*O,P,Q2R0*S,T,U1V0*W1*X,Y2*Z0AA,AB1AC,AD5"
     # string = "A0B,C2D,E1F1*K0L0*M0N0*O,P,Q2*R0*S,T,U1V0*W1*X,Y2*Z0AA,AB1AC,AD4"
-    # string = "A0B0C2D0E1F1*K0L0*M0N0*O0P0*Q2*R0*S0T0*U1V0*W1*X0Y2*Z0AA0AB1AC0AD4"
-    string = "J0J1J1J0J1J0J2J2J0J1J0J2J0J2J1J0J1J0J2J0J4J0J1J1J0J1J3"
-    tree_string =  string2TreeString(string, rename = True)   
+    string = "A0B0C2D0E1F1*K0L0*M0N0*O0P0*Q2*R0*S0T0*U1V0*W1*X0Y2*Z0AA0AB1AC0AD4"
+    string = "J0J0J0J0J2J0J1J0J0J4J0J0J3*J0J1J0J0J3J3"
+    tree_string =  string2TreeString(string, rename = True)
 #     print "coded string:", string
     print "tree string", tree_string    
-    # tree = PhyloTree(tree_string+";")
-    # print tree
+    tree = PhyloTree(tree_string+";")
+    print tree
+    print tree.getLeafCount()
+    
     # print PhyloTree.rename_node(tree, rename_all=True)
     # print tree
     
@@ -383,9 +396,10 @@ if __name__ == '__main__':
 
 
 
-#     t1 = PhyloTree(string2TreeString(string) + ';')
+    t1 = PhyloTree(string2TreeString(string) + ';')
 
-#     print t1
+    print t1
+    print t1.getLeafCount()
     
 #     t1 = PhyloTree("(((((((Lafidae, Stercorariidae), Sternidae), Rynchopidae),Glareolidae,Burhinidae,Chionidae,(((Haematopodidae, Recurvirostridae), Vanellinae), Charadriinae)), ((((((Jacanidae, Rostratulidae), Gallinagininae), Tringinae), (Arenariinae, Calidrinae)), Phalaropodinae), Thinocoridae)), Alcidae), Outgroups);")
     
@@ -432,12 +446,12 @@ if __name__ == '__main__':
 #     t2 = PhyloTree("((X,(X,X)), ((X,X),(X,X)));")
 
     
-    for n in t1.traverse():
-        print "name", n.name
-     
-    print 
-    for n in t2.traverse():
-        print "name", n.name   
+#     for n in t1.traverse():
+#         print "name", n.name
+#      
+#     print 
+#     for n in t2.traverse():
+#         print "name", n.name   
         
 
     PhyloTree.rename_node(t1, rename_all=True)
