@@ -1274,8 +1274,8 @@ class PhyloParser():
         verLineMappingDict['lineMapping'] = {}
         verLineMappingDict['overlapMapping'] = {} 
 
-        image_data.horLines, image_data.horLineMask, image_data.horLineMappingDict = PhyloParser.getUniqueLinesList(horLines, horLineMask, horLineMappingDict, image_data, mode = 'hor')
-        image_data.verLines, image_data.verLineMask, image_data.verLineMappingDict = PhyloParser.getUniqueLinesList(verLines, verLineMask, verLineMappingDict, image_data, mode = 'ver')
+        image_data.horLines, image_data.horLineMask, image_data.horLineMappingDict = PhyloParser.getUniqueLinesList_old(horLines, horLineMask, horLineMappingDict, image_data, mode = 'hor')
+        image_data.verLines, image_data.verLineMask, image_data.verLineMappingDict = PhyloParser.getUniqueLinesList_old(verLines, verLineMask, verLineMappingDict, image_data, mode = 'ver')
         image_data.lineGrouped = True
 
         # print image_data.getLineGroupGivenDot((492,23), 'ver')
@@ -1726,9 +1726,14 @@ class PhyloParser():
             x1, y1, x2, y2, length = targetLine
 
             lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
+            lineDict['midPoint_1'] = ((y1+y2)/2, (x1+x2)/2)
+            lineDict['midPoint_-1'] = ((y1+y2)/2, (x1+x2)/2)
             lineDict['rline'] = targetLine
             lineDict['rline_upper'] = targetLine
             lineDict['rline_lower'] = targetLine
+            lineDict['rline_1'] = targetLine
+            lineDict['rline_-1'] = targetLine
+        
 
 
         for lineIndex, lineDict in mappingDict['lineMapping'].items():
