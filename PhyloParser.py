@@ -571,20 +571,18 @@ class PhyloParser():
 
     @staticmethod
     def resizeImageByLineWidth(image, linewidth = 4):
-        w = PhyloParser.findLineWidth(image)
-        print "linewidth = ", w
-        
+        w = PhyloParser.findLineWidth(image)        
         if abs(w) > linewidth :
             ratio = linewidth / abs(float(w))
             image = cv.resize(image,(0,0), fx = ratio, fy = ratio, interpolation = cv.INTER_CUBIC)
-        return image
+        return image, w
 
     @staticmethod
     # return line width of the tree
     # approach: 
     # 1. use contour finder to separate tree
     # 2. Iteratively Use opening until detecting a change of overall pixel values 
-    def findLineWidth(image, upper_bond = 10):
+    def findLineWidth(image, upper_bond = 15):
         mask, nonTreeMask, contours, hierarchy = PhyloParser.findContours(255 - PhyloParser.negateImage(image)) 
         
         linewidth = 1
@@ -6337,8 +6335,9 @@ class PhyloParser():
                 if debug:
                     print "display Fixed Tree"
                     image_data.displayTrees('regular')
+                    print "??"
             
-            
+            print 'here'
             ## use orphane box to recover line
             # sort again to ensure the first root is the largest
             image_data.rootList = sorted(image_data.rootList, key = lambda x: -x.numNodes)
