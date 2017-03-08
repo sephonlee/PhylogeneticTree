@@ -270,6 +270,60 @@ class ImageData():
         plt.imshow(whatever)
         plt.show()
 
+    def displayGivenNodes(self, nodeList):
+        if len(self.image.shape) ==2:
+            whatever = self.image.copy()
+            whatever = cv.cvtColor(whatever, cv.COLOR_GRAY2RGB)
+        else:
+            whatever = self.image.copy()
+
+        count = 0
+        for node in nodeList:
+            count +=1
+            color = self.getColor(count)
+
+            if node.root:
+                x1, y1, x2, y2, length = node.root
+                cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+            if node.branch:
+                x1, y1, x2, y2, length = node.branch
+                cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+
+            if node.upperLeave:
+                x1, y1, x2, y2, length = node.upperLeave
+                cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+            if node.lowerLeave:
+                x1, y1, x2, y2, length = node.lowerLeave
+                cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+            if not node.isBinary:
+                for line in node.interLeave:
+                    x1, y1, x2, y2, length = line
+                    cv.rectangle(whatever, (x1, y1), (x2, y2), color=color, thickness=2)
+
+        plt.imshow(whatever)
+        plt.show()
+
+    def getLineGroupGivenDot(self, dot, mode):
+        potLinegroup = []
+
+        y, x =dot
+
+        if mode == 'hor':
+            ddict = self.horLineMappingDict
+            mask = self.horLineMask
+        elif mode == 'ver':
+            ddict = self.verLineMappingDict
+            mask = self.verLineMask
+
+        overlapIndex = mask[y, x, 1]
+
+        if overlapIndex == 0:
+            return mask[y,x,0]
+        else:
+            return ddict['overlapMapping'][overlapIndex]
+
+
+
 
     def displayNodes(self):
         if len(self.image.shape) ==2:
