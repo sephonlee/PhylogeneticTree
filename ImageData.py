@@ -71,6 +71,8 @@ class ImageData():
     line2Text = {} # key: line,  value: text
     orphanBox2Text = {} #key: box,  value: text; orphan boxes are boxes with not matched anchor lines
     speciesNameReady = False
+    count_shareBox = 0 # count of the share box corresponding to mutli-anchorlines, for evaluation only
+    count_contourBoxes = 0 # count of the coutour box corresponding to mutli-anchorlines, for evaluation only
 #     box2Text = {} #key: box, value:text;
 #     textGroup = [] #element: key: "text_row" value: bonding box; key: "boxes" value: sub-boxes in the bonding box
 

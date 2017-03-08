@@ -204,6 +204,8 @@ class Node():
                         speciesIndex+=1
                     else:
                         interChildren = "**"
+                        
+                print interChildren
                 result += interChildren + ','
 
             return result + '%s)' %lowerChildren, speciesIndex
