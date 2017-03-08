@@ -301,6 +301,27 @@ class ImageData():
         plt.imshow(whatever)
         plt.show()
 
+    def getLineGroupGivenDot(self, dot, mode):
+        potLinegroup = []
+
+        y, x =dot
+
+        if mode == 'hor':
+            ddict = self.horLineMappingDict
+            mask = self.horLineMask
+        elif mode == 'ver':
+            ddict = self.verLineMappingDict
+            mask = self.verLineMask
+
+        overlapIndex = mask[y, x, 1]
+
+        if overlapIndex == 0:
+            return mask[y,x,0]
+        else:
+            return ddict['overlapMapping'][overlapIndex]
+
+
+
 
     def displayNodes(self):
         if len(self.image.shape) ==2:

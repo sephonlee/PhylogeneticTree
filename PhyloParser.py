@@ -1278,13 +1278,17 @@ class PhyloParser():
         image_data.verLines, image_data.verLineMask, image_data.verLineMappingDict = PhyloParser.getUniqueLinesList(verLines, verLineMask, verLineMappingDict, image_data, mode = 'ver')
         image_data.lineGrouped = True
 
-
+                # print image_data.getLineGroupGivenDot((388,320), 'ver')
+                # print image_data.verLineMappingDict
+                # PhyloParser.displayLines(image_data.image, image_data.verLineMappingDict['lineMapping'][image_data.getLineGroupGivenDot((388,320), 'ver')]['lineGroup'])
 
 
         if debug:
             print 'groupLines debugging'
             image_data.displayTargetLines('horLines')
             image_data.displayTargetLines('verLines')
+
+
 
         # for key, value in horLineMappingDict.items():
         #     if key == 'overlapMapping':
@@ -1308,6 +1312,13 @@ class PhyloParser():
         # PhyloParser.displayImage(image_data.verLineMask[:,:,0])
 
         return image_data
+
+    @staticmethod
+    def isLineNoisy(length, aveLength):
+        if length < aveLength -5:
+            return True
+        else:
+            return False
 
 
     @staticmethod
@@ -1342,11 +1353,12 @@ class PhyloParser():
                     overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex, mode = mode)
                     mapIndex +=1
                 else:
-                    if PhyloParser.isSameLineGroup(length, mappingDict['lineMapping'][voteNumber]['length']):
-                        mappingDict['lineMapping'][voteNumber]['lineGroup'].append(line)
-                        PhyloParser.updateAverageLength(mappingDict, voteNumber, line)
+                    if PhyloParser.isSameLineGroup(line, mappingDict['lineMapping'][voteNumber]['lineGroup']):
+                        if not PhyloParser.isLineNoisy(length, mappingDict['lineMapping'][voteNumber]['length']):
+                            mappingDict['lineMapping'][voteNumber]['lineGroup'].append(line)
+                            PhyloParser.updateAverageLength(mappingDict, voteNumber, line)
 
-                        overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, voteNumber, overlapIndex, mode = mode)
+                            overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, voteNumber, overlapIndex, mode = mode)
                     else:
                         
                         mappingDict['lineMapping'][mapIndex] = {}
@@ -1363,12 +1375,14 @@ class PhyloParser():
                 isFound = False
 
                 for lineIndex in mappingDict['overlapMapping'][overlapNumber]:                 
-                    if PhyloParser.isSameLineGroup(length, mappingDict['lineMapping'][lineIndex]['length']):
-                        mappingDict['lineMapping'][lineIndex]['lineGroup'].append(line)
-                        PhyloParser.updateAverageLength(mappingDict, lineIndex, line)
+                    if PhyloParser.isSameLineGroup(line, mappingDict['lineMapping'][lineIndex]['lineGroup']):
+                        if not PhyloParser.isLineNoisy(length, mappingDict['lineMapping'][lineIndex]['length']):
+                            mappingDict['lineMapping'][lineIndex]['lineGroup'].append(line)
+                            PhyloParser.updateAverageLength(mappingDict, lineIndex, line)
+                            overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, lineIndex, overlapIndex, mode, overlapIndex = overlapNumber)
                         isFound = True
 
-                        overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, lineIndex, overlapIndex, mode, overlapIndex = overlapNumber)
+                        
 
                 if not isFound:
                     mappingDict['lineMapping'][mapIndex] = {}
@@ -1437,6 +1451,8 @@ class PhyloParser():
         #     print mappingDict['lineMapping'][42]
 
 
+
+
         for lineIndex, lineDict in mappingDict['lineMapping'].items():
             isNoise = False
             if lineIndex not in noiseIndexes:
@@ -1467,7 +1483,8 @@ class PhyloParser():
                                             noisePool.append(overlapIndex)
                             elif mode == 'ver':
                                 if oy1 >= ty1 - tlength/10 and oy2 <= ty2 + tlength/10:
-                                    
+                                    # if lineIndex == 17 and overlapIndex == 15:
+                                    #     print oy1, ty1, oy2, ty2
                                     midPoint = (tx1+ox1)/2
                                     pixelValues = image_lineDetection[oy1:oy2,midPoint :midPoint +1]
 
@@ -1562,20 +1579,31 @@ class PhyloParser():
 
 
     @staticmethod
-    def isSameLineGroup(length1, length2):
-        if length2 > length1:
-            margin = float(length2) / 10 +2
+    def isSameLineGroup(line, lineGroup):
+        rline = [0,0,0,0,0]
+        count = 0
+        for gline in lineGroup:
+            count +=1
+            for index, pixel in enumerate(gline):
+                rline[index] +=pixel
+        for i in range(len(rline)):
+            rline[i] = rline[i] / count
+        rline = tuple(rline)
 
-            if length2 < length1 + margin:
-                return True
-            else:
-                return False
-        else:
-            margin = float(length1) / 10 +2
-            if length1 < length2 + margin:
-                return True
-            else:
-                return False
+        return PhyloParser.isSameLine(line, rline)
+        # if length2 > length1:
+        #     margin = float(length2) / 10 +2
+
+        #     if length2 < length1 + margin:
+        #         return True
+        #     else:
+        #         return False
+        # else:
+        #     margin = float(length1) / 10 +2
+        #     if length1 < length2 + margin:
+        #         return True
+        #     else:
+        #         return False
 
 
     @staticmethod
