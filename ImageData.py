@@ -235,6 +235,7 @@ class ImageData():
             stack.append(rootNode)
             color = self.getColor(count)
             while stack:
+
                 node = stack.pop()
                 if node.to[0]:
                     stack.append(node.to[0])
