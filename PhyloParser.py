@@ -6369,8 +6369,126 @@ class PhyloParser():
             print "Error! Tree components are not found. Please do detectLine and matchLine before this method"
         
         return image_data
-    
 
+    @staticmethod
+    def initializeImageDataForTracing(image_data):
+
+        rootList = image_data.rootList[:]
+
+        rootList = sorted(rootList, key = lambda x: x.branch[0])
+        newRoot = Node(branch = rootList[0].branch)
+        newRoot.breakSpot.append(newRoot)
+        image_data.startNodeForTracing = newRoot
+        # image_data.displayNode(newRoot)
+        image_data.nodeList = []
+        image_data.rootList = [newRoot]
+
+
+        return image_data
+
+    
+    def constructTreeByTracing(self, image_data, debug = False, tracing = True):
+        
+        if image_data.lineDetected and image_data.lineMatched:
+            
+            # Pair h-v branch (parent) and v-h branch (children)
+            image_data = PhyloParser.createNodesFromLineGroups(image_data)
+            if debug:
+                print "Display Nodes"
+                image_data.displayNodes()
+
+            # Create Tree
+            image_data = self.createRootList(image_data)
+            if debug:
+                print "display Tree"
+                image_data.displayTrees('regular')
+                
+            ## found no node
+            if len(image_data.rootList) == 0:
+                image_data.treeHead = None
+                image_data.treeStructure = ""
+                return image_data
+            
+# ------------------------------------------------------------------------ #
+
+            image_data = PhyloParser.initializeImageDataForTracing(image_data)
+
+
+            if tracing:
+                print "tracing"
+                image_data = PhyloParser.makeTreeByTracing(image_data)            
+
+
+# ------------------------------------------------------------------------ #
+
+            ## verified leaves
+            image_data.rightVerticalLineX = PhyloParser.getRightVerticalLineX(image_data.image, image_data.rootList)
+            image_data.avg_anchorLine_x =  PhyloParser.getAvgRightEndPointOfLines(image_data.anchorLines)
+            image_data = self.labelSuspiciousAnchorLine(image_data, useClf=True)
+            
+            if debug:
+                for i, node in enumerate(image_data.rootList):
+                    print i, node.branch
+                    print "verifiedAnchorLines", len(node.verifiedAnchorLines)
+    #                 PhyloParser.displayLines(image_data.image, node.verifiedAnchorLines)
+                    print "suspiciousAnchorLines", len(node.suspiciousAnchorLines)
+    #                 PhyloParser.displayLines(image_data.image, node.suspiciousAnchorLines)
+                    print "unsureAnchorLines", len(node.unsureAnchorLines)
+    #                 PhyloParser.displayLines(image_data.image, node.unsureAnchorLines)
+                    print ""
+
+            print "refineAnchorLine"
+            image_data = PhyloParser.refineAnchorLine(image_data)
+
+
+# ------------------------------------------------------------------------ #
+
+            ###########################################
+            ### Recover missing components ############
+            
+            ## directly connect right sub-trees of broken point
+            if not self.isTreeReady(image_data):#######
+                ## Fix false-positive sub-trees and mandatorily connect sub-trees
+                image_data = self.fixTrees(image_data)
+
+#                 print image_data.rootList
+                if debug:
+                    print "display Fixed Tree"
+                    image_data.displayTrees('regular')
+                    print "??"
+            
+            print 'here'
+            ## use orphane box to recover line
+            # sort again to ensure the first root is the largest
+            image_data.rootList = sorted(image_data.rootList, key = lambda x: -x.numNodes)
+            if len(image_data.rootList[0].breakSpot) > 0 and image_data.speciesNameReady:
+                print "recoverInterLeaveFromOrphanBox"    
+#                 image_data = self.recoverInterLeaveFromOrphanBox(image_data) ## not test yet
+                if debug:
+                    print "recoverInterLeaveFromOrphanBox result"
+                    image_data.displayTrees('regular')
+
+# ------------------------------------------------------------------------ #
+
+            # select largest sub-tree as the final tree
+            image_data.defineTreeHead()
+
+            # merge tree structure and species text
+            useText = False
+            if image_data.speciesNameReady:
+                print "mergeTreeAndText"
+                self.mergeTreeAndText(image_data)
+                print "end mergeTreeAndText"
+                useText = True
+                
+            image_data.treeStructure = self.getTreeString(image_data, useText=useText)
+            if debug:
+                print image_data.treeStructure
+                image_data.displayTrees('final')                
+        else:
+            print "Error! Tree components are not found. Please do detectLine and matchLine before this method"
+        
+        return image_data
 
     def constructTree_eval(self, image_data, fixTree = False, tracing = False, orphanHint = False, debug = False):
         
@@ -8090,10 +8208,13 @@ class PhyloParser():
 
         refList = nodeList[:]
         isConnected = []
-        nodeList = sorted(nodeList, key = lambda x: -x.branch[0])
+        nodeList = sorted(nodeList, key = lambda x: x.branch[0])
+
         for nodeIndex, node in enumerate(nodeList):
+
+            isConnected.append(node)
             for refNodeIndex, refNode in enumerate(refList):
-                if refNodeIndex>nodeIndex:
+                if refNodeIndex!=nodeIndex:
                     if node.upperLeave:
                         if PhyloParser.isLineAndNodeConnected(node.upperLeave, refNode) and refNode not in isConnected:
                             if not node.to[0]:
@@ -8125,7 +8246,6 @@ class PhyloParser():
                                     refNode.origin = node.origin
                                     node.numNodes += refNode.numNodes
                                     isConnected.append(refNode)
-
 
     @staticmethod
     def findMissingNodesByTracing(brokenNode, image_data, mask = None):
@@ -8521,6 +8641,110 @@ class PhyloParser():
         image_data.rootList = rootList
 
         return image_data
+
+    @staticmethod
+    def makeTreeByTracing(image_data, debug = False):
+
+        rootList = image_data.rootList
+
+        rootList = sorted(rootList, key = lambda x: -x.branch[0])
+
+
+        connectedRootNodes = []
+
+
+        for topRootNode in rootList:
+            # print rootList
+
+            # for root in rootList:
+            #     image_data.displayATree(root)
+            for brokenNode in topRootNode.breakSpot:
+                # print 'firstRoot'
+                # print topRootNode.breakSpot
+                # image_data.nodeList = topRootNode.breakSpot
+                # image_data.displayNodes()
+                # print 'brokenNode', brokenNode
+                # image_data.displayNode(brokenNode)
+                mask, newNodeList = PhyloParser.findMissingNodesByTracing(brokenNode, image_data, mask = None)
+                # mask, newNodeList = PhyloParser.findMissingNodesByTracing(brokenNode, image_data)
+                # image_data.nodeList = newNodeList
+                # image_data.displayNodes()
+                # for node in newNodeList:
+                #     node.getNodeInfo()
+                
+                # print 'recoveredNodes'
+                # for node in newNodeList:
+                #     print node
+                #     image_data.displayNode(node)
+                if len(newNodeList)>1:
+                    image_data.nodeList += newNodeList[1:]
+
+
+
+                stack = []
+                if len(newNodeList)!=0:
+
+                    stack.append(newNodeList[0])
+                    seen = []
+                    seen.append(newNodeList[0])
+                    while stack:
+                        node = stack.pop()
+                        if node.to[0]:
+                            stack.append(node.to[0])
+                        else:
+                            if node.upperLeave:
+                                for potNode in rootList:
+                                    if topRootNode != potNode and potNode not in connectedRootNodes:
+                                        if PhyloParser.isLineAndNodeConnected(node.upperLeave, potNode):
+                                            if len(topRootNode.nodesIncluded + potNode.nodesIncluded) == len(list(set(topRootNode.nodesIncluded + potNode.nodesIncluded))):
+                                                topRootNode.nodesIncluded += potNode.nodesIncluded
+                                                connectedRootNodes.append(potNode)
+                                                tmp = list(node.to)
+                                                tmp[0] = potNode
+                                                node.to = tuple(tmp)
+                                                topRootNode.numNodes += potNode.numNodes
+                                                potNode.whereFrom = node
+                                                potNode.origin = node.origin
+
+                        if node.to[1]:
+                            stack.append(node.to[1])
+                        else:
+                            if node.lowerLeave:
+                                for potNode in rootList:
+                                    if topRootNode != potNode and potNode not in connectedRootNodes:
+                                        if PhyloParser.isLineAndNodeConnected(node.lowerLeave, potNode):
+                                            if len(topRootNode.nodesIncluded + potNode.nodesIncluded) == len(list(set(topRootNode.nodesIncluded + potNode.nodesIncluded))):
+                                                topRootNode.nodesIncluded += potNode.nodesIncluded
+                                                connectedRootNodes.append(potNode)
+                                                tmp = list(node.to)
+                                                tmp[1] = potNode
+                                                node.to = tuple(tmp)
+                                                topRootNode.numNodes += potNode.numNodes
+                                                potNode.whereFrom = node
+                                                potNode.origin = node.origin
+                        if not node.isBinary:
+                            for index, toNode in enumerate(node.otherTo):
+                                if toNode:
+                                    stack.append(toNode)
+                                else:
+                                    if node.interLeave[index]:
+                                        for potNode in rootList:
+                                            if topRootNode != potNode and potNode not in connectedRootNodes:
+                                                if PhyloParser.isLineAndNodeConnected(node.interLeave[index], potNode):
+                                                    if len(topRootNode.nodesIncluded + potNode.nodesIncluded) == len(list(set(topRootNode.nodesIncluded + potNode.nodesIncluded))):
+                                                        topRootNode.nodesIncluded += potNode.nodesIncluded
+                                                        connectedRootNodes.append(potNode)
+                                                        node.otherTo[index] = potNode
+                                                        topRootNode.numNodes += potNode.numNodes
+                                                        potNode.whereFrom = node
+                                                        potNode.origin = node.origin
+        
+        rootList = sorted(rootList, key = lambda x: -x.numNodes)
+
+        image_data.rootList = rootList
+
+        return image_data
+
 
     @staticmethod    
     def drawNode(whatever, node):

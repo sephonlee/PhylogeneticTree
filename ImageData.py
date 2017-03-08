@@ -93,6 +93,10 @@ class ImageData():
     rightVerticalLineX = None #the x position of the rightest vertical branch
     avg_anchorLine_x = None #the average x position of the right vertices of anchor lines
     
+    # tracing only
+    startNodeForTracing = None
+
+
     def __init__(self, image):
         self.image = image
         self.originalImage = image.copy()
