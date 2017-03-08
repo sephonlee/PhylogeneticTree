@@ -8033,7 +8033,7 @@ class PhyloParser():
                     if not node.isBinary:
                         for index, interLine in enumerate(node.interLeave):
                             if PhyloParser.isLineAndNodeConnected(interLine, refNode)and refNode not in isConnected:
-                                if not otherTo[index]:
+                                if not node.otherTo[index]:
                                     node.otherTo[index] = refNode
                                     refNode.whereFrom = node
                                     refNode.origin = node.origin
