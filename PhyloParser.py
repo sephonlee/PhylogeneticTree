@@ -1274,8 +1274,8 @@ class PhyloParser():
         verLineMappingDict['lineMapping'] = {}
         verLineMappingDict['overlapMapping'] = {} 
 
-        image_data.horLines, image_data.horLineMask, image_data.horLineMappingDict = PhyloParser.getUniqueLinesList(horLines, horLineMask, horLineMappingDict, image_data, mode = 'hor')
-        image_data.verLines, image_data.verLineMask, image_data.verLineMappingDict = PhyloParser.getUniqueLinesList(verLines, verLineMask, verLineMappingDict, image_data, mode = 'ver')
+        image_data.horLines, image_data.horLineMask, image_data.horLineMappingDict = PhyloParser.getUniqueLinesList_old(horLines, horLineMask, horLineMappingDict, image_data, mode = 'hor')
+        image_data.verLines, image_data.verLineMask, image_data.verLineMappingDict = PhyloParser.getUniqueLinesList_old(verLines, verLineMask, verLineMappingDict, image_data, mode = 'ver')
         image_data.lineGrouped = True
 
                 # print image_data.getLineGroupGivenDot((388,320), 'ver')
@@ -1437,8 +1437,8 @@ class PhyloParser():
             
             lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
             lineDict['rline'] = targetLine
-            lineDict['rline_upper'] = targetLine
-            lineDict['rline_lower'] = targetLine
+            lineDict['rline_upper'] = lineDict['lineGroup'][0]
+            lineDict['rline_lower'] = lineDict['lineGroup'][-1]
 
             
 #             targetIndex = len(lineDict['lineGroup'])/2
@@ -1480,127 +1480,6 @@ class PhyloParser():
         #     print mappingDict['lineMapping'][42]
 
 
-    @staticmethod
-    def getUniqueLinesList_old(lineList, mask, mappingDict, image_data, mode):
-        if mode == 'hor':
-            lineList = sorted(lineList, key = lambda x: x[1])
-        elif mode == 'ver':
-            lineList = sorted(lineList, key = lambda x: x[0])
-
-
-        image_lineDetection = image_data.image_preproc_for_line_detection    
-        mapIndex = 1
-        overlapIndex = 1
-
-        for line in lineList:
-
-            x1, y1, x2, y2, length = line
-            if mode == 'hor':
-                overlapNumber = PhyloParser.getVoteNumber(mask[y1:y2+1, x1:x2, 1], mode = 'overlap')
-            elif mode == 'ver':
-                overlapNumber = PhyloParser.getVoteNumber(mask[y1:y2, x1:x2+1, 1], mode = 'overlap')
-            if overlapNumber == 0:
-                if mode == 'hor':
-                    voteNumber=PhyloParser.getVoteNumber(mask[y1:y2+1, x1:x2, 0])
-                elif mode == 'ver':
-                    voteNumber = PhyloParser.getVoteNumber(mask[y1:y2, x1:x2+1, 0])
-                if voteNumber == 0:
-                    mappingDict['lineMapping'][mapIndex] = {}
-                    mappingDict['lineMapping'][mapIndex]['length'] = length
-                    mappingDict['lineMapping'][mapIndex]['lineGroup'] = [line]
-                    mappingDict['lineMapping'][mapIndex]['overlap'] = []
-                    overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex, mode = mode)
-                    mapIndex +=1
-                else:
-                    if PhyloParser.isSameLineGroup(line, mappingDict['lineMapping'][voteNumber]['lineGroup']):
-                        if not PhyloParser.isLineNoisy(length, mappingDict['lineMapping'][voteNumber]['length']):
-                            mappingDict['lineMapping'][voteNumber]['lineGroup'].append(line)
-                            PhyloParser.updateAverageLength(mappingDict, voteNumber, line)
-
-                            overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, voteNumber, overlapIndex, mode = mode)
-                    else:
-                        
-                        mappingDict['lineMapping'][mapIndex] = {}
-                        mappingDict['lineMapping'][mapIndex]['length'] = length
-                        mappingDict['lineMapping'][mapIndex]['lineGroup'] = [line]
-                        mappingDict['lineMapping'][mapIndex]['overlap'] = [overlapIndex]
-                        if overlapIndex not in mappingDict['lineMapping'][voteNumber]['overlap']:
-                            mappingDict['lineMapping'][voteNumber]['overlap'].append(overlapIndex)
-                        mappingDict['overlapMapping'][overlapIndex] = [mapIndex, voteNumber]
-
-                        overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex+1, mode = mode, overlapIndex = overlapIndex)
-                        mapIndex+=1
-            else:
-                isFound = False
-
-                for lineIndex in mappingDict['overlapMapping'][overlapNumber]:                 
-                    if PhyloParser.isSameLineGroup(line, mappingDict['lineMapping'][lineIndex]['lineGroup']):
-                        if not PhyloParser.isLineNoisy(length, mappingDict['lineMapping'][lineIndex]['length']):
-                            mappingDict['lineMapping'][lineIndex]['lineGroup'].append(line)
-                            PhyloParser.updateAverageLength(mappingDict, lineIndex, line)
-                            overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, lineIndex, overlapIndex, mode, overlapIndex = overlapNumber)
-                        isFound = True
-
-                        
-
-                if not isFound:
-                    mappingDict['lineMapping'][mapIndex] = {}
-                    mappingDict['lineMapping'][mapIndex]['length'] = length
-                    mappingDict['lineMapping'][mapIndex]['lineGroup'] = [line]
-                    mappingDict['lineMapping'][mapIndex]['overlap'] = [overlapNumber]
-                    mappingDict['overlapMapping'][overlapNumber].append(mapIndex)
-                    overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex, mode, overlapIndex = overlapNumber)
-                    mapIndex +=1
-        lineList = []
-        noiseIndexes = []
-        noiseOverlapIndexes = []
-
-
-        for lineIndex, lineDict in mappingDict['lineMapping'].items():
-
-            lineDict['noise'] = {}
-            lineDict['parent'] = []
-            lineDict['children'] = []
-            lineDict['type'] = None
-            
-            ### new version ####
-#             if mode =='hor':
-#                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
-#                 lineDict['rline_upper'] = lineDict['lineGroup'][0]
-#                 lineDict['rline_lower'] = lineDict['lineGroup'][-1]
-#                 mmax = lineDict['lineGroup'][-1][1]
-#                 mmin = lineDict['lineGroup'][0][1]
-#                 x1, y1, x2, y2, length = lineDict['lineGroup'][len(lineDict['lineGroup'])/2]
-#                 lineDict['midPoint'] = ((mmax+mmin)/2, (x1+x2)/2)
-#                 lineDict['rline'] = (x1, (mmax+mmin)/2, x2, (mmax+mmin)/2, length)
-#             else:
-#                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[0])
-#                 lineDict['rline'] = lineDict['lineGroup'][-1]
-#                 mmax = lineDict['lineGroup'][-1][0]
-#                 mmin = lineDict['lineGroup'][0][0]
-#                 lineDict['midPoint'] = ((y1+y2)/2, (mmax + mmin)/2)
-
-            ##### old version ######
-            if mode =='hor':
-                lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
-            else:
-                lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[0])
-                
-            targetIndex = len(lineDict['lineGroup'])/2
-#             if mode == 'ver':
-#                 targetLine = lineDict['lineGroup'][-1]
-#             else:
-            targetLine = lineDict['lineGroup'][targetIndex]
-            x1, y1, x2, y2, length = targetLine
-
-            
-            lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
-            lineDict['rline'] = targetLine
-            lineDict['rline_upper'] = targetLine
-            lineDict['rline_lower'] = targetLine
-
-            
-        
 
 
         for lineIndex, lineDict in mappingDict['lineMapping'].items():
@@ -1714,6 +1593,240 @@ class PhyloParser():
         return lineList, mask, mappingDict
 
 
+
+    @staticmethod
+    def getUniqueLinesList_old(lineList, mask, mappingDict, image_data, mode):
+        if mode == 'hor':
+            lineList = sorted(lineList, key = lambda x: x[1])
+        elif mode == 'ver':
+            lineList = sorted(lineList, key = lambda x: x[0])
+
+
+        image_lineDetection = image_data.image_preproc_for_line_detection    
+        mapIndex = 1
+        overlapIndex = 1
+
+        for line in lineList:
+
+            x1, y1, x2, y2, length = line
+            if mode == 'hor':
+                overlapNumber = PhyloParser.getVoteNumber(mask[y1:y2+1, x1:x2, 1], mode = 'overlap')
+            elif mode == 'ver':
+                overlapNumber = PhyloParser.getVoteNumber(mask[y1:y2, x1:x2+1, 1], mode = 'overlap')
+            if overlapNumber == 0:
+                if mode == 'hor':
+                    voteNumber=PhyloParser.getVoteNumber(mask[y1:y2+1, x1:x2, 0])
+                elif mode == 'ver':
+                    voteNumber = PhyloParser.getVoteNumber(mask[y1:y2, x1:x2+1, 0])
+                if voteNumber == 0:
+                    mappingDict['lineMapping'][mapIndex] = {}
+                    mappingDict['lineMapping'][mapIndex]['length'] = length
+                    mappingDict['lineMapping'][mapIndex]['lineGroup'] = [line]
+                    mappingDict['lineMapping'][mapIndex]['overlap'] = []
+                    overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex, mode = mode)
+                    mapIndex +=1
+                else:
+                    if PhyloParser.isSameLineGroup(line, mappingDict['lineMapping'][voteNumber]['lineGroup']):
+                        if not PhyloParser.isLineNoisy(length, mappingDict['lineMapping'][voteNumber]['length']):
+                            mappingDict['lineMapping'][voteNumber]['lineGroup'].append(line)
+                            PhyloParser.updateAverageLength(mappingDict, voteNumber, line)
+
+                            overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, voteNumber, overlapIndex, mode = mode)
+                    else:
+                        
+                        mappingDict['lineMapping'][mapIndex] = {}
+                        mappingDict['lineMapping'][mapIndex]['length'] = length
+                        mappingDict['lineMapping'][mapIndex]['lineGroup'] = [line]
+                        mappingDict['lineMapping'][mapIndex]['overlap'] = [overlapIndex]
+                        if overlapIndex not in mappingDict['lineMapping'][voteNumber]['overlap']:
+                            mappingDict['lineMapping'][voteNumber]['overlap'].append(overlapIndex)
+                        mappingDict['overlapMapping'][overlapIndex] = [mapIndex, voteNumber]
+
+                        overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex+1, mode = mode, overlapIndex = overlapIndex)
+                        mapIndex+=1
+            else:
+                isFound = False
+
+                for lineIndex in mappingDict['overlapMapping'][overlapNumber]:                 
+                    if PhyloParser.isSameLineGroup(line, mappingDict['lineMapping'][lineIndex]['lineGroup']):
+                        if not PhyloParser.isLineNoisy(length, mappingDict['lineMapping'][lineIndex]['length']):
+                            mappingDict['lineMapping'][lineIndex]['lineGroup'].append(line)
+                            PhyloParser.updateAverageLength(mappingDict, lineIndex, line)
+                            overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, lineIndex, overlapIndex, mode, overlapIndex = overlapNumber)
+                        isFound = True
+
+                        
+
+                if not isFound:
+                    mappingDict['lineMapping'][mapIndex] = {}
+                    mappingDict['lineMapping'][mapIndex]['length'] = length
+                    mappingDict['lineMapping'][mapIndex]['lineGroup'] = [line]
+                    mappingDict['lineMapping'][mapIndex]['overlap'] = [overlapNumber]
+                    mappingDict['overlapMapping'][overlapNumber].append(mapIndex)
+                    overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex, mode, overlapIndex = overlapNumber)
+                    mapIndex +=1
+        lineList = []
+        noiseIndexes = []
+        noiseOverlapIndexes = []
+
+
+        for lineIndex, lineDict in mappingDict['lineMapping'].items():
+
+            lineDict['noise'] = {}
+            lineDict['parent'] = []
+            lineDict['children'] = []
+            lineDict['type'] = None
+            
+            ### new version ####
+#             if mode =='hor':
+#                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
+#                 lineDict['rline_upper'] = lineDict['lineGroup'][0]
+#                 lineDict['rline_lower'] = lineDict['lineGroup'][-1]
+#                 mmax = lineDict['lineGroup'][-1][1]
+#                 mmin = lineDict['lineGroup'][0][1]
+#                 x1, y1, x2, y2, length = lineDict['lineGroup'][len(lineDict['lineGroup'])/2]
+#                 lineDict['midPoint'] = ((mmax+mmin)/2, (x1+x2)/2)
+#                 lineDict['rline'] = (x1, (mmax+mmin)/2, x2, (mmax+mmin)/2, length)
+#             else:
+#                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[0])
+#                 targetIndex = len(lineDict['lineGroup'])/2
+#                 targetLine = lineDict['lineGroup'][targetIndex]
+#                 x1, y1, x2, y2, length = targetLine
+#                 lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
+#                 lineDict['rline'] = targetLine
+                
+                ## new worse version
+#                 lineDict['rline'] = lineDict['lineGroup'][-1]
+#                 mmax = lineDict['lineGroup'][-1][0]
+#                 mmin = lineDict['lineGroup'][0][0]
+#                 lineDict['midPoint'] = ((y1+y2)/2, (mmax + mmin)/2)
+
+
+            ##### old version ######
+            if mode =='hor':
+                lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
+            else:
+                lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[0])
+                
+            targetIndex = len(lineDict['lineGroup'])/2
+            targetLine = lineDict['lineGroup'][targetIndex]
+            x1, y1, x2, y2, length = targetLine
+
+            lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
+            lineDict['rline'] = targetLine
+            lineDict['rline_upper'] = targetLine
+            lineDict['rline_lower'] = targetLine
+
+
+        for lineIndex, lineDict in mappingDict['lineMapping'].items():
+            isNoise = False
+            if lineIndex not in noiseIndexes:
+                noisePool = []
+                for overlapMappingIndex in mappingDict['lineMapping'][lineIndex]['overlap']:
+                    
+                    for overlapIndex in mappingDict['overlapMapping'][overlapMappingIndex]:
+                        if lineIndex != overlapIndex:
+                            ox1, oy1, ox2, oy2, olength = mappingDict['lineMapping'][overlapIndex]['rline']
+                            tx1, ty1, tx2, ty2, tlength = mappingDict['lineMapping'][lineIndex]['rline']
+
+                            if mode == 'hor':
+                                if ox1 >= tx1 - tlength/10 and ox2 <= tx2 + tlength/10:
+                                    midPoint = (ty1+oy1) / 2
+                                    pixelValues = image_lineDetection[midPoint:midPoint + 1,ox1:ox2]
+
+                                    values, counts = np.unique(pixelValues, return_counts=True)
+                                    pixelValueDict = dict(zip(values, counts))
+                                    blackPts = 0
+                                    allPts = sum(pixelValueDict.values())
+                                    for key, count in pixelValueDict.items():
+                                        if key < 235:
+                                            blackPts +=count
+
+                                    if blackPts > allPts/2:
+                                        isNoise = True
+                                        if overlapIndex not in noisePool:
+                                            noisePool.append(overlapIndex)
+                            elif mode == 'ver':
+                                if oy1 >= ty1 - tlength/10 and oy2 <= ty2 + tlength/10:
+                                    # if lineIndex == 17 and overlapIndex == 15:
+                                    #     print oy1, ty1, oy2, ty2
+                                    midPoint = (tx1+ox1)/2
+                                    pixelValues = image_lineDetection[oy1:oy2,midPoint :midPoint +1]
+
+                                    values, counts = np.unique(pixelValues, return_counts=True)
+                                    pixelValueDict = dict(zip(values, counts))
+                                    
+                                    blackPts = 0
+                                    allPts = sum(pixelValueDict.values())
+                                    for key, count in pixelValueDict.items():
+                                        if key < 235:
+                                            blackPts +=count
+                                    
+                                    if blackPts>allPts/2:
+                                        isNoise = True
+                                        if overlapIndex not in noisePool:
+                                            noisePool.append(overlapIndex)
+
+                if isNoise:
+                    overlapIndexCheckList = []
+
+                    for noiseIndex in noisePool:
+                        noiseIndexes.append(noiseIndex)
+                        lineDict['noise'][noiseIndex] = mappingDict['lineMapping'][noiseIndex].copy()
+                        for subNoiseIndex, subnoises in mappingDict['lineMapping'][noiseIndex]['noise'].items():
+                            lineDict['noise'][subNoiseIndex] = subnoises.copy()
+
+                        mask[PhyloParser.mapping2Dto3D(np.where(mask[:,:,0] == noiseIndex), 0)] = lineIndex
+                        for overlapIndex in mappingDict['lineMapping'][noiseIndex]['overlap']:
+                            if noiseIndex in mappingDict['overlapMapping'][overlapIndex]:
+                                mappingDict['overlapMapping'][overlapIndex].remove(noiseIndex)
+                            overlapIndexCheckList.append(overlapIndex)
+
+
+                    if len(overlapIndexCheckList) >0:
+                        for overlapMappingIndex in overlapIndexCheckList:
+                            
+                            if len(mappingDict['overlapMapping'][overlapMappingIndex])<2:
+                                mask[PhyloParser.mapping2Dto3D(np.where(mask[:,:,1] == overlapMappingIndex), 1)] = 0
+                                for overlapIndex in mappingDict['overlapMapping'][overlapMappingIndex]:
+                                    if overlapMappingIndex in mappingDict['lineMapping'][overlapIndex]['overlap']:
+                                        mappingDict['lineMapping'][overlapIndex]['overlap'].remove(overlapMappingIndex)
+                                if overlapMappingIndex not in noiseOverlapIndexes:
+                                    noiseOverlapIndexes.append(overlapMappingIndex)
+                                
+                                # print mappingDict
+        
+
+        # if mode == 'hor':
+        #     print '----------------------------Before deleting-------------------------'
+        #     print mappingDict
+
+        # print noiseIndexes
+        # print noiseOverlapIndexes
+
+
+        for noiseIndex in noiseIndexes:
+            del mappingDict['lineMapping'][noiseIndex]
+
+        for noiseIndex in noiseOverlapIndexes:
+            del mappingDict['overlapMapping'][noiseIndex]
+            # print '----------------------------After deleting-------------------------'
+            # print mappingDict
+
+#         PhyloParser.displayImage(mask[:,:,0])
+
+
+        # if mode == 'hor':
+        #     print mappingDict
+
+
+        for lineIndex, lineDict in mappingDict['lineMapping'].items():
+            lineList.append(lineDict['rline'])
+
+        # if mode == 'hor':
+        #     print mappingDict
+
+        return lineList, mask, mappingDict
 
     @staticmethod
     def updateAverageLength(mappingDict, mapIndex, line):
