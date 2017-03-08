@@ -8162,7 +8162,7 @@ class PhyloParser():
                     brokenNode, mask, refinedLines = PhyloParser.matchNodeAndTrunk(brokenNode, trunk, mask, refinedLines)
                     # trunk.getTrunkInfo()
                     # node.getNodeInfo()
-                    # image_data.displayNode(node)
+
                     newNodeList.append(brokenNode)
             else:
                 trunk = trunkList[0]
@@ -8212,7 +8212,7 @@ class PhyloParser():
 
         rootList = image_data.rootList
 
-
+        rootList = sorted(rootList, key = lambda x: -x.branch[0])
 
 
         connectedRootNodes = []
@@ -8243,6 +8243,7 @@ class PhyloParser():
                 #     image_data.displayNode(node)
                 if len(newNodeList)>1:
                     image_data.nodeList += newNodeList[1:]
+
                 stack = []
                 if len(newNodeList)!=0:
                     stack.append(newNodeList[0])
@@ -8297,7 +8298,7 @@ class PhyloParser():
                                                         topRootNode.numNodes += potNode.numNodes
                                                         potNode.whereFrom = node
                                                         potNode.origin = node.origin
-        #         seen = []
+        # #         seen = []
         #         refNewNodeList = newNodeList[:]
         #         for breakSpotNode in topRootNode.breakSpot:
         #             for newNode in refNewNodeList:
@@ -8745,7 +8746,7 @@ class PhyloParser():
 
         for line in verLineMappingDict['lineMapping'][verLineIndex]['lineGroup']:
             x1, y1, x2, y2, length = line
-            nodesCoveredMask[y1:y2, x1-1:x2+2] = 255
+            nodesCoveredMask[y1:y2, x1-2:x2+3] = 255
 
 
         # for child in lineChildren:
@@ -9568,7 +9569,7 @@ class PhyloParser():
 
             if mask != None:
                 for index, interLine in enumerate(current_trunk.interLines):
-                    if not PhyloParser.isLineCrossed(interLine, mask):
+                    if not PhyloParser.isLineCrossed(interLine, mask) and not PhyloParser.isDotCovered(current_trunk.nextStartPoint[index], mask):
                         new_trunk = TrunkNode(current_trunk.nextStartPoint[index])
                         new_trunk.rootLine = interLine
                         queue_trunk.append(new_trunk)
@@ -9614,6 +9615,14 @@ class PhyloParser():
             return (trunkList, True)
         else:
             return (trunkList, False)
+    @staticmethod
+    def isDotCovered(dot, mask):
+        y, x  = dot
+        if mask[y,x] == 255:
+            return True
+        else:
+            False
+
 
     @staticmethod
     def isLineCrossed(line, mask):
