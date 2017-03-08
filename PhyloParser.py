@@ -8090,9 +8090,10 @@ class PhyloParser():
 
         refList = nodeList[:]
         isConnected = []
-        for node in nodeList:
-            for refNode in refList:
-                if node != refNode:
+        nodeList = sorted(nodeList, key = lambda x: -x.branch[0])
+        for nodeIndex, node in enumerate(nodeList):
+            for refNodeIndex, refNode in enumerate(refList):
+                if refNodeIndex>nodeIndex:
                     if node.upperLeave:
                         if PhyloParser.isLineAndNodeConnected(node.upperLeave, refNode) and refNode not in isConnected:
                             if not node.to[0]:
@@ -8244,9 +8245,14 @@ class PhyloParser():
                 if len(newNodeList)>1:
                     image_data.nodeList += newNodeList[1:]
 
+
+
                 stack = []
                 if len(newNodeList)!=0:
+
                     stack.append(newNodeList[0])
+                    seen = []
+                    seen.append(newNodeList[0])
                     while stack:
                         node = stack.pop()
                         if node.to[0]:
