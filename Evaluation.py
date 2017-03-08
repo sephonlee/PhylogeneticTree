@@ -69,196 +69,196 @@ if __name__ == '__main__':
 # ##---------------------------- BASE --------------------------------##
 #  
     outFileName = os.path.join(rootPath, "hqtree_base_20170307.csv")
-#     results = []
-#  
-#  
-#     for index in range(0, len(fileNameList)):
-#  
-#         try:
-#             filePath = os.path.join(folderPath, fileNameList[index])
-#             print 
-#             print "%s (%d / %d)"%(fileNameList[index], index, len(fileNameList))
-#              
-#             if isfile(filePath) :
-#                 image = cv.imread(filePath,0)
-#                  
-#     #         PhyloParser.displayImage(image)
-#             image, w = PhyloParser.resizeImageByLineWidth(image)
-#  
-#               
-#             image_data = ImageData(image)
-#             image_data = phyloParser.preprocces(image_data, debug=False)
-#          
-#             image_data = phyloParser.detectLines(image_data, debug = False)
-#             image_data = phyloParser.getCorners(image_data, debug = False)   
-#             image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
-#             image_data = phyloParser.includeLinesFromCorners(image_data)
-#             image_data = phyloParser.postProcessLines(image_data)
-#              
-#   
-#             image_data = phyloParser.groupLines(image_data)
-#             image_data = phyloParser.matchLineGroups(image_data, debug = False)
-#              
-#  
-#             image_data = phyloParser.getSpecies_v3(image_data, debug = False)
-#  
-#  
-#             image_data = phyloParser.constructTree_eval(image_data, fixTree = False, tracing = False, orphanHint = False, debug = False)
-#          
-#  
-#             ####### evaluation
-#              
-#             truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
-#             print image_data.treeStructure
-#             t1 = PhyloTree(image_data.treeStructure + ";")
-#             t2 = PhyloTree(truth_string + ";")
-#             PhyloTree.rename_node(t1, rename_all=True)
-#             PhyloTree.rename_node(t2, rename_all=True)
-#              
-#             distance = PhyloTree.zhang_shasha_distance(t1, t2)
-#             num_node = PhyloTree.getNodeNum(t2)
-#             num_leaf = t2.getLeafCount()
-#             score = distance/float(num_node)
-#              
-#             print "distance %d/%d = %f, leave=%d" %(distance, num_node, score, num_leaf)
-#             print "contour count=%d , sharebox count=%d"%(image_data.count_contourBoxes, image_data.count_shareBox)
-#             results.append([fileNameList[index], distance, num_node, score, num_leaf, image_data.count_contourBoxes, image_data.count_shareBox])
-#          
-#         except:
-#             results.append([fileNameList[index], -1, -1, -1])
-#           
-#     saveResult(results, outFileName)
-#      
-#      
-# ##---------------------------- fix tree only --------------------------------##
-#  
-#     outFileName = os.path.join(rootPath, "hqtree_base_fixTree_20170307.csv")
-#     results = []
-#  
-#  
-#     for index in range(0, len(fileNameList)):
-#  
-#         try:
-#             filePath = os.path.join(folderPath, fileNameList[index])
-#             print 
-#             print "%s (%d / %d)"%(fileNameList[index], index, len(fileNameList))
-#              
-#             if isfile(filePath) :
-#                 image = cv.imread(filePath,0)
-#                  
-#     #         PhyloParser.displayImage(image)
-#             image, w = PhyloParser.resizeImageByLineWidth(image)
-#  
-#               
-#             image_data = ImageData(image)
-#             image_data = phyloParser.preprocces(image_data, debug=False)
-#          
-#             image_data = phyloParser.detectLines(image_data, debug = False)
-#             image_data = phyloParser.getCorners(image_data, debug = False)   
-#             image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
-#             image_data = phyloParser.includeLinesFromCorners(image_data)
-#             image_data = phyloParser.postProcessLines(image_data)
-#              
-#   
-#             image_data = phyloParser.groupLines(image_data)
-#             image_data = phyloParser.matchLineGroups(image_data, debug = False)
-#              
-#  
-#             image_data = phyloParser.getSpecies_v3(image_data, debug = False)
-#  
-#  
-#             image_data = phyloParser.constructTree_eval(image_data, fixTree = True, tracing = False, orphanHint = False, debug = False)
-#          
-#          
-#  
-#             ####### evaluation
-#              
-#             truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
-#             print image_data.treeStructure
-#             t1 = PhyloTree(image_data.treeStructure + ";")
-#             t2 = PhyloTree(truth_string + ";")
-#             PhyloTree.rename_node(t1, rename_all=True)
-#             PhyloTree.rename_node(t2, rename_all=True)
-#              
-#             distance = PhyloTree.zhang_shasha_distance(t1, t2)
-#             num_node = PhyloTree.getNodeNum(t2)
-#             num_leaf = t2.getLeafCount()
-#             score = distance/float(num_node)
-#              
-#             print "distance %d/%d = %f, leave=%d" %(distance, num_node, score, num_leaf)
-#             print "contour count=%d , sharebox count=%d"%(image_data.count_contourBoxes, image_data.count_shareBox)
-#             results.append([fileNameList[index], distance, num_node, score, num_leaf, image_data.count_contourBoxes, image_data.count_shareBox])
-#          
-#         except:
-#             results.append([fileNameList[index], -1, -1, -1])
-#           
-#     saveResult(results, outFileName)
-#      
-#      
-#  
-# ##---------------------------- fixTree + orphanHint --------------------------------##
-#  
-#     outFileName = os.path.join(rootPath, "hqtree_base_fixTree_orphanHint_20170307.csv")
-#     results = []
-#  
-#  
-#     for index in range(0, len(fileNameList)):
-#  
-#         try:
-#             filePath = os.path.join(folderPath, fileNameList[index])
-#             print 
-#             print "%s (%d / %d)"%(fileNameList[index], index, len(fileNameList))
-#              
-#             if isfile(filePath) :
-#                 image = cv.imread(filePath,0)
-#                  
-#     #         PhyloParser.displayImage(image)
-#             image, w = PhyloParser.resizeImageByLineWidth(image)
-#  
-#               
-#             image_data = ImageData(image)
-#             image_data = phyloParser.preprocces(image_data, debug=False)
-#          
-#             image_data = phyloParser.detectLines(image_data, debug = False)
-#             image_data = phyloParser.getCorners(image_data, debug = False)   
-#             image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
-#             image_data = phyloParser.includeLinesFromCorners(image_data)
-#             image_data = phyloParser.postProcessLines(image_data)
-#              
-#   
-#             image_data = phyloParser.groupLines(image_data)
-#             image_data = phyloParser.matchLineGroups(image_data, debug = False)
-#              
-#  
-#             image_data = phyloParser.getSpecies_v3(image_data, debug = False)
-#  
-#  
-#             image_data = phyloParser.constructTree_eval(image_data, fixTree = True, tracing = False, orphanHint = True, debug = False)
-#          
-#          
-#  
-#             ####### evaluation
-#              
-#             truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
-#             print image_data.treeStructure
-#             t1 = PhyloTree(image_data.treeStructure + ";")
-#             t2 = PhyloTree(truth_string + ";")
-#             PhyloTree.rename_node(t1, rename_all=True)
-#             PhyloTree.rename_node(t2, rename_all=True)
-#              
-#             distance = PhyloTree.zhang_shasha_distance(t1, t2)
-#             num_node = PhyloTree.getNodeNum(t2)
-#             num_leaf = t2.getLeafCount()
-#             score = distance/float(num_node)
-#              
-#             print "distance %d/%d = %f, leave=%d" %(distance, num_node, score, num_leaf)
-#             print "contour count=%d , sharebox count=%d"%(image_data.count_contourBoxes, image_data.count_shareBox)
-#             results.append([fileNameList[index], distance, num_node, score, num_leaf, image_data.count_contourBoxes, image_data.count_shareBox])
-#          
-#         except:
-#             results.append([fileNameList[index], -1, -1, -1])
-#           
-#     saveResult(results, outFileName)
+    results = []
+  
+  
+    for index in range(0, len(fileNameList)):
+  
+        try:
+            filePath = os.path.join(folderPath, fileNameList[index])
+            print 
+            print "%s (%d / %d)"%(fileNameList[index], index, len(fileNameList))
+              
+            if isfile(filePath) :
+                image = cv.imread(filePath,0)
+                  
+    #         PhyloParser.displayImage(image)
+            image, w = PhyloParser.resizeImageByLineWidth(image)
+  
+               
+            image_data = ImageData(image)
+            image_data = phyloParser.preprocces(image_data, debug=False)
+          
+            image_data = phyloParser.detectLines(image_data, debug = False)
+            image_data = phyloParser.getCorners(image_data, debug = False)   
+            image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
+            image_data = phyloParser.includeLinesFromCorners(image_data)
+            image_data = phyloParser.postProcessLines(image_data)
+              
+   
+            image_data = phyloParser.groupLines(image_data)
+            image_data = phyloParser.matchLineGroups(image_data, debug = False)
+              
+  
+            image_data = phyloParser.getSpecies_v3(image_data, debug = False)
+  
+  
+            image_data = phyloParser.constructTree_eval(image_data, fixTree = False, tracing = False, orphanHint = False, debug = False)
+          
+  
+            ####### evaluation
+              
+            truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
+            print image_data.treeStructure
+            t1 = PhyloTree(image_data.treeStructure + ";")
+            t2 = PhyloTree(truth_string + ";")
+            PhyloTree.rename_node(t1, rename_all=True)
+            PhyloTree.rename_node(t2, rename_all=True)
+              
+            distance = PhyloTree.zhang_shasha_distance(t1, t2)
+            num_node = PhyloTree.getNodeNum(t2)
+            num_leaf = t2.getLeafCount()
+            score = distance/float(num_node)
+              
+            print "distance %d/%d = %f, leave=%d" %(distance, num_node, score, num_leaf)
+            print "contour count=%d , sharebox count=%d"%(image_data.count_contourBoxes, image_data.count_shareBox)
+            results.append([fileNameList[index], distance, num_node, score, num_leaf, image_data.count_contourBoxes, image_data.count_shareBox])
+          
+        except:
+            results.append([fileNameList[index], -1, -1, -1])
+           
+    saveResult(results, outFileName)
+      
+      
+##---------------------------- fix tree only --------------------------------##
+  
+    outFileName = os.path.join(rootPath, "hqtree_base_fixTree_20170307.csv")
+    results = []
+  
+  
+    for index in range(0, len(fileNameList)):
+  
+        try:
+            filePath = os.path.join(folderPath, fileNameList[index])
+            print 
+            print "%s (%d / %d)"%(fileNameList[index], index, len(fileNameList))
+              
+            if isfile(filePath) :
+                image = cv.imread(filePath,0)
+                  
+    #         PhyloParser.displayImage(image)
+            image, w = PhyloParser.resizeImageByLineWidth(image)
+  
+               
+            image_data = ImageData(image)
+            image_data = phyloParser.preprocces(image_data, debug=False)
+          
+            image_data = phyloParser.detectLines(image_data, debug = False)
+            image_data = phyloParser.getCorners(image_data, debug = False)   
+            image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
+            image_data = phyloParser.includeLinesFromCorners(image_data)
+            image_data = phyloParser.postProcessLines(image_data)
+              
+   
+            image_data = phyloParser.groupLines(image_data)
+            image_data = phyloParser.matchLineGroups(image_data, debug = False)
+              
+  
+            image_data = phyloParser.getSpecies_v3(image_data, debug = False)
+  
+  
+            image_data = phyloParser.constructTree_eval(image_data, fixTree = True, tracing = False, orphanHint = False, debug = False)
+          
+          
+  
+            ####### evaluation
+              
+            truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
+            print image_data.treeStructure
+            t1 = PhyloTree(image_data.treeStructure + ";")
+            t2 = PhyloTree(truth_string + ";")
+            PhyloTree.rename_node(t1, rename_all=True)
+            PhyloTree.rename_node(t2, rename_all=True)
+              
+            distance = PhyloTree.zhang_shasha_distance(t1, t2)
+            num_node = PhyloTree.getNodeNum(t2)
+            num_leaf = t2.getLeafCount()
+            score = distance/float(num_node)
+              
+            print "distance %d/%d = %f, leave=%d" %(distance, num_node, score, num_leaf)
+            print "contour count=%d , sharebox count=%d"%(image_data.count_contourBoxes, image_data.count_shareBox)
+            results.append([fileNameList[index], distance, num_node, score, num_leaf, image_data.count_contourBoxes, image_data.count_shareBox])
+          
+        except:
+            results.append([fileNameList[index], -1, -1, -1])
+           
+    saveResult(results, outFileName)
+      
+      
+  
+##---------------------------- fixTree + orphanHint --------------------------------##
+  
+    outFileName = os.path.join(rootPath, "hqtree_base_fixTree_orphanHint_20170307.csv")
+    results = []
+  
+  
+    for index in range(0, len(fileNameList)):
+  
+        try:
+            filePath = os.path.join(folderPath, fileNameList[index])
+            print 
+            print "%s (%d / %d)"%(fileNameList[index], index, len(fileNameList))
+              
+            if isfile(filePath) :
+                image = cv.imread(filePath,0)
+                  
+    #         PhyloParser.displayImage(image)
+            image, w = PhyloParser.resizeImageByLineWidth(image)
+  
+               
+            image_data = ImageData(image)
+            image_data = phyloParser.preprocces(image_data, debug=False)
+          
+            image_data = phyloParser.detectLines(image_data, debug = False)
+            image_data = phyloParser.getCorners(image_data, debug = False)   
+            image_data = phyloParser.makeLinesFromCorner(image_data, debug = False)
+            image_data = phyloParser.includeLinesFromCorners(image_data)
+            image_data = phyloParser.postProcessLines(image_data)
+              
+   
+            image_data = phyloParser.groupLines(image_data)
+            image_data = phyloParser.matchLineGroups(image_data, debug = False)
+              
+  
+            image_data = phyloParser.getSpecies_v3(image_data, debug = False)
+  
+  
+            image_data = phyloParser.constructTree_eval(image_data, fixTree = True, tracing = False, orphanHint = True, debug = False)
+          
+          
+  
+            ####### evaluation
+              
+            truth_string = string2TreeString(ground_truth[fileNameList[index]], rename = True)
+            print image_data.treeStructure
+            t1 = PhyloTree(image_data.treeStructure + ";")
+            t2 = PhyloTree(truth_string + ";")
+            PhyloTree.rename_node(t1, rename_all=True)
+            PhyloTree.rename_node(t2, rename_all=True)
+              
+            distance = PhyloTree.zhang_shasha_distance(t1, t2)
+            num_node = PhyloTree.getNodeNum(t2)
+            num_leaf = t2.getLeafCount()
+            score = distance/float(num_node)
+              
+            print "distance %d/%d = %f, leave=%d" %(distance, num_node, score, num_leaf)
+            print "contour count=%d , sharebox count=%d"%(image_data.count_contourBoxes, image_data.count_shareBox)
+            results.append([fileNameList[index], distance, num_node, score, num_leaf, image_data.count_contourBoxes, image_data.count_shareBox])
+          
+        except:
+            results.append([fileNameList[index], -1, -1, -1])
+           
+    saveResult(results, outFileName)
  
  
 ##---------------------------- tracing only --------------------------------##
