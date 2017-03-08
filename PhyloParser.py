@@ -7672,13 +7672,19 @@ class PhyloParser():
     def isLineAndNodeConnected(line, node):
         x1, y1, x2, y2, length = line
         bx1, by1, bx2, by2, blength = node.branch
+
         if (node.root and PhyloParser.isSameLine(line, node.root)) or PhyloParser.isDotWithinLine((x2, y2), node.branch) or (y1>by1 and y1<by2 and bx1>x1):
+            # print line, node.branch
+            # print node.root, (node.root and PhyloParser.isSameLine(line, node.root))
+            # print (x2, y2), node.branch, PhyloParser.isDotWithinLine((x2, y2), node.branch)
+            # print (y1>by1 and y1<by2 and bx1>x1)
             return True
         else:
             return False
 
     @staticmethod
     def connectNodesInAList(nodeList):
+
         refList = nodeList[:]
         isConnected = []
         for node in nodeList:
@@ -7687,6 +7693,7 @@ class PhyloParser():
                     if node.upperLeave:
                         if PhyloParser.isLineAndNodeConnected(node.upperLeave, refNode) and refNode not in isConnected:
                             if not node.to[0]:
+
                                 tmp = list(node.to)
                                 tmp[0] = refNode
                                 node.to = tuple(tmp)
@@ -7697,7 +7704,7 @@ class PhyloParser():
                     if node.lowerLeave:
                         if PhyloParser.isLineAndNodeConnected(node.lowerLeave, refNode) and refNode not in isConnected:
                             if not node.to[1]:
-                                refNode.getNodeInfo()
+
                                 tmp = list(node.to)
                                 tmp[1] = refNode
                                 node.to = tuple(tmp)
@@ -7738,7 +7745,7 @@ class PhyloParser():
         result = PhyloParser.traceTree_v2(image_data, mask, branch)
         newNodeList = []
             # print result
-            # image_data.displayNode(node)
+
         if result:
             trunkList, isMulti = result
             # for trunk in trunkList:
@@ -7758,11 +7765,11 @@ class PhyloParser():
 
                 brokenNode, mask, refinedLines = PhyloParser.matchNodeAndTrunk(brokenNode, trunk, mask, refinedLines, mode = 'new')
                 newNodeList.append(brokenNode)
-                trunk.getTrunkInfo()
-                brokenNode.getNodeInfo()
+
                 for index, trunk in enumerate(trunkList):
                     if index!=0 and len(trunk.leaves) == 0 and not len(trunk.interLines) == 0:
                         # PhyloParser.displayTrunk(image_data.image, trunk)
+
                         newNode = Node(None, None, None, None)
 
                         newNode, mask, refinedLines = PhyloParser.matchNodeAndTrunk(newNode, trunk, mask, refinedLines, mode = 'new')
@@ -7773,8 +7780,7 @@ class PhyloParser():
                         # image_data.displayNode(newNode)
                         # nodeList.append(newNode)
                 PhyloParser.connectNodesInAList(newNodeList)
-                brokenNode.getNodeInfo()
-        
+
 
         # margin = 2
         # for node in brokenNodes:
@@ -9134,6 +9140,8 @@ class PhyloParser():
             # PhyloParser.displayTrunk(image, current_trunk)
             
             trunkList.append(current_trunk)
+            current_trunk.interLines = sorted(current_trunk.interLines, key = lambda x: x[1])
+            current_trunk.nextStartPoint = sorted(current_trunk.nextStartPoint, key = lambda x: x[0])
             if mask != None:
                 for index, interLine in enumerate(current_trunk.interLines):
                     # print interLine, current_trunk.nextStartPoint[index]
@@ -9188,7 +9196,7 @@ class PhyloParser():
     def isLineCrossed(line, mask):
         lineMask = np.zeros(mask.shape, dtype=np.uint8)
         x1, y1, x2, y2, length = line
-        quarterPt = float( x1 * 3 + x2) / 4
+        quarterPt = float( x1 + x2*3) / 4
         lineMask[y1:y2+1,quarterPt:x2] = 255
         overlapRange = np.where((mask == 255) & (lineMask == 255))
         if len(overlapRange[0])!=0:
