@@ -1274,12 +1274,12 @@ class PhyloParser():
         verLineMappingDict['lineMapping'] = {}
         verLineMappingDict['overlapMapping'] = {} 
 
-        image_data.horLines, image_data.horLineMask, image_data.horLineMappingDict = PhyloParser.getUniqueLinesList_old(horLines, horLineMask, horLineMappingDict, image_data, mode = 'hor')
-        image_data.verLines, image_data.verLineMask, image_data.verLineMappingDict = PhyloParser.getUniqueLinesList_old(verLines, verLineMask, verLineMappingDict, image_data, mode = 'ver')
+        image_data.horLines, image_data.horLineMask, image_data.horLineMappingDict = PhyloParser.getUniqueLinesList(horLines, horLineMask, horLineMappingDict, image_data, mode = 'hor')
+        image_data.verLines, image_data.verLineMask, image_data.verLineMappingDict = PhyloParser.getUniqueLinesList(verLines, verLineMask, verLineMappingDict, image_data, mode = 'ver')
         image_data.lineGrouped = True
 
-                # print image_data.getLineGroupGivenDot((388,320), 'ver')
-                # print image_data.verLineMappingDict
+        # print image_data.getLineGroupGivenDot((492,23), 'ver')
+        # print image_data.verLineMappingDict
                 # PhyloParser.displayLines(image_data.image, image_data.verLineMappingDict['lineMapping'][image_data.getLineGroupGivenDot((388,320), 'ver')]['lineGroup'])
 
 
@@ -1320,6 +1320,11 @@ class PhyloParser():
         else:
             return False
 
+
+    @staticmethod
+    def getMidPoint(line):
+        x1, y1, x2, y2, length = line
+        return ((y1+y2)/2, (x1+x2)/2)
 
     @staticmethod
     def getUniqueLinesList(lineList, mask, mappingDict, image_data, mode):
@@ -1424,30 +1429,38 @@ class PhyloParser():
             ##### old version ######
             if mode =='hor':
                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
+                lineDict['rline_1'] = lineDict['lineGroup'][0]
+                lineDict['rline_-1'] = lineDict['lineGroup'][-1]
+                mmax = lineDict['lineGroup'][-1][1]
+                mmin = lineDict['lineGroup'][0][1]
+                x1, y1, x2, y2, length = lineDict['lineGroup'][len(lineDict['lineGroup'])/2]
+                lineDict['midPoint'] = ((mmax+mmin)/2, (x1+x2)/2)
+                lineDict['rline'] = (x1, (mmax+mmin)/2, x2, (mmax+mmin)/2, length)
             else:
                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[0])
-                
-            targetIndex = len(lineDict['lineGroup'])/2
-#             if mode == 'ver':
-#                 targetLine = lineDict['lineGroup'][-1]
-#             else:
-            targetLine = lineDict['lineGroup'][targetIndex]
-            x1, y1, x2, y2, length = targetLine
+                # stack = []
+                # isFound = False
+                # stack.append(-1)
 
-            
-            lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
-            lineDict['rline'] = targetLine
-            lineDict['rline_upper'] = lineDict['lineGroup'][0]
-            lineDict['rline_lower'] = lineDict['lineGroup'][-1]
+                # while stack or not isFound:
 
-            
-#             targetIndex = len(lineDict['lineGroup'])/2
-#             targetLine = lineDict['lineGroup'][targetIndex]
-#             x1, y1, x2, y2, length = targetLine
-#             lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
-#             lineDict['rline'] = targetLine
-            
-            
+                #     index = stack.pop()
+
+                #     if lineDict['lineGroup'][index][4] >= lineDict['length']:
+                #         lineDict['rline'] = lineDict['lineGroup'][index]
+                #         isFound = True
+                #     else:
+                #         stack.append(index-1)
+
+                lineDict['rline_1'] = lineDict['lineGroup'][-1]
+                lineDict['rline_-1'] = lineDict['lineGroup'][0]
+                lineDict['rline'] = lineDict['lineGroup'][len(lineDict['lineGroup'])/2]
+                mmax = lineDict['lineGroup'][-1][0]
+                mmin = lineDict['lineGroup'][0][0]
+                lineDict['midPoint_1'] = PhyloParser.getMidPoint(lineDict['rline_1'])         
+                lineDict['midPoint_-1'] = PhyloParser.getMidPoint(lineDict['rline_-1'])
+                lineDict['midPoint'] = PhyloParser.getMidPoint(lineDict['rline'])
+
             # targetIndex = len(lineDict['lineGroup'])/2
             # if mode == 'ver':
             #     targetLine = lineDict['lineGroup'][-1]
@@ -3584,9 +3597,9 @@ class PhyloParser():
                 tmpLeaves = []
                 for leafIndex, leaf in enumerate(leavesIndex):
                     if leafIndex == 0:
-                        tmpLeaves.append(horLineMappingDict['lineMapping'][leaf]['rline_upper'])
+                        tmpLeaves.append(horLineMappingDict['lineMapping'][leaf]['rline_1'])
                     elif leafIndex == len(leavesIndex) - 1:
-                        tmpLeaves.append(horLineMappingDict['lineMapping'][leaf]['rline_lower'])
+                        tmpLeaves.append(horLineMappingDict['lineMapping'][leaf]['rline_-1'])
                     else:
                         tmpLeaves.append(horLineMappingDict['lineMapping'][leaf]['rline'])
                 children.append(((verLineGroup['rline'], tuple(leaves)), 0))
@@ -3597,9 +3610,9 @@ class PhyloParser():
                 x1, y1, x2, y2, length = leaves[0]
                 vx1, vy1, vx2, vy2, vlength = verLineGroup['rline']
                 if abs(y1 - vy1) > abs(y1 - vy2):
-                    leaves = [None, horLineMappingDict['lineMapping'][leavesIndex[0]]['rline_lower']]
+                    leaves = [None, horLineMappingDict['lineMapping'][leavesIndex[0]]['rline_-1']]
                 else:
-                    leaves = [horLineMappingDict['lineMapping'][leavesIndex[0]]['rline_upper'], None]
+                    leaves = [horLineMappingDict['lineMapping'][leavesIndex[0]]['rline_1'], None]
 
                 children.append(((verLineGroup['rline'], tuple(leaves)), 0))
 
@@ -3650,7 +3663,7 @@ class PhyloParser():
         y1, x1 = refPoint
         y2, x2 = targetPoint
 
-        if x2 > x1:
+        if x2 >= x1:
             return True
         else:
             return False            
@@ -3671,6 +3684,7 @@ class PhyloParser():
         countIndex = 1
         interLines = []
         interLinesIndexes = []
+
 
         for horLineIndex, horLineGroup in horLineMappingDict['lineMapping'].items():
             horLineGroup['type'] = None
