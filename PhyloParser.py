@@ -1404,28 +1404,56 @@ class PhyloParser():
             lineDict['children'] = []
             lineDict['type'] = None
             
+            ### new version ####
+#             if mode =='hor':
+#                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
+#                 lineDict['rline_upper'] = lineDict['lineGroup'][0]
+#                 lineDict['rline_lower'] = lineDict['lineGroup'][-1]
+#                 mmax = lineDict['lineGroup'][-1][1]
+#                 mmin = lineDict['lineGroup'][0][1]
+#                 x1, y1, x2, y2, length = lineDict['lineGroup'][len(lineDict['lineGroup'])/2]
+#                 lineDict['midPoint'] = ((mmax+mmin)/2, (x1+x2)/2)
+#                 lineDict['rline'] = (x1, (mmax+mmin)/2, x2, (mmax+mmin)/2, length)
+#             else:
+#                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[0])
+#                 lineDict['rline'] = lineDict['lineGroup'][-1]
+#                 mmax = lineDict['lineGroup'][-1][0]
+#                 mmin = lineDict['lineGroup'][0][0]
+#                 lineDict['midPoint'] = ((y1+y2)/2, (mmax + mmin)/2)
+
+            ##### old version ######
             if mode =='hor':
                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
-                lineDict['rline_upper'] = lineDict['lineGroup'][0]
-                lineDict['rline_lower'] = lineDict['lineGroup'][-1]
-                mmax = lineDict['lineGroup'][-1][1]
-                mmin = lineDict['lineGroup'][0][1]
-                x1, y1, x2, y2, length = lineDict['lineGroup'][len(lineDict['lineGroup'])/2]
-                lineDict['midPoint'] = ((mmax+mmin)/2, (x1+x2)/2)
-                lineDict['rline'] = (x1, (mmax+mmin)/2, x2, (mmax+mmin)/2, length)
             else:
                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[0])
-                lineDict['rline'] = lineDict['lineGroup'][-1]
-                mmax = lineDict['lineGroup'][-1][0]
-                mmin = lineDict['lineGroup'][0][0]
-                lineDict['midPoint'] = ((y1+y2)/2, (mmax + mmin)/2)                
+                
+            targetIndex = len(lineDict['lineGroup'])/2
+#             if mode == 'ver':
+#                 targetLine = lineDict['lineGroup'][-1]
+#             else:
+            targetLine = lineDict['lineGroup'][targetIndex]
+            x1, y1, x2, y2, length = targetLine
+
+            
+            lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
+            lineDict['rline'] = targetLine
+            lineDict['rline_upper'] = targetLine
+            lineDict['rline_lower'] = targetLine
+
+            
+#             targetIndex = len(lineDict['lineGroup'])/2
+#             targetLine = lineDict['lineGroup'][targetIndex]
+#             x1, y1, x2, y2, length = targetLine
+#             lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
+#             lineDict['rline'] = targetLine
+            
+            
             # targetIndex = len(lineDict['lineGroup'])/2
             # if mode == 'ver':
             #     targetLine = lineDict['lineGroup'][-1]
             # else:
             #     targetLine = lineDict['lineGroup'][targetIndex]
             # x1, y1, x2, y2, length = targetLine
-
 
             
             # lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
@@ -1452,6 +1480,127 @@ class PhyloParser():
         #     print mappingDict['lineMapping'][42]
 
 
+    @staticmethod
+    def getUniqueLinesList_old(lineList, mask, mappingDict, image_data, mode):
+        if mode == 'hor':
+            lineList = sorted(lineList, key = lambda x: x[1])
+        elif mode == 'ver':
+            lineList = sorted(lineList, key = lambda x: x[0])
+
+
+        image_lineDetection = image_data.image_preproc_for_line_detection    
+        mapIndex = 1
+        overlapIndex = 1
+
+        for line in lineList:
+
+            x1, y1, x2, y2, length = line
+            if mode == 'hor':
+                overlapNumber = PhyloParser.getVoteNumber(mask[y1:y2+1, x1:x2, 1], mode = 'overlap')
+            elif mode == 'ver':
+                overlapNumber = PhyloParser.getVoteNumber(mask[y1:y2, x1:x2+1, 1], mode = 'overlap')
+            if overlapNumber == 0:
+                if mode == 'hor':
+                    voteNumber=PhyloParser.getVoteNumber(mask[y1:y2+1, x1:x2, 0])
+                elif mode == 'ver':
+                    voteNumber = PhyloParser.getVoteNumber(mask[y1:y2, x1:x2+1, 0])
+                if voteNumber == 0:
+                    mappingDict['lineMapping'][mapIndex] = {}
+                    mappingDict['lineMapping'][mapIndex]['length'] = length
+                    mappingDict['lineMapping'][mapIndex]['lineGroup'] = [line]
+                    mappingDict['lineMapping'][mapIndex]['overlap'] = []
+                    overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex, mode = mode)
+                    mapIndex +=1
+                else:
+                    if PhyloParser.isSameLineGroup(line, mappingDict['lineMapping'][voteNumber]['lineGroup']):
+                        if not PhyloParser.isLineNoisy(length, mappingDict['lineMapping'][voteNumber]['length']):
+                            mappingDict['lineMapping'][voteNumber]['lineGroup'].append(line)
+                            PhyloParser.updateAverageLength(mappingDict, voteNumber, line)
+
+                            overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, voteNumber, overlapIndex, mode = mode)
+                    else:
+                        
+                        mappingDict['lineMapping'][mapIndex] = {}
+                        mappingDict['lineMapping'][mapIndex]['length'] = length
+                        mappingDict['lineMapping'][mapIndex]['lineGroup'] = [line]
+                        mappingDict['lineMapping'][mapIndex]['overlap'] = [overlapIndex]
+                        if overlapIndex not in mappingDict['lineMapping'][voteNumber]['overlap']:
+                            mappingDict['lineMapping'][voteNumber]['overlap'].append(overlapIndex)
+                        mappingDict['overlapMapping'][overlapIndex] = [mapIndex, voteNumber]
+
+                        overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex+1, mode = mode, overlapIndex = overlapIndex)
+                        mapIndex+=1
+            else:
+                isFound = False
+
+                for lineIndex in mappingDict['overlapMapping'][overlapNumber]:                 
+                    if PhyloParser.isSameLineGroup(line, mappingDict['lineMapping'][lineIndex]['lineGroup']):
+                        if not PhyloParser.isLineNoisy(length, mappingDict['lineMapping'][lineIndex]['length']):
+                            mappingDict['lineMapping'][lineIndex]['lineGroup'].append(line)
+                            PhyloParser.updateAverageLength(mappingDict, lineIndex, line)
+                            overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, lineIndex, overlapIndex, mode, overlapIndex = overlapNumber)
+                        isFound = True
+
+                        
+
+                if not isFound:
+                    mappingDict['lineMapping'][mapIndex] = {}
+                    mappingDict['lineMapping'][mapIndex]['length'] = length
+                    mappingDict['lineMapping'][mapIndex]['lineGroup'] = [line]
+                    mappingDict['lineMapping'][mapIndex]['overlap'] = [overlapNumber]
+                    mappingDict['overlapMapping'][overlapNumber].append(mapIndex)
+                    overlapIndex, mappingDict = PhyloParser.drawLine_lineVersion(line, mappingDict, mask, mapIndex, overlapIndex, mode, overlapIndex = overlapNumber)
+                    mapIndex +=1
+        lineList = []
+        noiseIndexes = []
+        noiseOverlapIndexes = []
+
+
+        for lineIndex, lineDict in mappingDict['lineMapping'].items():
+
+            lineDict['noise'] = {}
+            lineDict['parent'] = []
+            lineDict['children'] = []
+            lineDict['type'] = None
+            
+            ### new version ####
+#             if mode =='hor':
+#                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
+#                 lineDict['rline_upper'] = lineDict['lineGroup'][0]
+#                 lineDict['rline_lower'] = lineDict['lineGroup'][-1]
+#                 mmax = lineDict['lineGroup'][-1][1]
+#                 mmin = lineDict['lineGroup'][0][1]
+#                 x1, y1, x2, y2, length = lineDict['lineGroup'][len(lineDict['lineGroup'])/2]
+#                 lineDict['midPoint'] = ((mmax+mmin)/2, (x1+x2)/2)
+#                 lineDict['rline'] = (x1, (mmax+mmin)/2, x2, (mmax+mmin)/2, length)
+#             else:
+#                 lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[0])
+#                 lineDict['rline'] = lineDict['lineGroup'][-1]
+#                 mmax = lineDict['lineGroup'][-1][0]
+#                 mmin = lineDict['lineGroup'][0][0]
+#                 lineDict['midPoint'] = ((y1+y2)/2, (mmax + mmin)/2)
+
+            ##### old version ######
+            if mode =='hor':
+                lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[1])
+            else:
+                lineDict['lineGroup'] = sorted(lineDict['lineGroup'], key= lambda x: x[0])
+                
+            targetIndex = len(lineDict['lineGroup'])/2
+#             if mode == 'ver':
+#                 targetLine = lineDict['lineGroup'][-1]
+#             else:
+            targetLine = lineDict['lineGroup'][targetIndex]
+            x1, y1, x2, y2, length = targetLine
+
+            
+            lineDict['midPoint'] = ((y1+y2)/2, (x1+x2)/2)
+            lineDict['rline'] = targetLine
+            lineDict['rline_upper'] = targetLine
+            lineDict['rline_lower'] = targetLine
+
+            
+        
 
 
         for lineIndex, lineDict in mappingDict['lineMapping'].items():
@@ -6075,7 +6224,7 @@ class PhyloParser():
             image_data.rootList = sorted(image_data.rootList, key = lambda x: -x.numNodes)
             if len(image_data.rootList[0].breakSpot) > 0 and image_data.speciesNameReady:
                 print "recoverInterLeaveFromOrphanBox"    
-                image_data = self.recoverInterLeaveFromOrphanBox(image_data) ## not test yet
+#                 image_data = self.recoverInterLeaveFromOrphanBox(image_data) ## not test yet
                 if debug:
                     print "recoverInterLeaveFromOrphanBox result"
                     image_data.displayTrees('regular')
