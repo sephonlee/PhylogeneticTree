@@ -6294,10 +6294,10 @@ class PhyloParser():
             
 # ------------------------------------------------------------------------ #
 
-            if tracing:
-                print "tracing"
-                image_data = self.connectRootByTracing(image_data)            
-
+#             if tracing:
+#                 print "tracing"
+#                 image_data = self.connectRootByTracing(image_data)            
+#                 image_data = PhyloParser.getBreakSpot(image_data)
 
 # ------------------------------------------------------------------------ #
 
@@ -6335,15 +6335,20 @@ class PhyloParser():
                 if debug:
                     print "display Fixed Tree"
                     image_data.displayTrees('regular')
-                    print "??"
-            
-            print 'here'
+                    
+
+            if tracing:
+                print "tracing"
+                image_data = self.connectRootByTracing(image_data)            
+                image_data = PhyloParser.getBreakSpot(image_data)
+
+
             ## use orphane box to recover line
             # sort again to ensure the first root is the largest
             image_data.rootList = sorted(image_data.rootList, key = lambda x: -x.numNodes)
             if len(image_data.rootList[0].breakSpot) > 0 and image_data.speciesNameReady:
-                print "recoverInterLeaveFromOrphanBox"    
-#                 image_data = self.recoverInterLeaveFromOrphanBox(image_data) ## not test yet
+                print "recoverInterLeaveFromOrphanBox"
+                image_data = PhyloParser.recoverInterLeaveFromOrphanBox(image_data) ## not test yet
                 if debug:
                     print "recoverInterLeaveFromOrphanBox result"
                     image_data.displayTrees('regular')
@@ -6447,17 +6452,15 @@ class PhyloParser():
             ### Recover missing components ############
             
             ## directly connect right sub-trees of broken point
-            if not self.isTreeReady(image_data):#######
-                ## Fix false-positive sub-trees and mandatorily connect sub-trees
-                image_data = self.fixTrees(image_data)
-
-#                 print image_data.rootList
-                if debug:
-                    print "display Fixed Tree"
-                    image_data.displayTrees('regular')
-                    print "??"
+#             if not self.isTreeReady(image_data):#######
+#                 ## Fix false-positive sub-trees and mandatorily connect sub-trees
+#                 image_data = self.fixTrees(image_data)
+# 
+# #                 print image_data.rootList
+#                 if debug:
+#                     print "display Fixed Tree"
+#                     image_data.displayTrees('regular')
             
-            print 'here'
             ## use orphane box to recover line
             # sort again to ensure the first root is the largest
             image_data.rootList = sorted(image_data.rootList, key = lambda x: -x.numNodes)
@@ -6511,14 +6514,16 @@ class PhyloParser():
                 image_data.treeHead = None
                 image_data.treeStructure = ""
                 return image_data
-            
+
 # ------------------------------------------------------------------------ #
 
-            if tracing:
-                print "tracing"
-                image_data = self.connectRootByTracing(image_data)            
-
-
+#             if tracing:
+#                 print "tracing"
+#                 image_data = PhyloParser.getBreakSpot(image_data)
+#                 image_data = self.connectRootByTracing(image_data)            
+#                 image_data = PhyloParser.getBreakSpot(image_data)
+                  
+ 
 # ------------------------------------------------------------------------ #
 
             ## verified leaves
@@ -6556,7 +6561,16 @@ class PhyloParser():
                     print "display Fixed Tree"
                     image_data.displayTrees('regular')
             
-            
+
+# ------------------------------------------------------------------------ #
+
+            if tracing:
+                print "tracing"
+                image_data = PhyloParser.getBreakSpot(image_data)
+                image_data = self.connectRootByTracing(image_data)            
+                image_data = PhyloParser.getBreakSpot(image_data)
+                
+ # ------------------------------------------------------------------------ #           
             ## use orphane box to recover line
             # sort again to ensure the first root is the largest
             image_data.rootList = sorted(image_data.rootList, key = lambda x: -x.numNodes)
@@ -7713,6 +7727,38 @@ class PhyloParser():
         return image_data
 
 
+    @staticmethod 
+    # find breakspot
+    def getBreakSpot(image_data, debug = False):
+        breakSpot = Set([])
+        node_list = [image_data.rootList[0]];
+
+        while len(node_list) > 0:
+            
+            node = node_list.pop();
+            
+            if node.to[0] is None and node.upperLeave is None:
+                breakSpot.add(node)
+            elif node.to[0] is not None:
+                node_list.append(node.to[0])
+                
+                
+            if node.to[1] is None and node.lowerLeave is None:
+                breakSpot.add(node)
+            elif node.to[1] is not None:
+                node_list.append(node.to[1])
+
+            if len(node.otherTo) > 0:
+                for children in node.otherTo:
+                    if children is not None:
+                        node_list.append(children)
+                        
+        image_data.rootList[0].breakSpot = list(breakSpot)
+        
+        return image_data
+
+
+
     @staticmethod
     # for each node with breakspot, find matched orphan box
     # effective to a node with either only top leave or bot leave found or both 
@@ -7731,8 +7777,8 @@ class PhyloParser():
             x_left, y_top, x_right, y_bot, length = node.branch
       
             matchBoxes = PhyloParser.matchVerticalBranchWithOrphanBox(node.branch, image_data.orphanBox2Text)
-            print "matchBoxes", matchBoxes
-            print 
+#             print "matchBoxes", matchBoxes
+#             print 
             if node.upperLeave is None:
                 boxes = PhyloParser.getBoxCorrespond2Vertex(node.branch[0:2], matchBoxes)
                 if len(boxes) > 0:           
@@ -7773,8 +7819,8 @@ class PhyloParser():
                     pass
                         
             if len(matchBoxes) > 0:
-                print "matchBoxes for interLeaves", matchBoxes
-                print "current interleaves", node.interLeave
+#                 print "matchBoxes for interLeaves", matchBoxes
+#                 print "current interleaves", node.interLeave
                 node.isBinary = False
                 for mb in matchBoxes:
                     b = mb[0]
