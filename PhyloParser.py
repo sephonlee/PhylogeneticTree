@@ -936,7 +936,7 @@ class PhyloParser():
 
     
     @staticmethod
-    def traceTree(image_data, debug = False):
+    def traceTree_v1_0(image_data, debug = False):
         image = image_data.image_preproc
         image = PhyloParser.binarize(image, thres = 180, mode = 0)
     
@@ -8519,7 +8519,7 @@ class PhyloParser():
     @staticmethod
     def recoverMissingSmallTrees(node, image_data):
         branch = node.branch
-        result = PhyloParser.traceTree_v2(image_data, None, branch)
+        result = PhyloParser.traceTree_v1_0_1(image_data, None, branch)
         if result:
             trunkList, isMulti = result
             nodeList = [node]
@@ -8787,7 +8787,7 @@ class PhyloParser():
         refinedLines = []
 
         branch = brokenNode.branch
-        result = PhyloParser.traceTree_v2(image_data, mask, branch)
+        result = PhyloParser.traceTree_v1_0_1(image_data, mask, branch)
         newNodeList = []
             # print result
 
@@ -10082,7 +10082,7 @@ class PhyloParser():
         for node in brokenNodes:
 
             branch = node.branch
-            result = PhyloParser.traceTree_v2(image_data, mask, branch)
+            result = PhyloParser.traceTree_v1_0_1(image_data, mask, branch)
 
             # print result
             # image_data.displayNode(node)
@@ -10277,7 +10277,7 @@ class PhyloParser():
 
 
     @staticmethod
-    def traceTree_v2(image_data, mask, branch):
+    def traceTree_v1_0_1(image_data, mask, branch):
         image = image_data.image_preproc
         height, width = image.shape
         image = PhyloParser.binarize(image, thres = 180, mode = 0)
