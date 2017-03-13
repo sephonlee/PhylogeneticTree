@@ -850,7 +850,89 @@ class PhyloParser():
             
         return image_data
 
+    @staticmethod
+    def traceTree_v2_1_1(self, image_data, debug = False, mask = None):
+        image = image_data.image_preproc
+        image = PhyloParser.binarize(image, thres = 180, mode = 0)
+        image_data.image_trace = image
+        trunkList = []
+        verLines = image_data.verLines
+        verLines = sorted(verLines,  key = lambda x: int(x[0]))
+        
+        isFound, branch = PhyloParser.checkBranchIsBlack(verLines[1], image)
 
+        #use the very left vertical line to get startpoint
+        if isFound:
+            startPoint = PhyloParser.getStartPoint(image, branch)
+        else:
+            return None
+
+        
+#         startPoint = (553, 29)
+
+        history_map = np.zeros(image.shape, dtype = np.uint8)
+        history_map[np.where(image>0)] = -1
+        point2Trunk = {}
+        
+        new_trunk = TrunkNode(startPoint)
+        queue_trunk = [new_trunk]
+        
+        while len(queue_trunk) != 0:
+            current_trunk = queue_trunk.pop(0)
+            
+            # get the parent node for future use
+            parentStartPorint = current_trunk.parentStartPorint
+            if parentStartPorint is not None:
+                parentTrunk = point2Trunk[parentStartPorint]                
+                index_leave = parentTrunk.nextStartPoint.index(current_trunk.startPoint)
+            else: # this is the root
+                pass
+
+            
+            current_trunk = PhyloParser.traceTrunk_v2_1(image_data, history_map, current_trunk)
+
+            if current_trunk is None:# this is a fake trunk
+                # update parent's node
+                # 1. move the interline to leaves
+                # 2. delete the interline and nextStartPoint
+                if parentStartPorint is not None:
+                    parentTrunk.leaves.append(parentTrunk.interLines[index_leave])
+                    parentTrunk.leaves = sorted(parentTrunk.leaves, key = lambda x:x[1])
+                    del parentTrunk.nextStartPoint[index_leave]
+                    del parentTrunk.interLines[index_leave]
+                            
+            if current_trunk is not None: #valid trunk
+            
+                if debug:
+    #                 print "current_trunk", current_trunk
+    #                 print "current_trunk's bud", current_trunk.buds
+                    PhyloParser.displayTrunk(image, current_trunk)
+                trunkList.append(current_trunk)
+                point2Trunk[current_trunk.startPoint] = current_trunk
+                current_trunk.interLines = sorted(current_trunk.interLines, key = lambda x: x[1])
+                current_trunk.nextStartPoint = sorted(current_trunk.nextStartPoint, key = lambda x: x[0])                
+                if msak!= None:
+                    for index, startPoint in enumerate(current_trunk.nextStartPoint):
+                        if not PhyloParser.isLineCrossed(current_trank.interLines[index], mask) and PhyloParser.isDotCovered(startPoint, mask):
+                        new_trunk = TrunkNode(startPoint)
+                        new_trunk.rootLine = current_trank.interLines[index]
+                        new_trunk.parentStartPorint = current_trunk.startPoint
+                        queue_trunk.append(new_trunk)
+
+
+
+        if debug:
+            print "displayTreeFromTrunk"
+            PhyloParser.displayTreeFromTrunk(image, point2Trunk)
+#             print "point2Trunk"
+#             for point in point2Trunk:
+#                 PhyloParser.displayTrunk(image, point2Trunk[point])
+        if len(trunkList) == 0:
+            return None
+        elif len(trunkList) == 1:
+            return (trunkList, False)
+        else:
+            return (trunkList, True)
 
     
     @staticmethod
