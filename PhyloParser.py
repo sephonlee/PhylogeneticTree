@@ -850,8 +850,8 @@ class PhyloParser():
             
         return image_data
 
-    @staticmethod
-    def traceTree_v2_1_1(self, image_data, debug = False, mask = None):
+
+    def traceTree_v2_1_1(self, image_data, mask, branch,  debug = False):
         image = image_data.image_preproc
         image = PhyloParser.binarize(image, thres = 180, mode = 0)
         image_data.image_trace = image
@@ -859,7 +859,7 @@ class PhyloParser():
         verLines = image_data.verLines
         verLines = sorted(verLines,  key = lambda x: int(x[0]))
         
-        isFound, branch = PhyloParser.checkBranchIsBlack(verLines[1], image)
+        isFound, branch = PhyloParser.checkBranchIsBlack(branch, image)
 
         #use the very left vertical line to get startpoint
         if isFound:
@@ -889,7 +889,7 @@ class PhyloParser():
                 pass
 
             
-            current_trunk = PhyloParser.traceTrunk_v2_1(image_data, history_map, current_trunk)
+            current_trunk = self.traceTrunk_v2_1(image_data, history_map, current_trunk)
 
             if current_trunk is None:# this is a fake trunk
                 # update parent's node
@@ -911,13 +911,13 @@ class PhyloParser():
                 point2Trunk[current_trunk.startPoint] = current_trunk
                 current_trunk.interLines = sorted(current_trunk.interLines, key = lambda x: x[1])
                 current_trunk.nextStartPoint = sorted(current_trunk.nextStartPoint, key = lambda x: x[0])                
-                if msak!= None:
+                if mask!= None:
                     for index, startPoint in enumerate(current_trunk.nextStartPoint):
-                        if not PhyloParser.isLineCrossed(current_trank.interLines[index], mask) and PhyloParser.isDotCovered(startPoint, mask):
-                        new_trunk = TrunkNode(startPoint)
-                        new_trunk.rootLine = current_trank.interLines[index]
-                        new_trunk.parentStartPorint = current_trunk.startPoint
-                        queue_trunk.append(new_trunk)
+                        if not PhyloParser.isLineCrossed(current_trunk.interLines[index], mask) and PhyloParser.isDotCovered(startPoint, mask):
+                            new_trunk = TrunkNode(startPoint)
+                            new_trunk.rootLine = current_trank.interLines[index]
+                            new_trunk.parentStartPorint = current_trunk.startPoint
+                            queue_trunk.append(new_trunk)
 
 
 
@@ -8516,10 +8516,10 @@ class PhyloParser():
         return node     
 
 
-    @staticmethod
-    def recoverMissingSmallTrees(node, image_data):
+
+    def recoverMissingSmallTrees(self, node, image_data):
         branch = node.branch
-        result = PhyloParser.traceTree_v1_0_1(image_data, None, branch)
+        result = self.traceTree_v2_1_1(image_data, None, branch)
         if result:
             trunkList, isMulti = result
             nodeList = [node]
@@ -8768,8 +8768,8 @@ class PhyloParser():
                                     node.numNodes += refNode.numNodes
                                     isConnected.append(refNode)
 
-    @staticmethod
-    def findMissingNodesByTracing(brokenNode, image_data, mask = None):
+
+    def findMissingNodesByTracing(self, brokenNode, image_data, mask = None):
 
 
         if mask == None:
@@ -8787,7 +8787,7 @@ class PhyloParser():
         refinedLines = []
 
         branch = brokenNode.branch
-        result = PhyloParser.traceTree_v1_0_1(image_data, mask, branch)
+        result = self.traceTree_v2_1_1(image_data, mask, branch)
         newNodeList = []
             # print result
 
@@ -8848,9 +8848,8 @@ class PhyloParser():
 
         return mask, newNodeList        
 
-    @staticmethod
     # connect borken point using tracing algorithm
-    def connectRootByTracing(image_data, debug = False):
+    def connectRootByTracing(self, image_data, debug = False):
 
         rootList = image_data.rootList
 
@@ -8872,7 +8871,7 @@ class PhyloParser():
                 # image_data.displayNodes()
                 # print 'brokenNode', brokenNode
                 # image_data.displayNode(brokenNode)
-                mask, newNodeList = PhyloParser.findMissingNodesByTracing(brokenNode, image_data, mask = image_data.nodesCoveredMask)
+                mask, newNodeList = self.findMissingNodesByTracing(brokenNode, image_data, mask = image_data.nodesCoveredMask)
                 # mask, newNodeList = PhyloParser.findMissingNodesByTracing(brokenNode, image_data)
                 # image_data.nodeList = newNodeList
                 # image_data.displayNodes()
@@ -10063,8 +10062,8 @@ class PhyloParser():
         return image_data
 
 
-    @staticmethod
-    def findMissingLines(brokenNodes, nodeList, image_data, mask = None):
+
+    def findMissingLines(self, brokenNodes, nodeList, image_data, mask = None):
         refinedLines = []
 
         if mask == None:
@@ -10082,7 +10081,7 @@ class PhyloParser():
         for node in brokenNodes:
 
             branch = node.branch
-            result = PhyloParser.traceTree_v1_0_1(image_data, mask, branch)
+            result = self.traceTree_v2_1_1(image_data, mask, branch)
 
             # print result
             # image_data.displayNode(node)
