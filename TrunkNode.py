@@ -2,11 +2,14 @@ class TrunkNode():
     
     startPoint = None
     nextStartPoint = []
+    parentStartPorint = None
     buds = []
+    parent = None
     top = None
     bot = None
     interLines = []
     leaves = []
+
 
     upperLine = None
     lowerLine = None
