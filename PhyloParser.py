@@ -6452,9 +6452,9 @@ class PhyloParser():
             ### Recover missing components ############
             
             ## directly connect right sub-trees of broken point
-#             if not self.isTreeReady(image_data):#######
+            if not self.isTreeReady(image_data):#######
 #                 ## Fix false-positive sub-trees and mandatorily connect sub-trees
-#                 image_data = self.fixTrees(image_data)
+                image_data = self.fixTrees(image_data)
 # 
 # #                 print image_data.rootList
 #                 if debug:
@@ -6466,7 +6466,7 @@ class PhyloParser():
             image_data.rootList = sorted(image_data.rootList, key = lambda x: -x.numNodes)
             if len(image_data.rootList[0].breakSpot) > 0 and image_data.speciesNameReady:
                 print "recoverInterLeaveFromOrphanBox"    
-#                 image_data = self.recoverInterLeaveFromOrphanBox(image_data) ## not test yet
+                image_data = self.recoverInterLeaveFromOrphanBox(image_data) ## not test yet
                 if debug:
                     print "recoverInterLeaveFromOrphanBox result"
                     image_data.displayTrees('regular')
@@ -6517,11 +6517,11 @@ class PhyloParser():
 
 # ------------------------------------------------------------------------ #
 
-#             if tracing:
-#                 print "tracing"
-#                 image_data = PhyloParser.getBreakSpot(image_data)
-#                 image_data = self.connectRootByTracing(image_data)            
-#                 image_data = PhyloParser.getBreakSpot(image_data)
+            # if tracing:
+            #     print "tracing"
+            #     image_data = PhyloParser.getBreakSpot(image_data)
+            #     image_data = self.connectRootByTracing(image_data)            
+            #     image_data = PhyloParser.getBreakSpot(image_data)
                   
  
 # ------------------------------------------------------------------------ #
@@ -6576,7 +6576,7 @@ class PhyloParser():
             image_data.rootList = sorted(image_data.rootList, key = lambda x: -x.numNodes)
             if len(image_data.rootList[0].breakSpot) > 0 and image_data.speciesNameReady and orphanHint:
                 print "recoverInterLeaveFromOrphanBox"    
-                image_data = self.recoverInterLeaveFromOrphanBox(image_data) ## not test yet
+                # image_data = self.recoverInterLeaveFromOrphanBox(image_data) ## not test yet
                 if debug:
                     print "recoverInterLeaveFromOrphanBox result"
                     image_data.displayTrees('regular')
