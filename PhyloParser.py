@@ -775,6 +775,83 @@ class PhyloParser():
 
 
 
+    def traceTree_v2_1(self, image_data, debug = False):
+        image = image_data.image_preproc
+        image = PhyloParser.binarize(image, thres = 180, mode = 0)
+        image_data.image_trace = image
+    
+        verLines = image_data.verLines
+        verLines = sorted(verLines,  key = lambda x: int(x[0]))
+        
+        isFound, branch = PhyloParser.checkBranchIsBlack(verLines[1], image)
+
+        #use the very left vertical line to get startpoint
+        if isFound:
+            startPoint = PhyloParser.getStartPoint(image, branch)
+        else:
+            return None
+
+        
+#         startPoint = (553, 29)
+
+        history_map = np.zeros(image.shape, dtype = np.uint8)
+        history_map[np.where(image>0)] = -1
+        point2Trunk = {}
+        
+        new_trunk = TrunkNode(startPoint)
+        queue_trunk = [new_trunk]
+        
+        while len(queue_trunk) != 0:
+            current_trunk = queue_trunk.pop(0)
+            
+            # get the parent node for future use
+            parentStartPorint = current_trunk.parentStartPorint
+            if parentStartPorint is not None:
+                parentTrunk = point2Trunk[parentStartPorint]                
+                index_leave = parentTrunk.nextStartPoint.index(current_trunk.startPoint)
+            else: # this is the root
+                pass
+
+            
+            current_trunk = self.traceTrunk_v2_1(image_data, history_map, current_trunk)
+
+            if current_trunk is None:# this is a fake trunk
+                # update parent's node
+                # 1. move the interline to leaves
+                # 2. delete the interline and nextStartPoint
+                if parentStartPorint is not None:
+                    parentTrunk.leaves.append(parentTrunk.interLines[index_leave])
+                    parentTrunk.leaves = sorted(parentTrunk.leaves, key = lambda x:x[1])
+                    del parentTrunk.nextStartPoint[index_leave]
+                    del parentTrunk.interLines[index_leave]
+                            
+            if current_trunk is not None: #valid trunk
+            
+                if debug:
+    #                 print "current_trunk", current_trunk
+    #                 print "current_trunk's bud", current_trunk.buds
+                    PhyloParser.displayTrunk(image, current_trunk)
+                
+                point2Trunk[current_trunk.startPoint] = current_trunk
+                
+                for startPoint in current_trunk.nextStartPoint:
+                    new_trunk = TrunkNode(startPoint)
+                    new_trunk.parentStartPorint = current_trunk.startPoint
+                    queue_trunk.append(new_trunk)
+
+
+
+        if debug:
+            print "displayTreeFromTrunk"
+            PhyloParser.displayTreeFromTrunk(image, point2Trunk)
+#             print "point2Trunk"
+#             for point in point2Trunk:
+#                 PhyloParser.displayTrunk(image, point2Trunk[point])
+            
+        return image_data
+
+
+
     
     @staticmethod
     def traceTree(image_data, debug = False):
@@ -823,7 +900,7 @@ class PhyloParser():
 #             for point in point2Trunk:
 #                 PhyloParser.displayTrunk(image, point2Trunk[point])
             
-        return
+        return image_data
 
 
    
@@ -915,6 +992,10 @@ class PhyloParser():
             
             
     
+
+    
+    
+        
     @staticmethod
     def traceTrunk(image, history_map, trunk, threshold = 10):
         
@@ -1035,6 +1116,318 @@ class PhyloParser():
 
         return trunk
 
+
+    def traceTrunk_v2_1(self, image_data, history_map, trunk, threshold = 10):
+        
+        image = image_data.image_trace
+#         print "startPoint", trunk.startPoint
+        
+        # searching up
+        currentPoint = trunk.startPoint
+        currentPointValue = int(image[currentPoint])
+        history_map[currentPoint] = 1
+
+        isOnBoundary = False
+        while not isOnBoundary:
+            nextPoint = (currentPoint[0]-1, currentPoint[1])
+            leftPoint = (currentPoint[0], currentPoint[1]-1)
+            
+            if currentPoint[0]-1 >-1:
+                nextPointValue = int(image[nextPoint])
+                leftPointValue = int(image[leftPoint])
+                
+                nextBud = (currentPoint[0], currentPoint[1]+1)
+                nextBudValue = int(image[nextBud])
+                
+#                 print "current point", currentPoint, "value", currentPointValue
+                # top pixel is in the line            
+                if abs(nextPointValue - currentPointValue) <= threshold:
+#                     print "move on top"
+                    currentPoint = nextPoint
+                    currentPointValue = nextPointValue
+                    history_map[currentPoint] = 1 # update value in map at next point
+                
+#                 # top pixel is out of line but moving left is eligible
+                elif abs(leftPointValue - currentPointValue) <= threshold:
+                    # valid: not a path of found horizontal line
+                    # 0: new pixels never traversed
+                    # 3: old path of found horizontal lien
+                    if int(history_map[leftPoint]) == 0 or int(history_map[leftPoint]) == 3:
+                        currentPoint = leftPoint
+                        currentPointValue = leftPointValue
+                        history_map[currentPoint] = 1
+                          
+                    elif int(history_map[leftPoint]) == 2: # this is a deadend, not interline but anchorline
+                        return None
+                    
+                else:
+                    trunk.top = currentPoint
+#                     print "end of the line", trunk.top, image[trunk.top[0], trunk.top[1]], image[trunk.top[0]-1, trunk.top[1]]
+#                     print image[trunk.top[0]-2:trunk.top[0]+3, trunk.top[1]-2:trunk.top[1]+3]
+    #                 print "end of the line"
+#                     break
+                    isOnBoundary = True
+                
+                if abs(nextBudValue - currentPointValue) <= threshold and history_map[nextBud] != 1:
+    #                 print "find bud"
+    #                 print "nextBud", nextBud, "value", nextBudValue
+                    trunk.buds.append(nextBud)
+                    history_map[nextBud] = 2 # update value in map at next bud
+            else:
+                trunk.top = currentPoint
+                break
+                
+    
+    
+        # searching down
+        currentPoint = trunk.startPoint
+        currentPointValue = int(image[currentPoint])
+        
+        isOnBoundary = False
+        while not isOnBoundary:
+            nextPoint = (currentPoint[0]+1, currentPoint[1])
+            leftPoint = (currentPoint[0], currentPoint[1]-1)
+            
+            if currentPoint[0] +1 < image.shape[0]:
+                nextPointValue = int(image[nextPoint])
+                leftPointValue = int(image[leftPoint])
+                 
+                nextBud = (currentPoint[0], currentPoint[1]+1)
+                nextBudValue = int(image[nextBud])
+                 
+    #             print "current point", currentPoint, "value", currentPointValue
+                # bot pixel is in the line            
+                if abs(nextPointValue - currentPointValue) <= threshold:
+    #                 print "move on bot"
+                    currentPoint = nextPoint
+                    currentPointValue = nextPointValue
+                    history_map[currentPoint] = 1 # update value in map at next point
+                    
+#                 # top pixel is out of line but moving left is eligible
+                elif abs(leftPointValue - currentPointValue) <= threshold:
+                    # valid: not a path of found horizontal line
+                    # 0: new pixels never traversed
+                    # 3: old path of found horizontal lien
+                    if int(history_map[leftPoint]) == 0 or int(history_map[leftPoint]) == 3:
+                        currentPoint = leftPoint
+                        currentPointValue = leftPointValue
+                        history_map[currentPoint] = 1
+                          
+                    elif int(history_map[leftPoint]) == 2: # this is a deadend, not interline but anchorline
+                        return None
+                    
+                else:
+                    trunk.bot = currentPoint
+    #                 print "end of the line"
+#                     break
+                    isOnBoundary = True
+                 
+                
+                if abs(nextBudValue - currentPointValue) <= threshold and history_map[nextBud] != 1:
+                    trunk.buds.append(nextBud)
+                    history_map[nextBud] = 2 # update value in map at next bud
+            else:
+                trunk.bot = currentPoint
+                break
+
+#         print "trunk buds", trunk.buds
+#         print trunk.top
+#         print "map", history_map[trunk.top[0]-1:trunk.bot[0]+2, trunk.top[1]-1:trunk.top[1]+2]
+#         print "image", image[trunk.top[0]-2:trunk.bot[0]+2, trunk.top[1]-2:trunk.top[1]+4] 
+#         PhyloParser.displayTrunk(image, trunk)
+
+        trunk.trunkLine = (trunk.top[1], trunk.top[0], trunk.bot[1], trunk.bot[0], abs(trunk.bot[0] - trunk.bot[1]))
+        trunk.leaves, trunk.interLines, trunk.nextStartPoint = self.traceBuds_v2_1(image_data, history_map, trunk.buds)
+        
+#         print "trunk.leaves"
+#         print trunk.leaves
+        yt, xt = trunk.top
+        yb, xb = trunk.bot
+
+        for line in trunk.leaves:
+
+            if PhyloParser.isDotWithinLine((xt, yt), line):
+                trunk.upperLine = line
+            elif PhyloParser.isDotWithinLine((xb, yb), line):
+                trunk.lowerLine = line
+            else:
+                trunk.nonBinaryLines.append(line)
+                trunk.interGo.append(None)
+        for line in trunk.interLines:
+            if PhyloParser.isDotWithinLine((xt, yt), line):
+                trunk.upperLine = line
+            elif PhyloParser.isDotWithinLine((xb, yb), line):  
+                trunk.lowerLine = line
+            else:
+                trunk.nonBinaryLines.append(line) 
+                trunk.interGo.append(None)
+        # trunk.getTrunkInfo()           
+        # print trunk.getTrunkInfo()
+        # PhyloParser.displayLines(image, trunk.leaves)
+        # PhyloParser.displayLines(image, trunk.interLines)
+#         print "new trunk", trunk
+#         print "map", history_map[trunk["top"][0]-1:trunk["bot"][0]+2, trunk["top"][1]-1:trunk["top"][1]+2] 
+#         PhyloParser.displayTrunk(image, trunk)
+
+        return trunk
+    
+    
+    def traceBuds_v2_1(self, image_data, history_map, buds, threshold = 10, buffer = 5):
+        image = image_data.image_trace
+        old_buds = buds
+        new_buds = []
+        buds = sorted(buds, key = lambda x: x[0])
+       
+       
+        # aggregate buds 
+        if len(buds) > 0:
+            bud_group = []
+            tmp = [buds[0]]
+            if len(buds) >= 2:
+                for i in range(1, len(buds)):
+                    previous_bud = buds[i-1]
+                    bud = buds[i]
+                    
+                    # in the same group
+                    if bud[0]-1 == previous_bud[0] and bud[1] == previous_bud[1]:
+                        tmp.append(bud)
+                    # in a new group
+                    else:
+                        bud_group.append(tmp)
+                        tmp = [bud]
+                        
+                    if i == len(buds) - 1:
+                        bud_group.append(tmp)
+            else:
+                bud_group.append(tmp)
+            
+            for g in bud_group:
+                new_bud = g[len(g)/2]
+                new_bud_right = (new_bud[0], new_bud[1]+1) #move rightward
+                
+                
+                if abs(int(image[new_bud_right]) - int(image[new_bud])) <= threshold:
+                    # this mid bud can represent the group
+                    history_map[new_bud_right] = 2
+                    new_buds.append(new_bud_right)
+                else:
+                    # loop over all bud
+                    for new_bud in g:
+                        new_bud_right = (new_bud[0], new_bud[1]+1) #move rightward
+                        if abs(int(image[new_bud_right]) - int(image[new_bud])) <= threshold:
+                            history_map[new_bud_right] = 2
+                            new_buds.append(new_bud_right)
+                            break
+            buds = new_buds
+                
+#         print "bud_group", bud_group
+#         print "new_buds", new_buds
+#         print "##########################", len(bud_group) == len(new_buds)
+
+        # trace buds(horizontal line)
+        new_buds = []
+        while len(buds) != 0:
+            remove_index = []
+            for i, bud in enumerate(buds):
+                
+                top_bud = (bud[0]-1, bud[1])
+                right_bud = (bud[0], bud[1]+1)
+                
+#                 print "bud", bud, "top map value", history_map[top_bud], "top",  image[top_bud],"right", image[right_bud] 
+
+                if history_map[top_bud] == 2:
+                    #this bud dies
+                    remove_index.append(i)
+#                     print "kill", bud
+                    #stop this bud
+                else:
+                    
+#                     is_reached = False
+                    #first move                        
+#                     if not is_reached:
+                    right_bud = (bud[0], bud[1]+1)
+                    if abs(int(image[right_bud]) - int(image[bud])) <= threshold:
+                        #move right if possible
+#                             print bud, "move right", right_bud
+                        bud = right_bud
+                        buds[i] = bud
+                        history_map[right_bud] = 2
+                    else:
+                        # reach the destination
+                        dist = 99999
+                        target = 0
+                        for j, old_bud in enumerate(old_buds):
+#                                 print j, abs(old_bud[0] - bud[0])
+                            if abs(old_bud[0] - bud[0]) < dist:
+                                dist = abs(old_bud[0] - bud[0])
+                                target = j
+                                
+#                             bud = (old_buds[target][0], bud[1])
+                        buds[i] = bud
+                        
+                        #align the y axis
+                        line = (old_buds[target][1], old_buds[target][0], bud[1], old_buds[target][0], abs(bud[1]-old_buds[target][1]))
+                        new_buds.append((bud,line, bud_group[i])) 
+                        remove_index.append(i)
+
+#                             print "index", target, "old_buds", old_buds
+#                             print "reach"
+#                             is_reached = True
+                
+            # remove dead buds
+            remove_index = sorted(list(Set(remove_index)), reverse = True)
+            for index in remove_index:
+                del buds[index]
+                del bud_group[index]
+           
+         
+        # make the leaves (anchor lines), interlines and new startPoints (end of interlines)
+        leaves = []
+        interlines = []
+        new_startPoint = []
+        
+        for (bud,line, bud_group) in new_buds:
+            top_bud = (bud[0]-1, bud[1])
+            
+#             print "bud", bud
+#             print "bud_group", bud_group
+            for b in bud_group:
+                history_map[b[0], b[1]:max(b[1],bud[1]+1)] = 3
+                history_map[b[0], b[1]:max(b[1],bud[1]-buffer)] = 2
+                
+#             print bud, "top value", int(image[top_bud]), "bud value", int(image[bud])
+#             print image[bud[0]-3: bud[0]+4, bud[1]-6: bud[1]+4]
+#             print "history_map"
+#             print history_map[bud[0]-3: bud[0]+4, bud[1]-6: bud[1]+4]
+            
+
+            
+            if image_data.avg_anchorLine_x is None:
+                image_data.avg_anchorLine_x = image.shape[1]/2
+                
+            label, prob = self.identifyAnchorLineByClassifier(image_data, line)
+            isTrueAnchor = label[0]
+            
+            if isTrueAnchor:
+                #this bud is to leave
+#                 print "leave", line
+                leaves.append(line)
+            else:
+                #this bud is to next trunk
+#                 print "inter line", line
+                interlines.append(line)
+                new_startPoint.append(bud)
+                
+#             PhyloParser.displayLines(image, [line])
+            
+        new_startPoint = sorted(new_startPoint, key = lambda x: x[0])
+        interlines = sorted(interlines, key = lambda x:x[1])
+        leaves = sorted(leaves, key = lambda x:x[1])
+        return leaves, interlines, new_startPoint      
+    
+    
+       
+    
         
     @staticmethod
     def traceBuds(image, history_map, buds, threshold = 10):
