@@ -791,8 +791,6 @@ class PhyloParser():
         else:
             return None
 
-        
-#         startPoint = (553, 29)
 
         history_map = np.zeros(image.shape, dtype = np.uint8)
         history_map[np.where(image>0)] = -1
@@ -808,7 +806,7 @@ class PhyloParser():
             parentStartPorint = current_trunk.parentStartPorint
             if parentStartPorint is not None:
                 parentTrunk = point2Trunk[parentStartPorint]                
-                index_leave = parentTrunk.nextStartPoint.index(current_trunk.startPoint)
+                index_interline = parentTrunk.nextStartPoint.index(current_trunk.startPoint)
             else: # this is the root
                 pass
 
@@ -820,10 +818,11 @@ class PhyloParser():
                 # 1. move the interline to leaves
                 # 2. delete the interline and nextStartPoint
                 if parentStartPorint is not None:
-                    parentTrunk.leaves.append(parentTrunk.interLines[index_leave])
+                                        
+                    parentTrunk.leaves.append(parentTrunk.interLines[index_interline])
                     parentTrunk.leaves = sorted(parentTrunk.leaves, key = lambda x:x[1])
-                    del parentTrunk.nextStartPoint[index_leave]
-                    del parentTrunk.interLines[index_leave]
+                    del parentTrunk.nextStartPoint[index_interline]
+                    del parentTrunk.interLines[index_interline]
                             
             if current_trunk is not None: #valid trunk
             
@@ -852,6 +851,8 @@ class PhyloParser():
 
 
     def traceTree_v2_1_1(self, image_data, mask, branch,  debug = False):
+        
+#         print "traceTree_v2_1_1"
         image = image_data.image_preproc
         image = PhyloParser.binarize(image, thres = 180, mode = 0)
         image_data.image_trace = image
@@ -864,6 +865,10 @@ class PhyloParser():
         #use the very left vertical line to get startpoint
         if isFound:
             startPoint = PhyloParser.getStartPoint(image, branch)
+            left, top, right, bot, length = branch
+#             print "branch"
+#             print image[top-2:bot+3, left-2:right+3]
+#             PhyloParser.displayImage(image[top-20:bot+30, left-20:right+30])
         else:
             return None
 
@@ -884,7 +889,7 @@ class PhyloParser():
             parentStartPorint = current_trunk.parentStartPorint
             if parentStartPorint is not None:
                 parentTrunk = point2Trunk[parentStartPorint]                
-                index_leave = parentTrunk.nextStartPoint.index(current_trunk.startPoint)
+                index_interline = parentTrunk.nextStartPoint.index(current_trunk.startPoint)
             else: # this is the root
                 pass
 
@@ -896,10 +901,10 @@ class PhyloParser():
                 # 1. move the interline to leaves
                 # 2. delete the interline and nextStartPoint
                 if parentStartPorint is not None:
-                    parentTrunk.leaves.append(parentTrunk.interLines[index_leave])
+                    parentTrunk.leaves.append(parentTrunk.interLines[index_interline])
                     parentTrunk.leaves = sorted(parentTrunk.leaves, key = lambda x:x[1])
-                    del parentTrunk.nextStartPoint[index_leave]
-                    del parentTrunk.interLines[index_leave]
+                    del parentTrunk.nextStartPoint[index_interline]
+                    del parentTrunk.interLines[index_interline]
                             
             if current_trunk is not None: #valid trunk
             
@@ -915,7 +920,7 @@ class PhyloParser():
                     for index, startPoint in enumerate(current_trunk.nextStartPoint):
                         if not PhyloParser.isLineCrossed(current_trunk.interLines[index], mask) and PhyloParser.isDotCovered(startPoint, mask):
                             new_trunk = TrunkNode(startPoint)
-                            new_trunk.rootLine = current_trank.interLines[index]
+                            new_trunk.rootLine = current_trunk.interLines[index]
                             new_trunk.parentStartPorint = current_trunk.startPoint
                             queue_trunk.append(new_trunk)
 
@@ -1203,6 +1208,12 @@ class PhyloParser():
         
         image = image_data.image_trace
 #         print "startPoint", trunk.startPoint
+#         print "image" 
+#         print image[trunk.startPoint[0]-1:trunk.startPoint[0]+2, trunk.startPoint[1]-1:trunk.startPoint[1]+2]
+#         print "map", history_map[trunk.startPoint[0]-5:trunk.startPoint[0]+6, trunk.startPoint[1]-5:trunk.startPoint[1]+6]
+#         print "image", image[trunk.startPoint[0]-5:trunk.startPoint[0]+6, trunk.startPoint[1]-5:trunk.startPoint[1]+6]
+        
+#         PhyloParser.displayImage(map)
         
         # searching up
         currentPoint = trunk.startPoint
@@ -1211,6 +1222,8 @@ class PhyloParser():
 
         isOnBoundary = False
         while not isOnBoundary:
+#             print "currentPoint", currentPoint
+#             print history_map[currentPoint[0]-1:currentPoint[0]+2, currentPoint[1]-1:currentPoint[1]+2]
             nextPoint = (currentPoint[0]-1, currentPoint[1])
             leftPoint = (currentPoint[0], currentPoint[1]-1)
             
@@ -1224,30 +1237,31 @@ class PhyloParser():
 #                 print "current point", currentPoint, "value", currentPointValue
                 # top pixel is in the line            
                 if abs(nextPointValue - currentPointValue) <= threshold:
-#                     print "move on top"
+#                     print "move on top", nextPoint
                     currentPoint = nextPoint
                     currentPointValue = nextPointValue
                     history_map[currentPoint] = 1 # update value in map at next point
                 
 #                 # top pixel is out of line but moving left is eligible
-                elif abs(leftPointValue - currentPointValue) <= threshold:
+                elif abs(leftPointValue - currentPointValue) <= threshold \
+                and int(history_map[leftPoint]) != 2:
                     # valid: not a path of found horizontal line
                     # 0: new pixels never traversed
                     # 3: old path of found horizontal lien
-                    if int(history_map[leftPoint]) == 0 or int(history_map[leftPoint]) == 3:
-                        currentPoint = leftPoint
-                        currentPointValue = leftPointValue
-                        history_map[currentPoint] = 1
-                          
-                    elif int(history_map[leftPoint]) == 2: # this is a deadend, not interline but anchorline
-                        return None
+#                     print "move on left", leftPoint
+                    currentPoint = leftPoint
+                    currentPointValue = leftPointValue
+                    history_map[currentPoint] = 1
+                
+                elif abs(leftPointValue - currentPointValue) <= threshold \
+                and int(history_map[leftPoint]) == 2:
+                    # this is a deadend, not interline but anchorline
+                    return None
                     
                 else:
                     trunk.top = currentPoint
 #                     print "end of the line", trunk.top, image[trunk.top[0], trunk.top[1]], image[trunk.top[0]-1, trunk.top[1]]
 #                     print image[trunk.top[0]-2:trunk.top[0]+3, trunk.top[1]-2:trunk.top[1]+3]
-    #                 print "end of the line"
-#                     break
                     isOnBoundary = True
                 
                 if abs(nextBudValue - currentPointValue) <= threshold and history_map[nextBud] != 1:
@@ -1259,7 +1273,7 @@ class PhyloParser():
                 trunk.top = currentPoint
                 break
                 
-    
+#             PhyloParser.displayImage(image[currentPoint[0]-1:currentPoint[0]+2, currentPoint[1]-1:currentPoint[1]+2])
     
         # searching down
         currentPoint = trunk.startPoint
@@ -1267,6 +1281,8 @@ class PhyloParser():
         
         isOnBoundary = False
         while not isOnBoundary:
+#             print "currentPoint", currentPoint
+#             print history_map[currentPoint[0]-1:currentPoint[0]+2, currentPoint[1]-1:currentPoint[1]+2]
             nextPoint = (currentPoint[0]+1, currentPoint[1])
             leftPoint = (currentPoint[0], currentPoint[1]-1)
             
@@ -1280,28 +1296,30 @@ class PhyloParser():
     #             print "current point", currentPoint, "value", currentPointValue
                 # bot pixel is in the line            
                 if abs(nextPointValue - currentPointValue) <= threshold:
-    #                 print "move on bot"
+#                     print "move on bot", nextPoint
                     currentPoint = nextPoint
                     currentPointValue = nextPointValue
                     history_map[currentPoint] = 1 # update value in map at next point
                     
 #                 # top pixel is out of line but moving left is eligible
-                elif abs(leftPointValue - currentPointValue) <= threshold:
+                elif abs(leftPointValue - currentPointValue) <= threshold \
+                and int(history_map[leftPoint]) != 2:
                     # valid: not a path of found horizontal line
                     # 0: new pixels never traversed
                     # 3: old path of found horizontal lien
-                    if int(history_map[leftPoint]) == 0 or int(history_map[leftPoint]) == 3:
-                        currentPoint = leftPoint
-                        currentPointValue = leftPointValue
-                        history_map[currentPoint] = 1
-                          
-                    elif int(history_map[leftPoint]) == 2: # this is a deadend, not interline but anchorline
-                        return None
+                    currentPoint = leftPoint
+                    currentPointValue = leftPointValue
+                    history_map[currentPoint] = 1
+                
+                elif abs(leftPointValue - currentPointValue) <= threshold \
+                and int(history_map[leftPoint]) == 2:
+                    # this is a deadend, not interline but anchorline
+                    return None
                     
                 else:
                     trunk.bot = currentPoint
-    #                 print "end of the line"
-#                     break
+#                     print "end of the line", trunk.bot, image[trunk.top[0], trunk.top[1]], image[trunk.top[0]-1, trunk.top[1]]
+#                     print image[trunk.bot[0]-2:trunk.bot[0]+3, trunk.bot[1]-2:trunk.bot[1]+3]
                     isOnBoundary = True
                  
                 
@@ -1311,14 +1329,19 @@ class PhyloParser():
             else:
                 trunk.bot = currentPoint
                 break
+            
+#             PhyloParser.displayImage(image[currentPoint[0]-1:currentPoint[0]+2, currentPoint[1]-1:currentPoint[1]+2])
 
-#         print "trunk buds", trunk.buds
+#         print "################start porint", trunk.startPoint
+#         print "################trunk.buds", trunk.buds
 #         print trunk.top
 #         print "map", history_map[trunk.top[0]-1:trunk.bot[0]+2, trunk.top[1]-1:trunk.top[1]+2]
 #         print "image", image[trunk.top[0]-2:trunk.bot[0]+2, trunk.top[1]-2:trunk.top[1]+4] 
 #         PhyloParser.displayTrunk(image, trunk)
 
         trunk.trunkLine = (trunk.top[1], trunk.top[0], trunk.bot[1], trunk.bot[0], abs(trunk.bot[0] - trunk.bot[1]))
+        
+
         trunk.leaves, trunk.interLines, trunk.nextStartPoint = self.traceBuds_v2_1(image_data, history_map, trunk.buds)
         
 #         print "trunk.leaves"
