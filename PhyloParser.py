@@ -10378,7 +10378,7 @@ class PhyloParser():
     def isLineCrossed(line, mask):
         lineMask = np.zeros(mask.shape, dtype=np.uint8)
         x1, y1, x2, y2, length = line
-        quarterPt = float( x1 + x2) / 2
+        quarterPt = (x1 + x2) / 2
         lineMask[y1:y2+1,quarterPt:x2] = 255
         overlapRange = np.where((mask == 255) & (lineMask == 255))
         if len(overlapRange[0])!=0:
